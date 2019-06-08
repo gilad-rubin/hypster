@@ -1,3 +1,8 @@
+import pandas as pd
+import numpy as np
+import scipy
+import sklearn
+
 class Objective(object):
     def __init__(self
                  , X
