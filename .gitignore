@@ -1,3 +1,7 @@
 .*
 __*
 news/
+*.pkl
+*.csv
+*.npz
+*.pyc
