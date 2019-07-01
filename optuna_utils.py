@@ -9,6 +9,8 @@ from copy import deepcopy
 from sklearn.utils import safe_indexing
 from sklearn.pipeline import Pipeline
 
+from joblib import parallel_backend, delayed, Parallel
+
 class Objective(object):
     def __init__(self, X, y, estimator, pipeline=None, pipe_params=None,
                  cv='warn', scoring=None,  # sklearn, support multiple?
@@ -34,6 +36,7 @@ class Objective(object):
             pipeline.set_params(**pipe_params)
 
         weights = sklearn.utils.class_weight.compute_class_weight("balanced", np.unique(self.y), self.y)
+        n_classes = len(np.unique(self.y))
         estimator_list = []
 
         # create k folds and estimators
@@ -44,7 +47,7 @@ class Objective(object):
                 X_train = pipeline.fit_transform(X_train, y_train)
                 X_test = pipeline.transform(X_test)
 
-            self.estimator.choose_and_set_params(trial, weights)
+            self.estimator.choose_and_set_params(trial, weights, n_classes)
             estimator = deepcopy(self.estimator) #TODO: check if "copy" or "clone" is better
             estimator.set_train(X_train, y_train)
             estimator.set_test(X_test, y_test)
@@ -137,6 +140,10 @@ class Study():
         studies = []
         for i in range(len(self.estimators)):
             estimator = self.estimators[i]
+
+            #add "setters" to estimators?
+            estimator.n_jobs = n_jobs
+            estimator.seed = self.random_state
 
             print(estimator.get_properties()["name"]) #TODO: convert to static method?
 

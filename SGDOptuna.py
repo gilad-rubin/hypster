@@ -1,3 +1,8 @@
+import numpy as np
+import sklearn
+from copy import deepcopy
+from sklearn.linear_model import SGDClassifier
+
 class SGDClassifierOptuna(object):
     def __init__(self, lr_decay=0.5, seed=42):
         self.random_state = seed
@@ -73,11 +78,10 @@ class SGDClassifierOptuna(object):
         final_model = SGDClassifierLR(self.model_params, self.n_estimators, self.learning_rates)
         return final_model
 
-class SGDClassifierLR(ClassifierMixin):
-    def __init__(self, model_params=None, n_estimators=None, learning_rates=None):
-        self.model_params = model_params
-        self.n_estimators = n_estimators
+class SGDClassifierLR(SGDClassifier):
+    def __init__(self, learning_rates=None, **kwargs):
         self.learning_rates = learning_rates
+        super(SGDClassifierLR, self).__init__(**kwargs)
 
     def fit(self, X, y, sample_weight=None):
         classes = np.unique(y)
@@ -89,7 +93,7 @@ class SGDClassifierLR(ClassifierMixin):
                                                    , n_jobs=-1
                                                    , tol=1e-5
                                                    )
-        for i in range(self.n_estimators):
+        for i in range(len(self.learning_rates)):
             model.set_params(eta0=self.learning_rates[i])
             model.partial_fit(X, y, classes)
 

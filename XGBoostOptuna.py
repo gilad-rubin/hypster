@@ -4,12 +4,13 @@ import numpy as np
 
 class XGBClassifierOptuna(object):
     def __init__(self, lr_decay=0.5, booster_list=['gblinear', 'gbtree', 'dart'],
-                 seed=None, user_param_dict={}):
+                 seed=1, n_jobs=1, user_param_dict={}):
 
         #TODO: add "verbose" and other parameters (user_param_dict)
         #TODO: add support for argument "missing"
 
         self.random_state = seed
+        self.n_jobs = n_jobs
         self.lr_decay = lr_decay
         self.booster_list = booster_list
         self.user_param_dict = user_param_dict
@@ -31,26 +32,42 @@ class XGBClassifierOptuna(object):
 
     def set_train(self, X_train, y_train):
         #TODO: use XGBLabelEncoder
-        self.dtrain = xgb.DMatrix(X_train, label=np.array(y_train), )
+        self.dtrain = xgb.DMatrix(X_train, label=np.array(y_train))
 
     def set_test(self, X_test, y_test):
         self.dtest = xgb.DMatrix(X_test, label=np.array(y_test))
 
-    def choose_and_set_params(self, trial, weights):
+    def choose_and_set_params(self, trial, weights, n_classes):
         pos_weight = weights[1]
+
+        #included on autosklearn
+        # learning_rate, n_estimators, subsample, booster, max_depth,
+        # colsample_bylevel, colsample_bytree, reg_alpha, reg_lambda,
+
+        #not included:
+        # gamma, min_child_weight, max_delta_step,
+        # base_score, scale_pos_weight, n_jobs = 1, init = None,
+        # random_state = None, verbose = 0,
+
+        # TODO: check if it's regression or classification
+        if n_classes==2:
+            objective = 'binary:logistic'
+        else: #multiclass
+            objective = 'multi:softprob'
+
         model_params = {'seed': self.random_state
             , 'verbosity': 0
-            , 'nthread': -1
+            , 'nthread': self.n_jobs
             , 'scale_pos_weight': pos_weight
-            , 'objective': 'binary:logistic'
-            , 'eta': trial.suggest_loguniform('init_eta', 1e-3, 1.0)
+            , 'objective': objective
+            , 'eta': trial.suggest_loguniform('init_eta', 1e-4, 1.0)
             , 'booster': trial.suggest_categorical('booster', self.booster_list)
             , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
             , 'alpha': trial.suggest_loguniform('alpha', 1e-10, 1.0)
-                        }
+            }
 
         if model_params['booster'] in ['gbtree', 'dart']:
-            tree_dict = {'max_depth': trial.suggest_int('max_depth', 2, 20)
+            tree_dict = {'max_depth': trial.suggest_int('max_depth', 2, 20) #TODO: maybe change to higher range?
                 , 'min_child_weight': trial.suggest_int('min_child_weight', 1, 20)
                 , 'gamma': trial.suggest_loguniform('gamma', 1e-10, 1.0)
                 , 'grow_policy': trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
