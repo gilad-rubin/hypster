@@ -1,1 +1,1 @@
-# optuna-on-steroids
+# HyPSTER - HyperParameter optimization on STERoids
