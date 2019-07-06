@@ -19,6 +19,7 @@ class XGBClassifierOptuna(object):
 
     def get_properties(self):
         return {'shortname': 'XGBoost Classifier',
+                'alias' : ['xgb', 'xgboost'],
                 'name': 'XGBoost Classifier',
                 'handles_regression': False,
                 'handles_classification': True,

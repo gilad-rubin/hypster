@@ -103,7 +103,7 @@ class Objective(object):
         return param_dict
 
 
-class Study():
+class Studies():
     def __init__(self, X, y, estimators,  # names and/or instances,
                  pipeline=None, pipe_params=None,
                  cv='warn', scoring=None,  # sklearn, support multiple?
