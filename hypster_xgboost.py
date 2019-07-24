@@ -4,12 +4,12 @@ import numpy as np
 
 class XGBClassifierOptuna(object):
     def __init__(self, lr_decay=0.5, booster_list=['gblinear', 'gbtree', 'dart'],
-                 seed=1, n_jobs=1, user_param_dict={}):
+                 random_state=1, n_jobs=1, user_param_dict={}):
 
         #TODO: add "verbose" and other parameters (user_param_dict)
         #TODO: add support for argument "missing"
 
-        self.random_state = seed
+        self.random_state = random_state
         self.n_jobs = n_jobs
         self.lr_decay = lr_decay
         self.booster_list = booster_list
@@ -17,12 +17,18 @@ class XGBClassifierOptuna(object):
         self.n_estimators = 0
         self.learning_rates = []
 
+    def get_seed(self):
+        return self.random_state
+
+    def set_seed(self, seed):
+        self.random_state = seed
+
     def get_properties(self):
-        return {'shortname': 'XGBoost Classifier',
-                'alias' : ['xgb', 'xgboost'],
+        return {'alias' : ['xgb', 'xgboost'],
                 'name': 'XGBoost Classifier',
                 'handles_regression': False,
                 'handles_classification': True,
+                'handles_categorical' : False,
                 'handles_multiclass': True,
                 'handles_multilabel': False,
                 'is_deterministic': False,
@@ -31,16 +37,13 @@ class XGBClassifierOptuna(object):
                 #'output': [PREDICTIONS]
                 }
 
-    def set_train(self, X_train, y_train):
+    def set_train_test(self, X_train, y_train, X_test, y_test, cat_columns=None):
         #TODO: use XGBLabelEncoder
         self.dtrain = xgb.DMatrix(X_train, label=np.array(y_train))
-
-    def set_test(self, X_test, y_test):
         self.dtest = xgb.DMatrix(X_test, label=np.array(y_test))
 
     def choose_and_set_params(self, trial, weights, n_classes):
         pos_weight = weights[1]
-
         #included on autosklearn
         # learning_rate, n_estimators, subsample, booster, max_depth,
         # colsample_bylevel, colsample_bytree, reg_alpha, reg_lambda,
