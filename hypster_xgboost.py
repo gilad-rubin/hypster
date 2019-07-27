@@ -4,7 +4,7 @@ import numpy as np
 
 class XGBClassifierOptuna(object):
     def __init__(self, lr_decay=0.5, booster_list=['gblinear', 'gbtree', 'dart'],
-                 random_state=1, n_jobs=1, user_param_dict={}):
+                 random_state=1, n_jobs=1, param_dict=None):
 
         #TODO: add "verbose" and other parameters (user_param_dict)
         #TODO: add support for argument "missing"
@@ -13,7 +13,7 @@ class XGBClassifierOptuna(object):
         self.n_jobs = n_jobs
         self.lr_decay = lr_decay
         self.booster_list = booster_list
-        self.user_param_dict = user_param_dict
+        self.param_dict = param_dict
         self.n_estimators = 0
         self.learning_rates = []
 
@@ -38,12 +38,10 @@ class XGBClassifierOptuna(object):
                 }
 
     def set_train_test(self, X_train, y_train, X_test, y_test, cat_columns=None):
-        #TODO: use XGBLabelEncoder
         self.dtrain = xgb.DMatrix(X_train, label=np.array(y_train))
         self.dtest = xgb.DMatrix(X_test, label=np.array(y_test))
 
     def choose_and_set_params(self, trial, weights, n_classes):
-        pos_weight = weights[1]
         #included on autosklearn
         # learning_rate, n_estimators, subsample, booster, max_depth,
         # colsample_bylevel, colsample_bytree, reg_alpha, reg_lambda,
@@ -56,11 +54,13 @@ class XGBClassifierOptuna(object):
         # TODO: check if it's regression or classification
         if n_classes==2:
             objective = 'binary:logistic'
+            pos_weight = weights[1]
         else: #multiclass
             objective = 'multi:softprob'
+            pos_weight = weights #TODO check if it works
 
         model_params = {'seed': self.random_state
-            , 'verbosity': 0
+            , 'verbosity': 1
             , 'nthread': self.n_jobs
             , 'scale_pos_weight': pos_weight
             , 'objective': objective
@@ -78,8 +78,13 @@ class XGBClassifierOptuna(object):
                 , 'subsample': trial.suggest_uniform('subsample', 0.5, 1.0)
                 , 'colsample_bytree': trial.suggest_uniform('colsample_bytree', 0.1, 1.0)
                 , 'colsample_bynode': trial.suggest_uniform('colsample_bynode', 0.1, 1.0)
-                , 'num_parallel_tree': trial.suggest_int('num_parallel_tree', 1, 20)
                 }
+
+            forest_boosting = trial.suggest_categorical('forest_boosting', [True, False])
+            if forest_boosting:
+                model_params['num_parallel_tree'] = trial.suggest_int('num_parallel_tree', 2, 20)
+            else:
+                model_params['num_parallel_tree'] = 1
 
             model_params.update(tree_dict)
 
@@ -95,11 +100,6 @@ class XGBClassifierOptuna(object):
                 }
 
             model_params.update(dart_dict)
-
-        #TODO: add the option to run over default HP
-        # if self.user_param_dict is not None:
-        #     for (key, value) in self.user_param_dict:
-        #         self.model_params[key] = self.user_param_dict[key]
 
         self.model_params = model_params
 
