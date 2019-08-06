@@ -52,20 +52,6 @@ class XGBModelHypster(HypsterEstimator):
         self.n_estimators = 0
         self.learning_rates = []
 
-    def get_properties(self):
-        return {'alias' : ['xgb', 'xgboost'],
-                'name': 'XGBoost Classifier',
-                'handles_regression': False,
-                'handles_classification': True,
-                'handles_categorical' : False,
-                'handles_multiclass': True,
-                'handles_multilabel': False,
-                'is_deterministic': False,
-                # Both input and output must be tuple(iterable)
-                #'input': [DENSE, SIGNED_DATA, UNSIGNED_DATA],
-                #'output': [PREDICTIONS]
-                }
-
     def set_train_test(self, X_train, y_train, X_test, y_test, cat_columns=None): #TODO: move cat_columns to choose_set_params?
         self.dtrain = xgb.DMatrix(X_train, label=y_train)
         self.dtest = xgb.DMatrix(X_test, label=y_test)
@@ -85,18 +71,6 @@ class XGBModelHypster(HypsterEstimator):
                                , learning_rates=[self.model_params['eta']]
                                )
 
-    def score_test(self, scorer, scorer_type):
-        if self.model_params["booster"] == "dart":
-            preds = self.model.predict(self.dtest, output_margin=False, ntree_limit=self.n_estimators + 1)
-        else:
-            preds = self.model.predict(self.dtest, output_margin=False)
-
-        if (scorer_type == "predict"): #TODO find best threshold w.r.t scoring
-            preds = preds > 0.5
-            preds = preds.astype(int)
-
-        return scorer(self.dtest.get_label(), preds)
-
     def lower_complexity(self):
         self.model_params['eta'] = self.model_params['eta'] * self.lr_decay
         return True
@@ -108,14 +82,18 @@ class XGBModelHypster(HypsterEstimator):
 
 class XGBClassifierHypster(XGBModelHypster):
     def get_properties(self):
-        return {'alias' : ['xgb', 'xgboost', 'xgbclassifier'],
+        return {'alias' : ['xgb', 'xgboost'],
                 'name': 'XGBoost Classifier',
                 'handles_regression': False,
                 'handles_classification': True,
                 'handles_categorical' : False,
                 'handles_multiclass': True,
                 'handles_multilabel': False,
-                'is_deterministic': False
+                'is_deterministic': False,
+                'can_lower_complexity': True,
+                # Both input and output must be tuple(iterable)
+                #'input': [DENSE, SIGNED_DATA, UNSIGNED_DATA],
+                #'output': [PREDICTIONS]
                 }
 
     def choose_and_set_params(self, trial, class_counts):
@@ -128,7 +106,8 @@ class XGBClassifierHypster(XGBModelHypster):
         # base_score, scale_pos_weight, n_jobs = 1, init = None,
         # random_state = None, verbose = 0,
         n_classes = len(class_counts)
-
+        
+        base_score = 0.5 #TODO fix?
         if n_classes==2:
             objective = 'binary:logistic'
             pos_weight = class_counts[0] / class_counts[1]
@@ -143,6 +122,7 @@ class XGBClassifierHypster(XGBModelHypster):
             , 'nthread': self.n_jobs
             , 'scale_pos_weight': trial.suggest_categorical('scale_pos_weight', [1.0, pos_weight])
             , 'objective': objective
+            , 'base_score' : base_score
             , 'eta': trial.suggest_loguniform('init_eta', 1e-4, 1.0)
             , 'booster': trial.suggest_categorical('booster', self.booster_list)
             , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
@@ -181,6 +161,18 @@ class XGBClassifierHypster(XGBModelHypster):
             model_params.update(dart_dict)
 
         self.model_params = model_params
+    
+    def score_test(self, scorer, scorer_type):
+        if self.model_params["booster"] == "dart":
+            preds = self.model.predict(self.dtest, output_margin=False, ntree_limit=self.n_estimators + 1)
+        else:
+            preds = self.model.predict(self.dtest, output_margin=False)
+
+        if (scorer_type == "predict"): #TODO find best threshold w.r.t scoring
+            preds = preds > 0.5
+            preds = preds.astype(int)
+
+        return scorer(self.dtest.get_label(), preds)
 
     def create_model(self):
         self.model_params['n_estimators'] = self.n_estimators
@@ -204,16 +196,18 @@ class XGBRegressorHypster(XGBModelHypster):
                 'handles_categorical' : False,
                 'handles_multiclass': False,
                 'handles_multilabel': False,
-                'is_deterministic': False
+                'is_deterministic': False,
+                'can_lower_complexity' : True
                 }
 
     def choose_and_set_params(self, trial):
-        base_score = np.mean(self.dtrain.get_label())
+        #base_score = np.mean(self.dtrain.get_label()) #TODO get it before train/test
 
         model_params = {'seed': self.random_state
             , 'verbosity': 1
             , 'nthread': self.n_jobs
             , 'objective': 'reg:squarederror'
+            #, 'base_score' : base_score
             , 'eta': trial.suggest_loguniform('init_eta', 1e-4, 1.0)
             , 'booster': trial.suggest_categorical('booster', self.booster_list)
             , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
@@ -252,6 +246,14 @@ class XGBRegressorHypster(XGBModelHypster):
             model_params.update(dart_dict)
 
         self.model_params = model_params
+    
+    def score_test(self, scorer, scorer_type):
+        if self.model_params["booster"] == "dart":
+            preds = self.model.predict(self.dtest, output_margin=False, ntree_limit=self.n_estimators + 1)
+        else:
+            preds = self.model.predict(self.dtest, output_margin=False)
+
+        return scorer(self.dtest.get_label(), preds)
 
     def create_model(self):
         self.model_params['n_estimators'] = self.n_estimators
@@ -267,6 +269,7 @@ class XGBRegressorHypster(XGBModelHypster):
         return final_model
 
 class XGBClassifierLR(XGBClassifier):
+    #TODO add get_params with learning_rates
     def __init__(self, learning_rates = None,
                  max_depth=3, learning_rate=0.1, n_estimators=100,
                  verbosity=1, silent=True,
@@ -314,6 +317,7 @@ class XGBClassifierLR(XGBClassifier):
     #check_estimator(LinearSVC)
 
 class XGBRegressorLR(XGBRegressor):
+    #TODO add get_params with learning_rates
     def __init__(self, learning_rates = None,
                  max_depth=3, learning_rate=1, n_estimators=100,
                  verbosity=1, silent=None,
@@ -344,6 +348,7 @@ class XGBRegressorLR(XGBRegressor):
             early_stopping_rounds=None, verbose=True, xgb_model=None,
             sample_weight_eval_set=None, callbacks=None):
 
+        y = np.array(y) #TODO fix
         if self.learning_rates is not None:
             lr_callback = [xgb.callback.reset_learning_rate(self.learning_rates)]
         else:

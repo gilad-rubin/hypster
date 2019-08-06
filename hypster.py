@@ -64,6 +64,8 @@ class Objective(object):
         self.max_fails = max_fails
 
     def __call__(self, trial):
+        #construct pipeline
+
         pipeline = None
         if self.pipeline is not None:
             pipeline = clone(self.pipeline)
@@ -84,7 +86,14 @@ class Objective(object):
             else:
                 pipeline = Pipeline([('impute_ohe', impute_ohe_ct)])
 
+        can_lower_complexity = self.estimator.get_properties()["can_lower_complexity"]
+        
+        #sample estimator from options
         estimator_list = []
+        
+        #set params on main estimator
+
+        #overwrite params with user dictionary
 
         # create k folds and estimators
         #TODO use cv like in GridSearchCV
@@ -142,7 +151,7 @@ class Objective(object):
                     estimator.save_best()
             else:
                 fail_count += 1
-                if (fail_count >= self.max_fails) or (estimator_list[0].lower_complexity()==False):
+                if (can_lower_complexity == False) or (fail_count >= self.max_fails):
                     break
 
                 # TODO: make this step only after k times
@@ -177,7 +186,9 @@ class HyPSTEREstimator():
                  cv=3,
                  agg_func=np.mean,
                  refit=True,
-                 tol=1e-5, max_iter=1000, time_limit=None, max_fails=3,
+                 tol=1e-5, 
+                 max_iter=200, #TODO: add iterations if the learning curve prediction is high?
+                 time_limit=None, max_fails=3,
                  study_name="",  # TODO: think how to allow the user to define if they want to keep training or not?
                  save_cv_preds=False, #TODO: add support for stacking
                  pruner=optuna.pruners.SuccessiveHalvingPruner(min_resource=3, reduction_factor=3),
@@ -204,70 +215,15 @@ class HyPSTEREstimator():
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.random_state = random_state
+        self.best_estimator_ = None
 
         # TODO: set_seed function for samplers & cv_function(?) with random_state
 
     def fit(self, X=None, y=None, cat_columns=None, n_trials_per_estimator=10): #dataset_name
-        studies = []
-        for i in range(len(self.estimators)):
-            estimator = self.estimators[i]
-
-            if estimator.get_seed() == 1: #TODO make it nice and consider removing setters and getters
-                estimator.set_seed(self.random_state)
-
-            print(estimator.get_properties()["name"]) #TODO: convert to static method?
-            #TODO cat_columns = list of indices or names
-            objective = Objective(X, y, cat_columns, estimator, self.pipeline, self.pipe_params,
-                                  cv=self.cv, scorer=scorer, agg_func=self.agg_func,
-                                  tol=self.tol, max_iter=self.max_iter, max_fails=self.max_fails)
-
-            if self.greater_is_better:
-                direction = "maximize"
-            else:
-                direction = "minimize"
-
-            if self.verbose > 0:
-                optuna.logging.set_verbosity(optuna.logging.WARN)
-                # TODO: change
-
-            study = optuna.create_study(pruner=self.pruner, sampler=self.sampler, direction=direction)
-            studies.append(study)
-
-            if type(n_trials_per_estimator) == list:
-                n_trials = n_trials_per_estimator[i]
-            else:
-                n_trials = n_trials_per_estimator
-
-            studies[i].optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs)
-
-        #find best study
-        if self.greater_is_better:
-            func = np.argmax
-        else:
-            func = np.argmin
-        index = func([study.best_value for study in studies])
-        #index = get_best_study_index(studies, self.greater_is_better) #TODO convert to function
-
-        self.best_estimator_ = studies[index].best_trial.user_attrs['pipeline'] #TODO: what if refit=true?
-        self.best_score_ = studies[index].best_value
-        self.best_params_ = studies[index].best_params
-
-        if len(self.best_estimator_.steps) > 1: #pipeline has more than just a classifier
-            self.best_transformer_ = Pipeline(self.best_estimator_.steps[:-1]) #return all steps but last (classifier)
-        else:
-            self.best_transformer_ = IdentityTransformer() #TODO check if it's neccessary
-
-        self.studies = studies
-
-        if self.refit_:
-            self.best_estimator_.fit(X, y)
-
-        # append results
-        # output combined results
-        # return studies
-        # return cv_results_, best_index_
+        raise NotImplementedError
 
     def refit(self, X, y):
+        #TODO check if best_estimator exists
         self.refit_=True
         self.best_estimator_.fit(X, y)
 
@@ -285,11 +241,9 @@ class HyPSTEREstimator():
     def predict(self, X): #TODO
         self._check_is_fitted('predict')
         return self.best_estimator_.predict(X)
-
-    def predict_proba(self, X):
-        self._check_is_fitted('predict_proba')
-        return self.best_estimator_.predict_proba(X)
-
+    
+    #TODO: check if we should implement "score" and "predict_log_proba"
+    
     def visualize_results(self):
         return
         # TODO: plot... with matplotlib/plotly/hvplot
@@ -378,7 +332,95 @@ class HyPSTERClassifier(HyPSTEREstimator):
         # output combined results
         # return studies
         # return cv_results_, best_index_
-
+    
     def predict_proba(self, X):
-        self._check_is_fitted('predict_proba')
-        return self.best_estimator_.predict_proba(X)
+            #TODO: check if estimator has predict_proba. maybe remove from abstract class
+            self._check_is_fitted('predict_proba')
+            return self.best_estimator_.predict_proba(X)
+
+class HyPSTERRegressor(HyPSTEREstimator):
+    def fit(self, X=None, y=None, cat_columns=None, n_trials_per_estimator=10): #dataset_name
+        #TODO check that y is regression and not classification
+        #TODO: consider log-transform y?
+        
+        #TODO: get compatible transformers and estimators
+            #dataset_properties = get_dataset_properties(X, y, cat_columns, type="regression")
+            #transformers = get_compatible_estimators(dataset_properties)
+            #estimators = get_compatible_estimators(dataset_properties)
+        y = np.array(y) #TODO check if this makes sense
+        studies = []
+        for i in range(len(self.estimators)):
+            estimator = self.estimators[i]
+
+            if estimator.get_seed() == 1: #TODO make it nice and consider removing setters and getters
+                estimator.set_seed(self.random_state)
+
+            print(estimator.get_properties()["name"]) #TODO: convert to static method?
+            #TODO cat_columns = list of indices or names
+
+            scorer = sklearn.metrics.get_scorer(self.scoring)
+            #TODO check if we can make it a bit nicer
+            if "_Threshold" in str(type(scorer)):
+                scorer_type = "threshold"
+            elif "_Predict" in str(type(scorer)):
+                scorer_type = "predict"
+            else:
+                scorer_type = "proba"
+
+            # TODO check if we can make it a bit nicer
+            #TODO check if greater_is_better = False also works (with spaces " = ")
+            if "greater_is_better=False" in str(scorer):
+                greater_is_better=False
+            else:
+                greater_is_better = True
+
+            objective = Objective(X, y, cat_columns, objective_type="regression",
+                                  estimator=estimator, pipeline=self.pipeline, pipe_params=self.pipe_params,
+                                  cv=self.cv, scoring=scorer._score_func, scorer_type = scorer_type,
+                                  agg_func=self.agg_func, tol=self.tol, max_iter=self.max_iter, max_fails=self.max_fails)
+
+            if self.verbose > 0:
+                optuna.logging.set_verbosity(optuna.logging.WARN)
+                # TODO: change
+
+            if greater_is_better==True:
+                direction = "maximize"
+            else:
+                direction = "minimize"
+
+            study = optuna.create_study(pruner=self.pruner, sampler=self.sampler, direction=direction)
+            studies.append(study)
+
+            if type(n_trials_per_estimator) == list:
+                n_trials = n_trials_per_estimator[i]
+            else:
+                n_trials = n_trials_per_estimator
+
+            studies[i].optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs)
+
+        #find best study
+        if greater_is_better:
+            func = np.argmax
+        else:
+            func = np.argmin
+        index = func([study.best_value for study in studies])
+        #index = get_best_study_index(studies, greater_is_better) #TODO convert to function
+
+        self.best_estimator_ = studies[index].best_trial.user_attrs['pipeline'] #TODO: what if refit=true?
+        self.best_score_ = studies[index].best_value
+        self.best_params_ = studies[index].best_params
+
+        if len(self.best_estimator_.steps) > 1: #pipeline has more than just a classifier
+            self.best_transformer_ = Pipeline(self.best_estimator_.steps[:-1]) #return all steps but last (classifier)
+        else:
+            self.best_transformer_ = IdentityTransformer() #TODO check if it's neccessary
+
+        self.studies = studies
+
+        if self.refit_:
+            self.best_estimator_.fit(X, y)
+
+        # append results
+        # output combined results
+        # return studies
+        # return cv_results_, best_index_
