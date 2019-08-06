@@ -40,18 +40,22 @@ def get_best_study_index(self, studies, greater_is_better=True):
     return res
 
 class Objective(object):
-    def __init__(self, X, y, cat_columns, estimator, pipeline=None, pipe_params=None,
-                 cv='warn', scoring=None,  # sklearn, support multiple?
+    def __init__(self, X, y, cat_columns, objective_type=None, class_counts=None,
+                 estimator=None, pipeline=None, pipe_params=None,
+                 cv='warn', scoring=None, scorer_type=None,
                  refit=False, tol=1e-5, agg_func=np.mean, max_iter=5000, max_fails=3):
 
         self.X = X
         self.y = y
         self.cat_columns = cat_columns
+        self.objective_type = objective_type
+        self.class_counts = class_counts
         self.pipeline = pipeline
         self.pipe_params = pipe_params
         self.estimator = estimator
         self.cv = cv
         self.scoring = scoring
+        self.scorer_type = scorer_type
         self.refit_ = refit
         #self.agg_func = agg_func #TODO fix func regarded as "tuple"
         self.agg_func = np.mean
@@ -80,17 +84,13 @@ class Objective(object):
             else:
                 pipeline = Pipeline([('impute_ohe', impute_ohe_ct)])
 
-        y = LabelEncoder().fit_transform(self.y)
-
-        weights = sklearn.utils.class_weight.compute_class_weight("balanced", np.unique(y), y)
-        n_classes = len(np.unique(y))
         estimator_list = []
 
         # create k folds and estimators
         #TODO use cv like in GridSearchCV
-        for train, test in self.cv.split(self.X, y):  # groups=self.groups
-            X_train, y_train = safe_indexing(self.X, train), safe_indexing(y, train)
-            X_test, y_test = safe_indexing(self.X, test), safe_indexing(y, test)
+        for train, test in self.cv.split(self.X, self.y):  # groups=self.groups
+            X_train, y_train = safe_indexing(self.X, train), safe_indexing(self.y, train)
+            X_test, y_test = safe_indexing(self.X, test), safe_indexing(self.y, test)
 
             if pipeline is not None:
                 X_train = pipeline.fit_transform(X_train, y_train)
@@ -101,7 +101,10 @@ class Objective(object):
             if estimator.param_dict is not None:
                 user_params = _get_params(trial, estimator.param_dict)
 
-            estimator.choose_and_set_params(trial, weights, n_classes)
+            if self.objective_type=="classification":
+                estimator.choose_and_set_params(trial, self.class_counts)
+            else:
+                estimator.choose_and_set_params(trial)
 
             # avoid hp's that don't work with conditions
             # TODO fix it in cases where the user wants to add a hp
@@ -121,7 +124,7 @@ class Objective(object):
             scores = []
             for estimator in estimator_list:
                 estimator.train_one_iteration()
-                fold_score = estimator.score_test(self.scoring)
+                fold_score = estimator.score_test(self.scoring, self.scorer_type)
                 scores.append(fold_score)
 
             intermediate_value = self.agg_func(scores)
@@ -148,9 +151,9 @@ class Objective(object):
 
         model = estimator.create_model()
         if pipeline is not None:
-            pipeline.steps.append(['classifier', model])
+            pipeline.steps.append(["model", model])
         else:
-            pipeline = Pipeline([("classifier", model)])
+            pipeline = Pipeline([("model", model)])
 
         print('Score: ' + str(round(best_score, 5)))
 
@@ -167,17 +170,16 @@ def _get_params(trial, params):
             param_dict[key] = params[key]
     return param_dict
 
-class HyPSTERClassifier():
+class HyPSTEREstimator():
     def __init__(self, estimators,  # names and/or instances,
                  pipeline=None, pipe_params=None,
                  scoring=None,  # sklearn, support multiple? #TODO: add support for strings like sklearn
-                 greater_is_better=None,  # TODO: check how to extract from scorer/metric
                  cv=3,
                  agg_func=np.mean,
                  refit=True,
                  tol=1e-5, max_iter=1000, time_limit=None, max_fails=3,
                  study_name="",  # TODO: think how to allow the user to define if they want to keep training or not?
-                 save_cv_probs=False, #TODO: add support for stacking
+                 save_cv_preds=False, #TODO: add support for stacking
                  pruner=optuna.pruners.SuccessiveHalvingPruner(min_resource=3, reduction_factor=3),
                  sampler=optuna.samplers.TPESampler(),
                  n_jobs=1,
@@ -188,7 +190,6 @@ class HyPSTERClassifier():
         self.pipeline = pipeline
         self.pipe_params = pipe_params
         self.scoring = scoring
-        self.greater_is_better = greater_is_better
         self.cv = cv
         self.agg_func = agg_func,
         self.refit_ = refit
@@ -197,7 +198,7 @@ class HyPSTERClassifier():
         self.time_limit = time_limit
         self.max_fails = max_fails
         self.study_name = study_name #TODO:needed? maybe replace with "resume last study"?
-        self.save_cv_probs = save_cv_probs
+        self.save_cv_probs = save_cv_preds
         self.pruner = pruner
         self.sampler = sampler
         self.n_jobs = n_jobs
@@ -217,7 +218,7 @@ class HyPSTERClassifier():
             print(estimator.get_properties()["name"]) #TODO: convert to static method?
             #TODO cat_columns = list of indices or names
             objective = Objective(X, y, cat_columns, estimator, self.pipeline, self.pipe_params,
-                                  cv=self.cv, scoring=self.scoring, agg_func=self.agg_func,
+                                  cv=self.cv, scorer=scorer, agg_func=self.agg_func,
                                   tol=self.tol, max_iter=self.max_iter, max_fails=self.max_fails)
 
             if self.greater_is_better:
@@ -293,3 +294,91 @@ class HyPSTERClassifier():
         return
         # TODO: plot... with matplotlib/plotly/hvplot
         # TODO: show if it will help to increase max_iter
+
+class HyPSTERClassifier(HyPSTEREstimator):
+    def fit(self, X=None, y=None, cat_columns=None, n_trials_per_estimator=10): #dataset_name
+        #TODO check that y is classification and not regression
+        le = LabelEncoder()
+        y = le.fit_transform(y)
+        class_counts = np.bincount(y)
+
+        studies = []
+        for i in range(len(self.estimators)):
+            estimator = self.estimators[i]
+
+            if estimator.get_seed() == 1: #TODO make it nice and consider removing setters and getters
+                estimator.set_seed(self.random_state)
+
+            print(estimator.get_properties()["name"]) #TODO: convert to static method?
+            #TODO cat_columns = list of indices or names
+
+            scorer = sklearn.metrics.get_scorer(self.scoring)
+            #TODO check if we can make it a bit nicer
+            if "_Threshold" in str(type(scorer)):
+                scorer_type = "threshold"
+            elif "_Predict" in str(type(scorer)):
+                scorer_type = "predict"
+            else:
+                scorer_type = "proba"
+
+            # TODO check if we can make it a bit nicer
+            if "greater_is_better=False" in str(scorer):
+                greater_is_better=False
+            else:
+                greater_is_better = True
+
+            objective = Objective(X, y, cat_columns, objective_type="classification",
+                                  class_counts=class_counts, estimator=estimator,
+                                  pipeline=self.pipeline, pipe_params=self.pipe_params,
+                                  cv=self.cv, scoring=scorer._score_func, scorer_type = scorer_type,
+                                  agg_func=self.agg_func, tol=self.tol, max_iter=self.max_iter, max_fails=self.max_fails)
+
+            if self.verbose > 0:
+                optuna.logging.set_verbosity(optuna.logging.WARN)
+                # TODO: change
+
+            if greater_is_better==True:
+                direction = "maximize"
+            else:
+                direction = "minimize"
+
+            study = optuna.create_study(pruner=self.pruner, sampler=self.sampler, direction=direction)
+            studies.append(study)
+
+            if type(n_trials_per_estimator) == list:
+                n_trials = n_trials_per_estimator[i]
+            else:
+                n_trials = n_trials_per_estimator
+
+            studies[i].optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs)
+
+        #find best study
+        if greater_is_better:
+            func = np.argmax
+        else:
+            func = np.argmin
+        index = func([study.best_value for study in studies])
+        #index = get_best_study_index(studies, greater_is_better) #TODO convert to function
+
+        self.best_estimator_ = studies[index].best_trial.user_attrs['pipeline'] #TODO: what if refit=true?
+        self.best_score_ = studies[index].best_value
+        self.best_params_ = studies[index].best_params
+
+        if len(self.best_estimator_.steps) > 1: #pipeline has more than just a classifier
+            self.best_transformer_ = Pipeline(self.best_estimator_.steps[:-1]) #return all steps but last (classifier)
+        else:
+            self.best_transformer_ = IdentityTransformer() #TODO check if it's neccessary
+
+        self.studies = studies
+
+        if self.refit_:
+            self.best_estimator_.fit(X, y)
+
+        # append results
+        # output combined results
+        # return studies
+        # return cv_results_, best_index_
+
+    def predict_proba(self, X):
+        self._check_is_fitted('predict_proba')
+        return self.best_estimator_.predict_proba(X)
