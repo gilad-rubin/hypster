@@ -82,6 +82,7 @@ class XGBModelHypster(HypsterEstimator):
 
 class XGBClassifierHypster(XGBModelHypster):
     def get_properties(self):
+        #TODO: follow sklearn's new API
         return {'alias' : ['xgb', 'xgboost'],
                 'name': 'XGBoost Classifier',
                 'handles_regression': False,
@@ -161,7 +162,8 @@ class XGBClassifierHypster(XGBModelHypster):
             model_params.update(dart_dict)
 
         self.model_params = model_params
-    
+
+    ##TODO: change to predict, predict proba
     def score_test(self, scorer, scorer_type):
         if self.model_params["booster"] == "dart":
             preds = self.model.predict(self.dtest, output_margin=False, ntree_limit=self.n_estimators + 1)

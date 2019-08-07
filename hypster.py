@@ -40,19 +40,19 @@ def get_best_study_index(self, studies, greater_is_better=True):
     return res
 
 class Objective(object):
-    def __init__(self, X, y, cat_columns, objective_type=None, class_counts=None,
-                 estimator=None, pipeline=None, pipe_params=None,
+    def __init__(self, X, y, cat_columns, estimator, objective_type="classification",
+                 class_counts=None, pipeline=None, pipe_params=None,
                  cv='warn', scoring=None, scorer_type=None,
                  refit=False, tol=1e-5, agg_func=np.mean, max_iter=5000, max_fails=3):
 
         self.X = X
         self.y = y
         self.cat_columns = cat_columns
+        self.estimator = estimator
         self.objective_type = objective_type
         self.class_counts = class_counts
         self.pipeline = pipeline
         self.pipe_params = pipe_params
-        self.estimator = estimator
         self.cv = cv
         self.scoring = scoring
         self.scorer_type = scorer_type
@@ -64,7 +64,8 @@ class Objective(object):
         self.max_fails = max_fails
 
     def __call__(self, trial):
-        #construct pipeline
+
+        ##construct pipeline
 
         pipeline = None
         if self.pipeline is not None:
@@ -73,7 +74,8 @@ class Objective(object):
                 pipe_params = _get_params(trial, self.pipe_params)
                 pipeline.set_params(**pipe_params)
 
-        # convert categorical columns with OneHotEncoding
+        ## convert categorical columns
+
         #TODO return sparse or dense? consider that in sparse sometimes na is 0
         #TODO what if model handles imputation?
         if (self.cat_columns is not None) and (self.estimator.get_properties()['handles_categorical'] == False):
@@ -86,16 +88,31 @@ class Objective(object):
             else:
                 pipeline = Pipeline([('impute_ohe', impute_ohe_ct)])
 
-        can_lower_complexity = self.estimator.get_properties()["can_lower_complexity"]
+        can_lower_complexity = self.estimator.get_properties()["can_lower_complexity"] ##TODO think of a better name than "can_lower..."
         
-        #sample estimator from options
+        ## sample estimator from list
         estimator_list = []
         
-        #set params on main estimator
+        ## set params on main estimator
+        if self.estimator.param_dict is not None:
+            user_params = _get_params(trial, self.estimator.param_dict)
 
-        #overwrite params with user dictionary
+        if self.objective_type == "classification":
+            self.estimator.choose_and_set_params(trial, self.class_counts)
+        else:
+            self.estimator.choose_and_set_params(trial)
 
-        # create k folds and estimators
+        ## overwrite params with user dictionary
+        # to avoid hp's that don't work with conditions
+        # TODO fix it in cases where the user wants to add a hp
+        # TODO get this out of the loop
+        if self.estimator.param_dict is not None:
+            for (key, value) in user_params.items():  # override default params
+                if key in self.estimator.model_params.keys():
+                    self.estimator.model_params[key] = value
+
+        ## create k folds and estimators
+        #TODO save indices for splits
         #TODO use cv like in GridSearchCV
         for train, test in self.cv.split(self.X, self.y):  # groups=self.groups
             X_train, y_train = safe_indexing(self.X, train), safe_indexing(self.y, train)
@@ -105,35 +122,20 @@ class Objective(object):
                 X_train = pipeline.fit_transform(X_train, y_train)
                 X_test = pipeline.transform(X_test)
 
-            estimator = deepcopy(self.estimator) #TODO: check if "copy" or "clone" is better
-
-            if estimator.param_dict is not None:
-                user_params = _get_params(trial, estimator.param_dict)
-
-            if self.objective_type=="classification":
-                estimator.choose_and_set_params(trial, self.class_counts)
-            else:
-                estimator.choose_and_set_params(trial)
-
-            # avoid hp's that don't work with conditions
-            # TODO fix it in cases where the user wants to add a hp
-            # TODO get this out of the loop
-            if estimator.param_dict is not None:
-                for (key, value) in user_params.items():  # override default params
-                    if key in estimator.model_params.keys():
-                        estimator.model_params[key] = value
-
+            estimator = deepcopy(self.estimator)
             estimator.set_train_test(X_train, y_train, X_test, y_test, self.cat_columns)
-
             estimator_list.append(estimator)
 
         best_score = 0.0
         for step in range(self.max_iter):
             # print("Iteration #", step)
             scores = []
+
             for estimator in estimator_list:
                 estimator.train_one_iteration()
-                fold_score = estimator.score_test(self.scoring, self.scorer_type)
+                ## get raw predictions by type
+                ## if save_raw_predictions - save it :)
+                fold_score = estimator.score_test(self.scoring, self.scorer_type) ## calculate fold score
                 scores.append(fold_score)
 
             intermediate_value = self.agg_func(scores)
@@ -162,7 +164,7 @@ class Objective(object):
         if pipeline is not None:
             pipeline.steps.append(["model", model])
         else:
-            pipeline = Pipeline([("model", model)])
+            pipeline = Pipeline([("model", model)]) #TODO should we just return the model?
 
         print('Score: ' + str(round(best_score, 5)))
 
