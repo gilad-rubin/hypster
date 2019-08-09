@@ -1,12 +1,16 @@
 import xgboost as xgb
 from xgboost import XGBClassifier, XGBRegressor
 import numpy as np
+from sklearn.base import clone
 
 class HypsterEstimator:
-    def __init__(self, random_state=1, n_jobs=1, param_dict={}):
+    def __init__(self, random_state, n_jobs, n_iter_per_round, param_dict={}):
         self.random_state = random_state
         self.n_jobs = n_jobs
         self.param_dict = param_dict
+        self.n_iter_per_round = n_iter_per_round
+        self.best_model = None
+        self.current_model = None
 
     def get_seed(self):
         return self.random_state
@@ -17,13 +21,16 @@ class HypsterEstimator:
     def get_properties(self):
         raise NotImplementedError()
 
-    def set_train_test(self, X_train, y_train, X_test, y_test, cat_columns=None):
-        raise NotImplementedError()
+    def get_current_model(self):
+        return self.current_model
+
+    def get_n_iter_per_round(self):
+        return self.n_iter_per_round
 
     def choose_and_set_params(self, trial, weights, n_classes):
         raise NotImplementedError()
 
-    def train_one_iteration(self):
+    def fit(self):
         raise NotImplementedError()
 
     def predict(self):
@@ -32,53 +39,32 @@ class HypsterEstimator:
     def lower_complexity(self):
         raise NotImplementedError()
 
-    def save_best_model(self):
-        raise NotImplementedError()
+    # def save_best_model(self):
+    #     raise NotImplementedError()
 
     def create_model(self):
         raise NotImplementedError()
 
 class XGBModelHypster(HypsterEstimator):
     def __init__(self, lr_decay=0.5, booster_list=['gblinear', 'gbtree', 'dart'],
-                 random_state=1, n_jobs=1, param_dict=None):
+                 n_iter_per_round=1, random_state=1, n_jobs=1, param_dict=None):
 
-        #TODO: add "verbose" and other parameters (user_param_dict)
-
-        self.random_state = random_state
-        self.n_jobs = n_jobs
         self.lr_decay = lr_decay
         self.booster_list = booster_list
-        self.param_dict = param_dict
-        self.n_estimators = 0
+        self.best_n_iterations = 0
         self.learning_rates = []
 
-    def set_train_test(self, X_train, y_train, X_test, y_test, cat_columns=None): #TODO: move cat_columns to choose_set_params?
-        self.dtrain = xgb.DMatrix(X_train, label=y_train)
-        self.dtest = xgb.DMatrix(X_test, label=y_test)
-
-    def train_one_iteration(self):
-        if self.n_estimators == 0:
-            init_model = None
-            self.init_eta = self.model_params["eta"]
-        else:
-            init_model = self.best_model
-            init_model.set_param({"eta": self.model_params['eta']})
-
-        self.model = xgb.train(self.model_params
-                               , self.dtrain
-                               , xgb_model=init_model
-                               , num_boost_round=1
-                               , learning_rates=[self.model_params['eta']]
-                               )
+        super(XGBModelHypster, self).__init__(random_state, n_jobs, n_iter_per_round, param_dict)
 
     def lower_complexity(self):
         self.model_params['eta'] = self.model_params['eta'] * self.lr_decay
         return True
 
     def save_best(self):
-        self.best_model = self.model.copy() #TODO check if needed to use copy or clone?
-        self.learning_rates.append(self.model_params['eta'])
-        self.n_estimators += 1
+        self.learning_rates += [self.model_params['eta']] * self.n_iter_per_round
+        self.best_n_iterations = len(self.learning_rates)
+        self.best_model = self.current_model.copy()
+
 
 class XGBClassifierHypster(XGBModelHypster):
     def get_properties(self):
@@ -92,7 +78,7 @@ class XGBClassifierHypster(XGBModelHypster):
                 'handles_multilabel': False,
                 'is_deterministic': False,
                 'can_lower_complexity': True,
-                # Both input and output must be tuple(iterable)
+                'has_probabilities' : True
                 #'input': [DENSE, SIGNED_DATA, UNSIGNED_DATA],
                 #'output': [PREDICTIONS]
                 }
@@ -106,6 +92,9 @@ class XGBClassifierHypster(XGBModelHypster):
         # gamma, min_child_weight, max_delta_step,
         # base_score, scale_pos_weight, n_jobs = 1, init = None,
         # random_state = None, verbose = 0,
+
+        # TODO change values to SKLEARN language
+
         n_classes = len(class_counts)
         
         base_score = 0.5 #TODO fix?
@@ -124,7 +113,7 @@ class XGBClassifierHypster(XGBModelHypster):
             , 'scale_pos_weight': trial.suggest_categorical('scale_pos_weight', [1.0, pos_weight])
             , 'objective': objective
             , 'base_score' : base_score
-            , 'eta': trial.suggest_loguniform('init_eta', 1e-4, 1.0)
+            , 'eta': trial.suggest_loguniform('init_lr', 1e-4, 1.0)
             , 'booster': trial.suggest_categorical('booster', self.booster_list)
             , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
             , 'alpha': trial.suggest_loguniform('alpha', 1e-10, 1.0)
@@ -163,22 +152,40 @@ class XGBClassifierHypster(XGBModelHypster):
 
         self.model_params = model_params
 
-    ##TODO: change to predict, predict proba
-    def score_test(self, scorer, scorer_type):
+    def fit(self, X, y):
+        #if self.best_model is None:
+        #    init_model = None
+            #self.init_eta = self.model_params["eta"]
+        #else:
+        #    init_model = self.best_model
+            #init_model.set_param({"eta": self.model_params['eta']})
+
+        dtrain = xgb.DMatrix(X, y)
+        self.current_model = xgb.train(self.model_params
+                               , dtrain
+                               , xgb_model=self.best_model
+                               , num_boost_round=self.n_iter_per_round
+                               , learning_rates=[self.model_params['eta']] * self.n_iter_per_round
+                               )
+
+    def predict_proba(self, X):
+        X = xgb.DMatrix(X)
         if self.model_params["booster"] == "dart":
-            preds = self.model.predict(self.dtest, output_margin=False, ntree_limit=self.n_estimators + 1)
+            class_probs = self.current_model.predict(X, output_margin=False, ntree_limit=0)
         else:
-            preds = self.model.predict(self.dtest, output_margin=False)
+            class_probs = self.current_model.predict(X, output_margin=False)
 
-        if (scorer_type == "predict"): #TODO find best threshold w.r.t scoring
-            preds = preds > 0.5
-            preds = preds.astype(int)
+        #TODO apply to multiclass
+        classone_probs = class_probs
+        classzero_probs = 1.0 - classone_probs
+        return np.vstack((classzero_probs, classone_probs)).transpose()
 
-        return scorer(self.dtest.get_label(), preds)
-
-    def create_model(self):
-        self.model_params['n_estimators'] = self.n_estimators
-        self.model_params['learning_rate'] = self.init_eta
+    # def predict(self, X):
+    #     X = xgb.DMatrix(X)
+    #     return self.current_model.predict(X)
+    def get_best_model(self):
+        self.model_params['n_estimators'] = self.best_n_iterations
+        self.model_params['learning_rate'] = self.model_params["eta"]
 
         self.model_params['n_jobs'] = self.model_params.pop('nthread')
         self.model_params['random_state'] = self.model_params.pop('seed')
@@ -186,7 +193,6 @@ class XGBClassifierHypster(XGBModelHypster):
         self.model_params['reg_alpha'] = self.model_params.pop('alpha')
 
         final_model = XGBClassifierLR(learning_rates=self.learning_rates, **self.model_params)
-
         return final_model
 
 class XGBRegressorHypster(XGBModelHypster):

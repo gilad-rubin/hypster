@@ -1,7 +1,13 @@
-from sklearn.datasets import fetch_20newsgroups
-from sklearn.model_selection import train_test_split, StratifiedKFold
+import pandas as pd
+import numpy as np
+import scipy
+import sklearn
+
 from sklearn.feature_extraction.text import TfidfVectorizer
+
+from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
 from sklearn.pipeline import Pipeline
+from sklearn.feature_selection import SelectFromModel, SelectPercentile, chi2, VarianceThreshold
 from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 from sklearn import metrics
 
@@ -10,45 +16,90 @@ from optuna.visualization import plot_intermediate_values
 
 import numpy as np
 import xgboost as xgb
-import lightgbm as lgb
+#import lightgbm as lgb
 
-from catboost import CatBoost
-from catboost import Pool
+SEED = 85
+
+from hypster_xgboost import *
+from hypster import *
 
 # Get Dataset
-dataset = fetch_20newsgroups(data_home="news", subset='all', shuffle = False, remove=['headers', 'footers', 'quotes'])
-word_count = [len(x.split()) for x in dataset.data]
-df = pd.DataFrame({"text" : dataset.data,
-                   "subclass_index" : dataset.target,
-                   "word_count" : word_count})
-df.sort_values("word_count", inplace=True)
-df = df[df["word_count"] > 30]
-target_prefix = 'sci'
-df["subclass_name"] = [dataset.target_names[class_num] for class_num in df["subclass_index"]]
-df["binary_label"] = np.where(df["subclass_name"].str.startswith(target_prefix), 1, 0)
-df["subclass_name_vs_other"] = np.where(df["binary_label"]==1, df["subclass_name"], "other")
-df = df[["text", "subclass_name", "binary_label", "subclass_name_vs_other", "word_count"]]
 
-# Train-Test Split
-df_train, df_test, y_train, y_test = train_test_split(df, df["binary_label"],
-                                                    test_size = 0.33,
-                                                    random_state = SEED,
-                                                    stratify = df["binary_label"])
-#because Pandas....
-df_train = df_train.copy()
-df_test = df_test.copy()
+from scipy.sparse import csr_matrix, save_npz, load_npz
 
-# Build Pipeline
-pipeline = Pipeline([("tfidf", TfidfVectorizer(ngram_range=(1,2),
-                                               min_df=5,
-                                               use_idf=False,
-                                               smooth_idf=False,
-                                               strip_accents="unicode",
-                                               encoding = "latin1",
-                                               stop_words="english",
-                                               sublinear_tf=True,
-                                               norm="l2"))
-                    ])
-#%%
-X_train = pipeline.fit_transform(df_train["text"], y_train)
-X_test = pipeline.transform(df_test["text"])
+dataset = "newsgroup" #adult, boston
+
+if dataset=="adult":
+    X_train = pd.read_pickle("./data/adult_X_train.pkl")
+    y_train = pd.read_pickle("./data/adult_y_train.pkl")
+    X_test = pd.read_pickle("./data/adult_X_test.pkl")
+    y_test = pd.read_pickle("./data/adult_y_test.pkl")
+    cat_columns = X_train.select_dtypes(include="object").columns
+elif dataset=="newsgroup":
+    X_train = load_npz("./data/X_train.npz")
+    y_train = pd.read_pickle("./data/y_train.pkl")
+    X_test = load_npz("./data/X_test.npz")
+    y_test = pd.read_pickle("./data/y_test.pkl")
+    cat_columns=None
+else:
+    X_train = pd.read_pickle("./data/boston_X_train.pkl")
+    y_train = pd.read_pickle("./data/boston_y_train.pkl")
+    X_test = pd.read_pickle("./data/boston_X_test.pkl")
+    y_test = pd.read_pickle("./data/boston_y_test.pkl")
+    cat_columns = None
+
+#X_train = X_train.sample(n=10000, random_state=SEED, axis=0)
+
+#y_train = y_train.iloc[X_train.index].reset_index(drop=True)
+#X_train.reset_index(inplace=True, drop=True)
+
+#pipeline - pipeline_objective OR regular pipeline
+#consider making pre-made steps with best practices (FS, scaling, etc...) then add option to concat to make one pipeline
+
+#pipeline = Pipeline([("sel", SelectPercentile(chi2))])
+#pipe_params = {"sel__percentile" : optuna.distributions.IntUniformDistribution(1,100)}
+pipeline = None
+pipe_params = None
+
+from optuna.samplers import TPESampler
+
+sampler = TPESampler(**TPESampler.hyperopt_parameters())
+
+xgb_linear = XGBClassifierHypster(booster_list=['gblinear'], n_iter_per_round=5
+                               #,param_dict={#TODO check what happens when you run over parameters in optuna}
+                               #,'subsample' : 0.9
+                               )
+#gb_dart = XGBClassifierHypster(booster_list=['dart'])
+#xgb_tree = XGBClassifierHypster(booster_list=['gbtree', 'dart'], user_param_dict={'max_depth' : 2})
+xgb_tree = XGBClassifierHypster(booster_list=['gbtree', 'dart'],
+                                n_iter_per_round=1
+                                )
+#lgb_estimator = LGBClassifierOptuna()
+#sgd_estimator = SGDClassifierOptuna()
+#rf_estimator  = RFClassifierOptuna()
+
+estimators = [xgb_linear]#, xgb_tree]#, sgd|_estimator]
+
+clf = HyPSTERClassifier(estimators, pipeline, pipe_params,
+                        scoring="roc_auc", cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED), #sampler=sampler,
+                        refit=False, random_state=SEED, n_jobs=1)
+import time
+start_time = time.time()
+
+clf.fit(X_train, y_train, cat_columns=cat_columns, n_trials=1)
+
+print("time elapsed: {:.2f}s".format(time.time() - start_time))
+print(clf.best_score_)
+
+# clf.best_params_
+#
+# clf.refit(X_train, y_train)
+#
+# test_preds = clf.predict(X_test)
+#
+# sklearn.metrics.accuracy_score(y_test, test_preds)
+#
+# test_probs = clf.predict_proba(X_test)
+# test_probs = test_probs[:,1]
+#
+# sklearn.metrics.roc_auc_score(y_test, test_probs)
