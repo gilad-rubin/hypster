@@ -58,16 +58,22 @@ else:
 
 #pipeline = Pipeline([("sel", SelectPercentile(chi2))])
 #pipe_params = {"sel__percentile" : optuna.distributions.IntUniformDistribution(1,100)}
+
 pipeline = None
 pipe_params = None
 
 from optuna.samplers import TPESampler
 
-sampler = TPESampler(**TPESampler.hyperopt_parameters())
+sampler = TPESampler(**TPESampler.hyperopt_parameters(), seed=SEED)
 
-xgb_linear = XGBClassifierHypster(booster_list=['gblinear'], n_iter_per_round=5
-                               #,param_dict={#TODO check what happens when you run over parameters in optuna}
-                               #,'subsample' : 0.9
+# sampler = optuna.integration.CmaEsSampler(n_startup_trials=40,
+#                       independent_sampler=TPESampler(**TPESampler.hyperopt_parameters()),
+#                       warn_independent_sampling=False, seed=SEED)
+
+xgb_linear = XGBClassifierHypster(booster_list=['gblinear'], lr_decay=0.1, n_iter_per_round=2
+                               ,param_dict={#'subsample' : 0.9,
+                                            #'eta' : optuna.distributions.LogUniformDistribution(0.8, 1.0)
+                                            }
                                )
 #gb_dart = XGBClassifierHypster(booster_list=['dart'])
 #xgb_tree = XGBClassifierHypster(booster_list=['gbtree', 'dart'], user_param_dict={'max_depth' : 2})
@@ -78,28 +84,32 @@ xgb_tree = XGBClassifierHypster(booster_list=['gbtree', 'dart'],
 #sgd_estimator = SGDClassifierOptuna()
 #rf_estimator  = RFClassifierOptuna()
 
-estimators = [xgb_linear]#, xgb_tree]#, sgd|_estimator]
+estimators = [xgb_linear, xgb_tree]#, sgd|_estimator]
 
-clf = HyPSTERClassifier(estimators, pipeline, pipe_params,
-                        scoring="roc_auc", cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED), #sampler=sampler,
-                        refit=False, random_state=SEED, n_jobs=1)
+clf = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
+                        scoring="roc_auc", cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED), tol=1e-5,
+                        sampler=sampler, refit=False, random_state=SEED, n_jobs=-1)
 import time
 start_time = time.time()
 
-clf.fit(X_train, y_train, cat_columns=cat_columns, n_trials=1)
+clf.fit(X_train, y_train, cat_columns=cat_columns, n_trials=2)
 
 print("time elapsed: {:.2f}s".format(time.time() - start_time))
 print(clf.best_score_)
 
-# clf.best_params_
-#
-# clf.refit(X_train, y_train)
-#
-# test_preds = clf.predict(X_test)
-#
-# sklearn.metrics.accuracy_score(y_test, test_preds)
-#
-# test_probs = clf.predict_proba(X_test)
-# test_probs = test_probs[:,1]
-#
-# sklearn.metrics.roc_auc_score(y_test, test_probs)
+clf.best_params_
+
+clf.refit(X_train, y_train)
+
+test_preds = clf.predict(X_test)
+
+sklearn.metrics.accuracy_score(y_test, test_preds)
+
+test_probs = clf.predict_proba(X_test)
+test_probs = test_probs[:,1]
+
+print(sklearn.metrics.roc_auc_score(y_test, test_probs))
+
+print(clf.best_estimator_.named_steps["model"].get_params()['learning_rates'])
+
+plot_intermediate_values(clf.studies[0])

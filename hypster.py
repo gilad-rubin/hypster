@@ -1,3 +1,5 @@
+#TODO: stick with eith "" or ''
+#TODO: clean imports
 import pandas as pd
 import numpy as np
 import scipy
@@ -15,17 +17,29 @@ from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.utils.validation import check_is_fitted
 from sklearn.exceptions import NotFittedError
-
+from sklearn.model_selection import check_cv
+from sklearn.utils.validation import indexable
 from sklearn.base import BaseEstimator, TransformerMixin
 
+
+def _init_pipeline(pipeline, pipe_params, trial):
+    if pipeline is not None:
+        final_pipeline = clone(pipeline)
+        if pipe_params is not None:
+            pipe_params = _get_params(trial, pipe_params)
+            final_pipeline.set_params(**pipe_params)
+        return final_pipeline
+    return None
+
 class Objective(object):
-    def __init__(self, X, y, cat_columns, estimator, objective_type="classification",
+    def __init__(self, X, y, groups, cat_columns, estimator, objective_type="classification",
                  y_stats=None, pipeline=None, pipe_params=None, greater_is_better=True,
-                 cv='warn', save_cv_preds=False, scoring=None, scorer_type=None,
-                 refit=False, tol=1e-5, agg_func=np.mean, max_iter=50, max_fails=3):
+                 cv='warn', save_cv_preds=False, save_cv_model_embeddings=False, scoring=None, scorer_type=None,
+                 refit=False, tol=1e-5, agg_func=np.mean, max_iter=30, max_fails=3):
 
         self.X = X
         self.y = y
+        self.groups = groups
         self.cat_columns = cat_columns
         self.estimator = estimator
         self.objective_type = objective_type
@@ -35,6 +49,7 @@ class Objective(object):
         self.greater_is_better = greater_is_better
         self.cv = cv
         self.save_cv_preds = save_cv_preds
+        self.save_cv_model_embeddings = save_cv_model_embeddings
         self.scoring = scoring
         self.scorer_type = scorer_type
         self.refit_ = refit
@@ -43,32 +58,19 @@ class Objective(object):
         self.max_iter = max_iter
         self.max_fails = max_fails
 
-    # def init_pipeline(self, trial):
-    #     pipeline = None
-    #     if self.pipeline is not None:
-    #         pipeline = clone(self.pipeline)
-    #         if self.pipe_params is not None:
-    #             pipe_params = _get_params(trial, self.pipe_params)
-    #             pipeline.set_params(**pipe_params)
-
     def __call__(self, trial):
-
-        # init_pipeline(self.pipeline)
-        ## init pipeline
-
-        pipeline = None
-        if self.pipeline is not None:
-            pipeline = clone(self.pipeline)
-            if self.pipe_params is not None:
-                pipe_params = _get_params(trial, self.pipe_params)
-                pipeline.set_params(**pipe_params)
+        pipeline = _init_pipeline(self.pipeline, self.pipe_params, trial)
 
         ## impute & convert categorical columns
-
         #TODO return sparse or dense? consider that in sparse sometimes na is 0
         #TODO what if model handles imputation?
-        #TODO make this into a seperate class
-        if (self.cat_columns is not None) and (self.estimator.get_properties()['handles_categorical'] == False):
+        #TODO make this into a seperate class:
+        # Preprocess = [TfIDFTransformer(optuna….),
+        # 'impute',
+        # 'cat_encode',
+        # HyPSTERNormalizer()]
+
+        if (self.cat_columns is not None) and (self.estimator.get_tags()['handles categorical'] == False):
             impute_ohe_pipe = Pipeline([('impute', SimpleImputer(strategy="constant", fill_value="unknown")),
                                          ('ohe', OneHotEncoder(categories="auto", handle_unknown='ignore'))])
             impute_ohe_ct = ColumnTransformer([('impute_ohe', impute_ohe_pipe, self.cat_columns)],
@@ -79,34 +81,29 @@ class Objective(object):
             else:
                 pipeline = Pipeline([('impute_ohe', impute_ohe_ct)])
 
-        can_lower_complexity = self.estimator.get_properties()["can_lower_complexity"]
-        ##TODO think of a better name than "can_lower..."
+        can_lower_complexity = self.estimator.get_tags()["adjustable model complexity"]
         
         ## choose estimator from list
         estimator_list = []
-        
+
         ## set params on main estimator
-        ## TODO Create LRFinder for sklearn compatible objects (Separate greedy/global estimators)
         if self.estimator.param_dict is not None:
             user_params = _get_params(trial, self.estimator.param_dict)
 
         estimator = deepcopy(self.estimator)
         estimator.choose_and_set_params(trial, self.y_stats)
 
-        ## overwrite params with user dictionary
-        # to avoid hp's that don't work with conditions
-        # TODO fix it in cases where the user wants to add a hp
-        # TODO get this out of the loop
-        if estimator.param_dict is not None:
-            for (key, value) in user_params.items():  # override default params
+        # overwrite params with user dictionary
+        # to avoid hp's that don't comply to the structure of other sampled HPs
+        if self.estimator.param_dict is not None:
+            for (key, value) in user_params.items():
                 if key in estimator.model_params.keys():
                     estimator.model_params[key] = value
+                #TODO: 'else:' warn user that the key is not compatible with the structure of the other sampled HPs
 
         ## create k folds and estimators
-        #TODO save indices for splits
-        #TODO use cv like in GridSearchCV
         folds = []
-        for train_idx, test_idx in self.cv.split(self.X, self.y):  # groups=self.groups
+        for train_idx, test_idx in self.cv.split(self.X, self.y, groups=self.groups):
             X_train, y_train = safe_indexing(self.X, train_idx), safe_indexing(self.y, train_idx)
             X_test, y_test = safe_indexing(self.X, test_idx), safe_indexing(self.y, test_idx)
 
@@ -116,8 +113,6 @@ class Objective(object):
                 X_test = pipeline.transform(X_test)
 
             fold_estimator = deepcopy(estimator)
-            #fold_estimator.set_train_test(X_train, y_train, X_test, y_test, self.cat_columns)
-            #estimator.init_model() #TODO inspect
 
             folds.append({"X_train" : X_train, "y_train" : y_train,
                           "X_test" : X_test, "y_test" : y_test,
@@ -125,12 +120,11 @@ class Objective(object):
                           "estimator": fold_estimator})
 
         if self.greater_is_better:
-            best_score = 0.0
+            best_score = -np.inf
         else:
             best_score = np.inf
 
-        n_iter_per_round = estimator.get_n_iter_per_round()
-        total_iterations = 0 #counts the number of total iterations
+        save_cv_embeddings = (self.save_cv_model_embeddings) and (estimator.get_tags()["has model embeddings"])
 
         for step in range(self.max_iter):
             # print("Iteration #", step)
@@ -138,23 +132,22 @@ class Objective(object):
             raw_preds_list = []
             for fold in folds:
                 ## train for n_iter while resuming from current model
-                #model = fold['estimator'].get_current_model()
-                fold['estimator'].fit(fold['X_train'], fold['y_train'])
-                total_iterations += n_iter_per_round
+                fold['estimator'].fit(fold['X_train'], fold['y_train'], warm_start=True)
 
                 ## get raw predictions
                 if self.objective_type == "regression":
                     raw_preds = fold['estimator'].predict(fold['X_test'])
                 else:
-                    # TODO check that the result is equal in shape to n_rows, n_classes
                     raw_preds = fold['estimator'].predict_proba(fold['X_test'])
+                    #TODO: what about decision_function?
 
-                raw_preds_list.append(raw_preds)
+                if self.save_cv_preds:
+                    raw_preds_list.append(raw_preds)
 
                 ## get classes for metrics that deal with classes
                 if self.scorer_type == "predict" and self.objective_type == "classification":
-                    # TODO handle multiclass
-                    threshold = 0.5 #TODO: find optimal threshold
+                    #TODO handle multiclass
+                    threshold = 0.5 #TODO: find optimal threshold w.r.t scoring function
                     raw_preds = (raw_preds >= threshold).astype(int)
 
                 if self.scorer_type == "threshold":
@@ -165,38 +158,64 @@ class Objective(object):
                 scores.append(fold_score)
 
             intermediate_value = self.agg_func(scores)
-            trial.report(intermediate_value, step)
+            # Using "max" in order to avoid pruning just because of overfitting at one certain step:
+            report_value = max(intermediate_value, best_score)
+            trial.report(report_value, step)
 
             #print("intermediate result = ", intermediate_value)
 
             if trial.should_prune(step):
                 raise optuna.structs.TrialPruned()
 
-            if intermediate_value >= best_score + self.tol:
+            ## if result improved
+            if intermediate_value - best_score >= self.tol: #TODO: should I make it self.tol * estimator.n_iter_per_round?
                 best_score = intermediate_value
                 fail_count = 0
                 for (i, fold) in enumerate(folds):
                     fold['estimator'].save_best()
                     if self.save_cv_preds:
-                        fold["raw_predictions"] = raw_preds[i]
+                        #TODO handle cases where:
+                        # self.cv does not cover the whole dataset (e.g train/test)
+                        # self.cv is repeated cross validation. then we should perhaps choose one cover of the whole dataset
+                        fold["raw_predictions"] = raw_preds_list[i]
+
+                    if save_cv_embeddings:
+                        fold["model_embeddings"] = estimator.get_model_embeddings(fold["X_test"])
             else:
                 fail_count += 1
                 if (can_lower_complexity == False) or (fail_count >= self.max_fails):
                     break
 
-                # TODO: make this step only after k times
                 for fold in folds:
                     fold['estimator'].lower_complexity()
+                    fold['estimator'].revert_to_best_model()
 
-        model = folds[0]['estimator'].get_best_model() #TODO do it nicer
+        model = folds[0]['estimator'].get_best_model()
+
         if pipeline is not None:
             pipeline.steps.append(["model", model])
         else:
-            pipeline = Pipeline([("model", model)]) #TODO should we just return the model?
+            pipeline = Pipeline([("model", model)])
 
-        print('Score: ' + str(round(best_score, 5)))
+        print('Score: ' + str(round(best_score, 5))) #TODO: change to logging
 
         trial.set_user_attr('pipeline', pipeline)
+
+        if self.save_cv_preds:
+            n_rows = self.X.shape[0]
+            n_columns = folds[0]["raw_predictions"].shape[1]
+            raw_preds = np.zeros((n_rows, n_columns))
+            for fold in folds:
+                raw_preds[fold["test_idx"],:] = fold['raw_predictions']
+            trial.set_user_attr("cv_preds", raw_preds)
+
+        if save_cv_embeddings:
+            n_rows = self.X.shape[0]
+            n_columns = folds[0]["model_embeddings"].shape
+            embeddings = np.zeros(n_rows, n_columns)
+            for fold in folds:
+                embeddings[fold["test_idx"]] = fold['model_embeddings']
+            trial.set_user_attr("cv_model_embeddings", embeddings)
 
         return best_score
 
@@ -210,17 +229,19 @@ def _get_params(trial, params):
     return param_dict
 
 class HyPSTEREstimator():
-    def __init__(self, estimators,  # names and/or instances,
-                 pipeline=None, pipe_params=None,
-                 scoring=None,  # sklearn, support multiple? #TODO: add support for strings like sklearn
+    def __init__(self, estimators,
+                 pipeline=None,
+                 pipe_params=None,
+                 scoring=None,
                  cv=3,
                  agg_func=np.mean,
                  refit=True,
                  tol=1e-5,
-                 max_iter=200, #TODO: add iterations if the learning curve prediction is high?
+                 max_iter=100,
                  time_limit=None, max_fails=3,
-                 study_name="",  # TODO: think how to allow the user to define if they want to keep training or not?
-                 save_cv_preds=False, #TODO: add support for stacking
+                 study_name="",
+                 save_cv_preds=False,
+                 save_cv_model_embeddings=False,
                  pruner=SuccessiveHalvingPruner(min_resource=3, reduction_factor=3),
                  sampler=TPESampler(**TPESampler.hyperopt_parameters()),
                  n_jobs=1,
@@ -240,14 +261,13 @@ class HyPSTEREstimator():
         self.max_fails = max_fails
         self.study_name = study_name #TODO:needed? maybe replace with "resume last study"?
         self.save_cv_preds = save_cv_preds
+        self.save_cv_model_embeddings = save_cv_model_embeddings
         self.pruner = pruner
         self.sampler = sampler
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.random_state = random_state
         self.best_estimator_ = None
-
-        # TODO: set_seed function for samplers & cv_function(?) with random_state
 
     def fit(self, X=None, y=None, cat_columns=None, n_trials_per_estimator=10): #dataset_name
         raise NotImplementedError
@@ -273,25 +293,31 @@ class HyPSTEREstimator():
         return self.best_estimator_.predict(X)
     
     #TODO: check if we should implement "score" and "predict_log_proba"
-    
+
     def visualize_results(self):
         return
         # TODO: plot... with matplotlib/plotly/hvplot
         # TODO: show if it will help to increase max_iter
+
     def summary(self):
         #TODO estimators tested, estimators left out
         #TODO more statistics about estimators
         return
 
 class HyPSTERClassifier(HyPSTEREstimator):
-    def fit(self, X=None, y=None, cat_columns=None, n_trials=10): #dataset_name
-        #TODO check that y is classification and not regression
-        le = LabelEncoder()
-        y = le.fit_transform(y)
-        class_counts = np.bincount(y)
+    def fit(self, X, y, groups=None, cat_columns=None, n_trials=10): #dataset_name
+
+        ##initialize seeds
+        if self.sampler.seed is None:
+            self.sampler.seed = self.random_state
+
+        X, y, groups = indexable(X, y, groups)
+        cv = check_cv(self.cv, y, classifier=True)
+
+        if cv.random_state is None:
+            cv.random_state = self.random_state
 
         scorer = sklearn.metrics.get_scorer(self.scoring)
-        # TODO check if we can make it a bit nicer
         # https://github.com/scikit-learn/scikit-learn/blob/1495f6924/sklearn/metrics/scorer.py
         if "_Threshold" in str(type(scorer)):
             scorer_type = "threshold"
@@ -303,13 +329,22 @@ class HyPSTERClassifier(HyPSTEREstimator):
         # TODO check if we can make it a bit nicer
         if "greater_is_better=False" in str(scorer):
             greater_is_better = False
+            direction = "minimize"
         else:
             greater_is_better = True
+            direction = "maximize"
 
-        ## Get only valid estimators and transformers, using: scorer_type(proba/threshold),
-        ## dense/sparse, multiclass, multilabel, positive_only X
+        #convert labels to np.array
+        le = LabelEncoder()
+        y = le.fit_transform(y)
+        class_counts = np.bincount(y)
+
+        #TODO: filter out estimators & transformer
+        ## using: scorer_type(proba/threshold), dense/sparse, multiclass, multilabel, positive_only X
 
         studies = []
+        #TODO: continue study instead of creating a new one
+        #TODO: sort estimators by speed(?)
         for i in range(len(self.estimators)):
             estimator = self.estimators[i]
 
@@ -318,14 +353,15 @@ class HyPSTERClassifier(HyPSTEREstimator):
 
             estimator.n_jobs =  self.n_jobs #TODO make it nice and consider removing setters and getters
 
-            print(estimator.get_properties()["name"]) #TODO: convert to static method?
+            print(estimator.get_tags()["name"]) #TODO: convert to static method?
 
             #TODO cat_columns = list of indices or names?
-            objective = Objective(X, y, cat_columns, objective_type="classification",
+            objective = Objective(X, y, groups, cat_columns, objective_type="classification",
                                   y_stats=class_counts, estimator=estimator,
                                   pipeline=self.pipeline, pipe_params=self.pipe_params,
                                   greater_is_better=greater_is_better,
                                   cv=self.cv, save_cv_preds=self.save_cv_preds,
+                                  save_cv_model_embeddings = self.save_cv_model_embeddings,
                                   scoring=scorer._score_func,
                                   scorer_type = scorer_type,
                                   agg_func=self.agg_func, tol=self.tol,
@@ -334,11 +370,6 @@ class HyPSTERClassifier(HyPSTEREstimator):
             if self.verbose > 0:
                 optuna.logging.set_verbosity(optuna.logging.WARN)
                 # TODO: change
-
-            if greater_is_better==True:
-                direction = "maximize"
-            else:
-                direction = "minimize"
 
             study = optuna.create_study(pruner=self.pruner,
                                         sampler=self.sampler,
@@ -363,20 +394,22 @@ class HyPSTERClassifier(HyPSTEREstimator):
         index = func([study.best_value for study in studies])
         #index = get_best_study_index(studies, greater_is_better) #TODO convert to function
 
-        self.best_estimator_ = studies[index].best_trial.user_attrs['pipeline'] #TODO: what if refit=true?
-        self.best_score_ = studies[index].best_value
-        self.best_params_ = studies[index].best_params
-
-        if len(self.best_estimator_.steps) > 1: #pipeline has more than just a classifier
-            self.best_transformer_ = Pipeline(self.best_estimator_.steps[:-1]) #return all steps but last (classifier)
-        else:
-            self.best_transformer_ = IdentityTransformer() #TODO check if it's neccessary
+        best_study = studies[index]
+        self.best_estimator_ = best_study.best_trial.user_attrs['pipeline'] #TODO: what if refit=true?
+        self.best_score_ = best_study.best_value
+        self.best_params_ = best_study.best_params
 
         self.studies = studies
 
         if self.refit_:
             self.best_estimator_.fit(X, y)
 
+        if len(self.best_estimator_.steps) > 1: #pipeline has more than just a classifier
+            self.best_transformer_ = Pipeline(self.best_estimator_.steps[:-1]) #return all steps but last (classifier)
+        else:
+            self.best_transformer_ = IdentityTransformer() #TODO check if it's neccessary
+
+        self.best_model_ = self.best_estimator_.named_steps["model"]
         # append results
         # output combined results
         # return studies
@@ -404,7 +437,7 @@ class HyPSTERRegressor(HyPSTEREstimator):
             if estimator.get_seed() == 1: #TODO make it nice and consider removing setters and getters
                 estimator.set_seed(self.random_state)
 
-            print(estimator.get_properties()["name"]) #TODO: convert to static method?
+            print(estimator.get_tags()["name"]) #TODO: convert to static method?
             #TODO cat_columns = list of indices or names
 
             scorer = sklearn.metrics.get_scorer(self.scoring)
@@ -433,7 +466,7 @@ class HyPSTERRegressor(HyPSTEREstimator):
                 optuna.logging.set_verbosity(optuna.logging.WARN)
                 # TODO: change
 
-            if greater_is_better==True:
+            if greater_is_better:
                 direction = "maximize"
             else:
                 direction = "minimize"
