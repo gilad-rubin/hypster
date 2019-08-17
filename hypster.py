@@ -21,6 +21,7 @@ from sklearn.model_selection import check_cv
 from sklearn.utils.validation import indexable
 from sklearn.base import BaseEstimator, TransformerMixin
 
+from scipy.sparse import issparse
 
 def _init_pipeline(pipeline, pipe_params, trial):
     if pipeline is not None:
@@ -30,6 +31,15 @@ def _init_pipeline(pipeline, pipe_params, trial):
             final_pipeline.set_params(**pipe_params)
         return final_pipeline
     return None
+
+def _get_params(trial, params):
+    param_dict = {}
+    for (key, value) in params.items():
+        if "optuna.distributions" in str(type(value)):
+            param_dict[key] = trial._suggest(key, value)
+        else:
+            param_dict[key] = params[key]
+    return param_dict
 
 class Objective(object):
     def __init__(self, X, y, estimator, sample_weight=None, groups=None, cat_columns=None, objective_type="classification",
@@ -61,15 +71,6 @@ class Objective(object):
     def __call__(self, trial):
         pipeline = _init_pipeline(self.pipeline, self.pipe_params, trial)
 
-        ## impute & convert categorical columns
-        #TODO return sparse or dense? consider that in sparse sometimes na is 0
-        #TODO what if model handles imputation?
-        #TODO make this into a seperate class:
-        # Preprocess = [TfIDFTransformer(optuna….),
-        # 'impute',
-        # 'cat_encode',
-        # HyPSTERNormalizer()]
-
         ## choose estimator from list
         estimator_list = []
         estimator = deepcopy(self.estimator)
@@ -87,8 +88,11 @@ class Objective(object):
                     estimator.model_params[key] = value
                 #TODO: 'else:' warn user that the key is not compatible with the structure of the other sampled HPs
 
-        estimator.set_tags()
+        estimator.update_tags()
 
+        ## impute & convert categorical columns
+        # TODO cat_columns = list of indices or names?
+        # TODO add imputation for numeric columns
         if (self.cat_columns is not None) and (estimator.get_tags()['handles categorical'] == False):
             impute_ohe_pipe = Pipeline([('impute', SimpleImputer(strategy="constant", fill_value="unknown")),
                                          ('ohe', OneHotEncoder(categories="auto", handle_unknown='ignore'))])
@@ -115,8 +119,17 @@ class Objective(object):
 
             fold_estimator = deepcopy(estimator)
 
-            folds.append({"X_train" : X_train, "y_train" : y_train,
-                          "X_test" : X_test, "y_test" : y_test,
+            if self.sample_weight is not None:
+                train_sample_weight = safe_indexing(self.sample_weight, train_idx)
+                test_sample_weight = safe_indexing(self.sample_weight, test_idx)
+            else:
+                train_sample_weight = None
+                test_sample_weight = None
+
+            fold_estimator.set_train(X_train, y_train, train_sample_weight)
+            fold_estimator.set_test(X_test, y_test, test_sample_weight)
+
+            folds.append({"y_test" : y_test,
                           "train_idx" : train_idx, "test_idx" : test_idx,
                           "estimator": fold_estimator})
 
@@ -131,14 +144,14 @@ class Objective(object):
             raw_preds_list = []
             for fold in folds:
                 ## train for n_iter while resuming from current model
-                fold['estimator'].fit(fold['X_train'], fold['y_train'], warm_start=True)
+                fold['estimator'].fit(warm_start=True)
 
                 ## get raw predictions
                 if self.objective_type == "regression":
-                    raw_preds = fold['estimator'].predict(fold['X_test'])
+                    raw_preds = fold['estimator'].predict()
                 else:
-                    raw_preds = fold['estimator'].predict_proba(fold['X_test'])
-                    #TODO: what about decision_function?
+                    raw_preds = fold['estimator'].predict_proba()
+                    #TODO: what about decision_function? and those who don't have predict_proba?
 
                 if self.save_cv_preds:
                     raw_preds_list.append(raw_preds)
@@ -153,7 +166,7 @@ class Objective(object):
                     raw_preds = raw_preds[:,1] #TODO handle multiclass and other scorers
 
                 ##get score & append
-                fold_score = self.scoring(fold['y_test'], raw_preds)
+                fold_score = self.scoring(fold["y_test"], raw_preds)
                 scores.append(fold_score)
 
             intermediate_value = self.agg_func(scores)
@@ -185,7 +198,8 @@ class Objective(object):
 
                 for fold in folds:
                     fold['estimator'].lower_complexity()
-                    fold['estimator'].revert_to_best_model()
+                    best_model = deepcopy(fold['estimator'].get_best_model)
+                    fold['estimator'].set_current_model(best_model)
 
         model = folds[0]['estimator'].get_best_model()
 
@@ -207,15 +221,6 @@ class Objective(object):
             trial.set_user_attr("cv_preds", raw_preds)
 
         return best_score
-
-def _get_params(trial, params):
-    param_dict = {}
-    for (key, value) in params.items():
-        if "optuna.distributions" in str(type(value)):
-            param_dict[key] = trial._suggest(key, value)
-        else:
-            param_dict[key] = params[key]
-    return param_dict
 
 class HyPSTEREstimator():
     def __init__(self, estimators,
@@ -256,7 +261,7 @@ class HyPSTEREstimator():
         self.random_state = random_state
         self.best_estimator_ = None
 
-    def fit(self, X=None, y=None, cat_columns=None, n_trials_per_estimator=10): #dataset_name
+    def fit(self, X=None, y=None, sample_weight=None, groups=None, cat_columns=None, n_trials=10):
         raise NotImplementedError
 
     def refit(self, X, y):
@@ -275,7 +280,7 @@ class HyPSTEREstimator():
         else:
             check_is_fitted(self, 'best_estimator_')
 
-    def predict(self, X): #TODO
+    def predict(self, X):
         self._check_is_fitted('predict')
         return self.best_estimator_.predict(X)
     
@@ -292,7 +297,12 @@ class HyPSTEREstimator():
         return
 
 class HyPSTERClassifier(HyPSTEREstimator):
-    def fit(self, X, y, sample_weight=None, groups=None, cat_columns=None, n_trials=10): #dataset_name
+    def fit(self, X, y, sample_weight=None, groups=None, cat_columns=None,
+            n_trials_per_estimator=10):
+
+        if isinstance(n_trials_per_estimator, list) and (len(n_trials_per_estimator) < len(self.estimators)):
+            print("n_trials_per_estimator size is smaller than the number of estimators!") #TODO error
+            return
 
         ##initialize seeds
         if self.sampler.seed is None:
@@ -300,7 +310,6 @@ class HyPSTERClassifier(HyPSTEREstimator):
 
         X, y, groups = indexable(X, y, groups)
         cv = check_cv(self.cv, y, classifier=True)
-
         if cv.random_state is None:
             cv.random_state = self.random_state
 
@@ -321,28 +330,45 @@ class HyPSTERClassifier(HyPSTEREstimator):
             greater_is_better = True
             direction = "maximize"
 
-        #convert labels to np.array
+        ## convert labels to np.array
         le = LabelEncoder()
         y = le.fit_transform(y)
         class_counts = np.bincount(y)
 
-        #TODO: filter out estimators & transformer
-        ## using: scorer_type(proba/threshold), dense/sparse, multiclass, multilabel, positive_only X
-
-        studies = []
-        #TODO: continue study instead of creating a new one
-        #TODO: sort estimators by speed(?)
+        valid_estimators = []
+        ## filter out estimators & transformer
         for i in range(len(self.estimators)):
+            remove_estimator=False
             estimator = self.estimators[i]
+            estimator.set_default_tags()
+            tags = estimator.get_tags()
+            if issparse(X) and (tags["handles sparse"] == False):
+                remove_estimator=True
+                #TODO add logging
+            elif (tags["supports multiclass"] == False) and (class_counts.shape[1] > 2):
+                remove_estimator = True
+                # TODO add logging
+            if remove_estimator:
+                if isinstance(n_trials_per_estimator, list):
+                    del n_trials_per_estimator[i]
+            else:
+                valid_estimators.append(estimator)
+
+        if len(valid_estimators)==0:
+            print("No valid estimators available for this type of input") #TODO convert to error
+            return
+
+        study = None
+        for i in range(len(valid_estimators)):
+            estimator = valid_estimators[i]
 
             print(estimator.get_name())
 
             if estimator.get_seed() == 1: #TODO make it nice and consider removing setters and getters
                 estimator.set_seed(self.random_state)
 
-            estimator.n_jobs =  self.n_jobs #TODO make it nice and consider removing setters and getters
+            estimator.set_n_jobs(self.n_jobs)
 
-            #TODO cat_columns = list of indices or names?
             objective = Objective(X, y, estimator, sample_weight, groups, cat_columns,
                                   objective_type="classification", y_stats=class_counts,
                                   pipeline=self.pipeline, pipe_params=self.pipe_params,
@@ -355,37 +381,30 @@ class HyPSTERClassifier(HyPSTEREstimator):
 
             if self.verbose > 0:
                 optuna.logging.set_verbosity(optuna.logging.WARN)
-                # TODO: change
 
-            study = optuna.create_study(pruner=self.pruner,
-                                        sampler=self.sampler,
-                                        study_name="study",
-                                        direction=direction)
+            if study is None:
+                study = optuna.create_study(pruner=self.pruner,
+                                            sampler=self.sampler,
+                                            study_name="study",
+                                            load_if_exists=True,
+                                            direction=direction)
+            else:
+                #currently there's a bug in optuna that doesn't allow changes in distribution options
+                #this is a temporary fix
+                study.storage.param_distribution = {}
+
+            if isinstance(n_trials_per_estimator, list):
+                n_trials = n_trials_per_estimator[i]
+            else:
+                n_trials = n_trials_per_estimator
 
             study.optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs)
-            studies.append(study)
 
-            # if type(n_trials_per_estimator) == list:
-            #     n_trials = n_trials_per_estimator[i] #TODO what if the list is shorter than num of estimators?
-            # else:
-            #     n_trials = n_trials_per_estimator
-
-            #studies[i].optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs)
-
-        #find best study
-        if greater_is_better:
-            func = np.argmax
-        else:
-            func = np.argmin
-        index = func([study.best_value for study in studies])
-        #index = get_best_study_index(studies, greater_is_better) #TODO convert to function
-
-        best_study = studies[index]
-        self.best_estimator_ = best_study.best_trial.user_attrs['pipeline'] #TODO: what if refit=true?
-        self.best_score_ = best_study.best_value
-        self.best_params_ = best_study.best_params
-
-        self.studies = studies
+        self.study = study
+        self.best_estimator_ = study.best_trial.user_attrs['pipeline']
+        self.best_score_ = study.best_value
+        self.best_params_ = study.best_params
+        self.best_index_ = study.best_trial.trial_id
 
         if self.refit_:
             self.best_estimator_.fit(X, y)
@@ -396,15 +415,10 @@ class HyPSTERClassifier(HyPSTEREstimator):
             self.best_transformer_ = IdentityTransformer() #TODO check if it's neccessary
 
         self.best_model_ = self.best_estimator_.named_steps["model"]
-        # append results
-        # output combined results
-        # return studies
-        # return cv_results_, best_index_
     
     def predict_proba(self, X):
-            #TODO: check if estimator has predict_proba. maybe remove from abstract class
-            self._check_is_fitted('predict_proba')
-            return self.best_estimator_.predict_proba(X)
+        self._check_is_fitted('predict_proba')
+        return self.best_estimator_.predict_proba(X)
 
 class HyPSTERRegressor(HyPSTEREstimator):
     def fit(self, X=None, y=None, cat_columns=None, n_trials_per_estimator=10): #dataset_name
@@ -474,7 +488,7 @@ class HyPSTERRegressor(HyPSTEREstimator):
         else:
             func = np.argmin
         index = func([study.best_value for study in studies])
-        #index = get_best_study_index(studies, greater_is_better) #TODO convert to function
+        index = get_best_study_index(studies, greater_is_better) #TODO convert to function
 
         self.best_estimator_ = studies[index].best_trial.user_attrs['pipeline'] #TODO: what if refit=true?
         self.best_score_ = studies[index].best_value
@@ -504,16 +518,3 @@ class IdentityTransformer(BaseEstimator, TransformerMixin):
 
     def transform(self, X, y=None):
         return X
-
-def get_best_study_index(self, studies, greater_is_better=True):
-    if greater_is_better:
-        func = np.argmax
-    else:
-        func = np.argmin
-    print()
-    print(func)
-    lst = [study.best_value for study in studies]
-    print(lst)
-    res = func(lst)
-    print(res)
-    return res

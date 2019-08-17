@@ -4,46 +4,18 @@ import numpy as np
 from sklearn.base import clone
 from copy import deepcopy
 
-import umap
-import numba
-
-@numba.njit()
-def jaccard_categorical(x, y):
-    num_non_zero = 0.0
-    num_equal = 0.0
-    num_non_zero = x.shape[0]
-    for i in range(x.shape[0]):
-        num_equal += x[i] == y[i]
-
-    if num_non_zero == 0.0:
-        return 0.0
-    else:
-        return float(num_non_zero - num_equal) / num_non_zero
-
-def tree_ensemble_embeddings(X, model, reducer=None, n_componenets=2, random_state=1):
-    leaves = model.apply(X)
-    if reducer is None:
-        reducer = umap.UMAP(metric=jaccard_categorical,
-                            n_components=n_componenets,
-                            random_state=random_state,
-                            verbose=False)
-        embeddings = reducer.fit_transform(leaves)
-        return embeddings, reducer
-    else:
-        embeddings = reducer.transform(leaves)
-    return embeddings
-
-#train_emb, reducer = tree_ensemble_embeddings(X_train, model=rf, random_state=SEED)
-#test_emb = tree_ensemble_embeddings(X_test, model=rf, reducer=reducer ,random_state=SEED)
-
 class HypsterEstimator:
-    def __init__(self, random_state, n_jobs, n_iter_per_round, param_dict={}):
-        self.random_state = random_state
-        self.n_jobs = n_jobs
-        self.param_dict = param_dict
+    def __init__(self, n_iter_per_round=1, n_jobs=1, random_state=1, param_dict={}):
         self.n_iter_per_round = n_iter_per_round
+        self.n_jobs = n_jobs
+        self.random_state = random_state
+        self.param_dict = param_dict
         self.best_model = None
         self.current_model = None
+        self.tags = {}
+
+    def get_name(self):
+        raise NotImplementedError
 
     def get_seed(self):
         return self.random_state
@@ -51,23 +23,32 @@ class HypsterEstimator:
     def set_seed(self, seed):
         self.random_state = seed
 
+    def get_n_jobs(self):
+        return self.n_jobs
+
+    def set_n_jobs(self, n_jobs):
+        self.n_jobs = n_jobs
+
     def get_tags(self):
-        raise NotImplementedError
+        return self.tags
+
+    def set_current_model(self, model):
+        self.current_model = model
 
     def get_current_model(self):
         return self.current_model
 
-    def get_n_iter_per_round(self):
-        return self.n_iter_per_round
+    def get_best_model(self):
+        return self.best_model
+
+    def set_best_model(self, best_model):
+        self.best_model = best_model
 
     def set_n_iter_per_round(self, n_iter):
         self.n_iter_per_round = n_iter
 
-    def get_learning_rates(self):
-        return self.learning_rates
-
-    def set_learning_rates(self, learning_rates):
-        self.learning_rates = learning_rates
+    def get_n_iter_per_round(self):
+        return self.n_iter_per_round
 
     def choose_and_set_params(self, trial, weights, y_stats):
         raise NotImplementedError()
@@ -75,24 +56,15 @@ class HypsterEstimator:
     def fit(self, X, y, warm_start):
         raise NotImplementedError()
 
-    def predict(self):
+    def predict(self, X):
         raise NotImplementedError()
-
-    def lower_complexity(self):
-        raise NotImplementedError()
-
-    def revert_to_best_model(self):
-        self.current_model = deepcopy(self.best_model) #TODO should we .copy()?
-
-    # def save_best_model(self):
-    #     raise NotImplementedError()
 
     def create_model(self):
         raise NotImplementedError()
 
 class XGBModelHypster(HypsterEstimator):
     def __init__(self, lr_decay=0.2, booster_list=['gblinear', 'gbtree', 'dart'],
-                 n_iter_per_round=1, random_state=1, n_jobs=1, param_dict=None):
+                 n_iter_per_round=1, random_state=1, n_jobs=1, param_dict={}):
         self.lr_decay = lr_decay
         self.booster_list = booster_list
         self.best_n_iterations = 0
@@ -100,74 +72,82 @@ class XGBModelHypster(HypsterEstimator):
 
         super(XGBModelHypster, self).__init__(random_state, n_jobs, n_iter_per_round, param_dict)
 
+    def set_learning_rates(self, learning_rates):
+        self.learning_rates = learning_rates
+
+    def get_learning_rates(self):
+        return self.learning_rates
+
     def lower_complexity(self):
         self.model_params['eta'] = self.model_params['eta'] * self.lr_decay
 
     def save_best(self):
         self.learning_rates += [self.model_params['eta']] * self.n_iter_per_round
         self.best_n_iterations = len(self.learning_rates)
-        self.best_model = self.current_model.copy()
-
+        self.set_best_model(self.current_model.copy())
 
 class XGBClassifierHypster(XGBModelHypster):
-    def get_name(self):
+    @staticmethod
+    def get_name():
         return 'XGBoost Classifier'
 
-    # TODO: convert to static method?
-    def set_tags(self):
-        self.tags={'alias' : ['xgb', 'xgboost'],
-                   'supports regression': False,
-                   'supports ranking': False,
-                   'supports classification': True,
-                   'supports multiclass': True,
-                   'supports multilabel': False,
-                   'handles categorical' : False,
-                   'handles sparse': True,
-                   'handles nan': True,
-                   'default nan value when sparse': 0,
-                   'requires positive data' : False,
-                   'sensitive to feature scaling': self.model_params["booster"] == "gblinear",
-                   'has predict_proba' : True,
-                   'has model embeddings': True,
-                   'adjustable model complexity' : True,
-                   'greedy algorithm': self.model_params["booster"] in ["gbtree", "dart"]
-                   }
+    def set_default_tags(self):
+        self.tags = {'alias' : ['xgb', 'xgboost'],
+                    'supports regression': False,
+                    'supports ranking': False,
+                    'supports classification': True,
+                    'supports multiclass': True,
+                    'supports multilabel': False,
+                    'handles categorical' : False,
+                    'handles sparse': True,
+                    'handles nan': True,
+                    'default nan value when sparse': 0,
+                    'sensitive to feature scaling': False,
+                    'has predict_proba' : True,
+                    'has model embeddings': True,
+                    'adjustable model complexity' : True,
+                    'greedy algorithm': True
+                    }
 
-    def get_tags(self):
-        return self.tags
+    def update_tags(self):
+        self.tags['sensitive to feature scaling'] = self.model_params["booster"] == "gblinear"
+        self.tags['greedy algorithm'] = self.model_params["booster"] in ["gbtree", "dart"]
+
+    def set_train(self, X, y, sample_weight=None):
+        # TODO make sample_weight works with class_weight
+        self.dtrain = xgb.DMatrix(X, y, weight=sample_weight, nthread=self.n_jobs)
+
+    def set_test(self, X, y, sample_weight=None):
+        # TODO make sample_weight works with class_weight
+        # TODO make sure sample_weight passes to XGBClassifierLR
+        self.dtest = xgb.DMatrix(X, y, weight=sample_weight, nthread=self.n_jobs)
 
     def choose_and_set_params(self, trial, class_counts):
-        #included on autosklearn
-        # learning_rate, n_estimators, subsample, booster, max_depth,
-        # colsample_bylevel, colsample_bytree, reg_alpha, reg_lambda,
-
-        #not included:
-        # gamma, min_child_weight, max_delta_step,
-        # base_score, scale_pos_weight, n_jobs = 1, init = None,
-        # random_state = None, verbose = 0,
         n_classes = len(class_counts)
-        
-        base_score = 0.5 #TODO fix?
-        if n_classes==2:
-            objective = 'binary:logistic'
-            pos_weight = class_counts[0] / class_counts[1]
-            base_score = class_counts[1] / (class_counts[0] + class_counts[1]) #equivalent to np.mean(y)
-        else: #multiclass
-            objective = 'multi:softprob'
-            #pos_weight = #TODO
-            base_score = 0.5 #TODO change to class priors (https://github.com/dmlc/xgboost/issues/1380)
-            #TODO change according to Laurae
+
+        #TODO change according to Laurae
         model_params = {'seed': self.random_state
             , 'verbosity': 1
             , 'nthread': self.n_jobs
-            , 'scale_pos_weight': trial.suggest_categorical('scale_pos_weight', [1.0, pos_weight])
-            , 'objective': objective
-            , 'base_score' : base_score
             , 'eta': trial.suggest_loguniform('eta', 1e-3, 1.0)
             , 'booster': trial.suggest_categorical('booster', self.booster_list)
             , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
             , 'alpha': trial.suggest_loguniform('alpha', 1e-10, 1.0)
             }
+
+        if n_classes == 2:
+            model_params['objective'] = 'binary:logistic'
+
+            pos_weight = class_counts[0] / class_counts[1]
+            model_params['scale_pos_weight'] = trial.suggest_categorical("scale_pos_weight", [1.0, pos_weight])
+
+            base_score = class_counts[1] / (class_counts[0] + class_counts[1])  # equivalent to np.mean(y)
+            model_params['base_score'] = base_score
+        else:  # multiclass
+            model_params['objective'] = 'multi:softprob'
+            #TODO change base and sample weight on DMatrix
+            #change base score to class priors (https://github.com/dmlc/xgboost/issues/1380)
+            #change sample weight by multiplying class_weight and sample weight
 
         if model_params['booster'] in ['gbtree', 'dart']:
             tree_dict = {'max_depth': trial.suggest_int('max_depth', 2, 20) #TODO: maybe change to higher range?
@@ -202,34 +182,26 @@ class XGBClassifierHypster(XGBModelHypster):
 
         self.model_params = model_params
 
-    def fit(self, X, y, sample_weight=None, warm_start=False):
-        #TODO: check if need to initialize learning rate
-        #if self.best_model is None:
-        #    init_model = None
-            #self.init_eta = self.model_params["eta"]
-        #else:
-        #    init_model = self.best_model
-            #init_model.set_param({"eta": self.model_params['eta']})
-
+    def fit(self, sample_weight=None, warm_start=False):
         if warm_start==True:
             xgb_model = self.current_model
         else:
             xgb_model = None
 
-        dtrain = xgb.DMatrix(X, y, weight=sample_weight) #TODO: test sample_weight
+        learning_rates = [self.model_params['eta']] * self.n_iter_per_round
+
         self.current_model = xgb.train(self.model_params
-                               , dtrain
+                               , self.dtrain
                                , xgb_model=xgb_model
                                , num_boost_round=self.n_iter_per_round
-                               , learning_rates=[self.model_params['eta']] * self.n_iter_per_round
+                               , callbacks=[xgb.callback.reset_learning_rate(learning_rates)]
                                )
 
-    def predict_proba(self, X):
-        X = xgb.DMatrix(X)
+    def predict_proba(self):
         if self.model_params["booster"] == "dart":
-            class_probs = self.current_model.predict(X, output_margin=False, ntree_limit=0)
+            class_probs = self.current_model.predict(self.dtest, output_margin=False, ntree_limit=0)
         else:
-            class_probs = self.current_model.predict(X, output_margin=False)
+            class_probs = self.current_model.predict(self.dtest, output_margin=False)
 
         if self.model_params['objective'] == "multi:softprob":
             return class_probs
@@ -238,16 +210,6 @@ class XGBClassifierHypster(XGBModelHypster):
         classzero_probs = 1.0 - classone_probs
         return np.vstack((classzero_probs, classone_probs)).transpose()
 
-    def get_model_embeddings(self, X):
-        train_leaves = rf.apply(X_train)
-        test_leaves = rf.apply(X_test)
-        reducer = umap.UMAP(metric=jaccard_categorical, n_components=2, random_state=SEED, verbose=False)
-        train_emb = reducer.fit_transform(train_leaves)
-        test_embedding = reducer.transform(test_leaves)
-
-    # def predict(self, X):
-    #     X = xgb.DMatrix(X)
-    #     return self.current_model.predict(X)
     def get_best_model(self):
         self.model_params['n_estimators'] = self.best_n_iterations
         self.model_params['learning_rate'] = self.model_params["eta"]
@@ -342,7 +304,7 @@ class XGBRegressorHypster(XGBModelHypster):
         return final_model
 
 class XGBClassifierLR(XGBClassifier):
-    #TODO add get_params with learning_rates
+    #TODO add support for class and sample weight
     def __init__(self, learning_rates = None,
                  max_depth=3, learning_rate=0.1, n_estimators=100,
                  verbosity=1, silent=True,
@@ -435,3 +397,36 @@ class XGBRegressorLR(XGBRegressor):
         #TODO: check if there's already a "reset_learning_rate" callback and decide what to do
 
         return super(XGBRegressorLR, self).fit(X, y, callbacks = callbacks)
+
+
+import umap
+import numba
+
+@numba.njit()
+def jaccard_categorical(x, y):
+    num_non_zero = 0.0
+    num_equal = 0.0
+    num_non_zero = x.shape[0]
+    for i in range(x.shape[0]):
+        num_equal += x[i] == y[i]
+
+    if num_non_zero == 0.0:
+        return 0.0
+    else:
+        return float(num_non_zero - num_equal) / num_non_zero
+
+def tree_ensemble_embeddings(X, model, reducer=None, n_componenets=2, random_state=1):
+    leaves = model.apply(X)
+    if reducer is None:
+        reducer = umap.UMAP(metric=jaccard_categorical,
+                            n_components=n_componenets,
+                            random_state=random_state,
+                            verbose=False)
+        embeddings = reducer.fit_transform(leaves)
+        return embeddings, reducer
+    else:
+        embeddings = reducer.transform(leaves)
+    return embeddings
+
+#train_emb, reducer = tree_ensemble_embeddings(X_train, model=rf, random_state=SEED)
+#test_emb = tree_ensemble_embeddings(X_test, model=rf, reducer=reducer ,random_state=SEED)
