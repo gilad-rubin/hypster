@@ -84,7 +84,7 @@ xgb_tree = XGBClassifierHypster(booster_list=['gbtree', 'dart'],
 #sgd_estimator = SGDClassifierOptuna()
 #rf_estimator  = RFClassifierOptuna()
 
-estimators = [xgb_linear, xgb_tree]#, sgd|_estimator]
+estimators = [xgb_linear]#, xgb_tree]#, sgd|_estimator]
 
 clf = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
                         scoring="roc_auc", cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED), tol=1e-5,
@@ -92,7 +92,7 @@ clf = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
 import time
 start_time = time.time()
 
-clf.fit(X_train, y_train, cat_columns=cat_columns, n_trials=2)
+clf.fit(X_train, y_train, cat_columns=cat_columns, n_trials=20)
 
 print("time elapsed: {:.2f}s".format(time.time() - start_time))
 print(clf.best_score_)

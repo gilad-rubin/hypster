@@ -32,16 +32,17 @@ def _init_pipeline(pipeline, pipe_params, trial):
     return None
 
 class Objective(object):
-    def __init__(self, X, y, groups, cat_columns, estimator, objective_type="classification",
+    def __init__(self, X, y, estimator, sample_weight=None, groups=None, cat_columns=None, objective_type="classification",
                  y_stats=None, pipeline=None, pipe_params=None, greater_is_better=True,
-                 cv='warn', save_cv_preds=False, save_cv_model_embeddings=False, scoring=None, scorer_type=None,
+                 cv='warn', save_cv_preds=False, scoring=None, scorer_type=None,
                  refit=False, tol=1e-5, agg_func=np.mean, max_iter=30, max_fails=3):
 
         self.X = X
         self.y = y
+        self.estimator = estimator
+        self.sample_weight = sample_weight
         self.groups = groups
         self.cat_columns = cat_columns
-        self.estimator = estimator
         self.objective_type = objective_type
         self.y_stats = y_stats
         self.pipeline = pipeline
@@ -49,7 +50,6 @@ class Objective(object):
         self.greater_is_better = greater_is_better
         self.cv = cv
         self.save_cv_preds = save_cv_preds
-        self.save_cv_model_embeddings = save_cv_model_embeddings
         self.scoring = scoring
         self.scorer_type = scorer_type
         self.refit_ = refit
@@ -70,7 +70,26 @@ class Objective(object):
         # 'cat_encode',
         # HyPSTERNormalizer()]
 
-        if (self.cat_columns is not None) and (self.estimator.get_tags()['handles categorical'] == False):
+        ## choose estimator from list
+        estimator_list = []
+        estimator = deepcopy(self.estimator)
+        estimator.choose_and_set_params(trial, self.y_stats)
+
+        ## set params on main estimator
+        if estimator.param_dict is not None:
+            user_params = _get_params(trial, estimator.param_dict)
+
+        # overwrite params with user dictionary
+        # to avoid hp's that don't comply to the structure of other sampled HPs
+        if estimator.param_dict is not None:
+            for (key, value) in user_params.items():
+                if key in estimator.model_params.keys():
+                    estimator.model_params[key] = value
+                #TODO: 'else:' warn user that the key is not compatible with the structure of the other sampled HPs
+
+        estimator.set_tags()
+
+        if (self.cat_columns is not None) and (estimator.get_tags()['handles categorical'] == False):
             impute_ohe_pipe = Pipeline([('impute', SimpleImputer(strategy="constant", fill_value="unknown")),
                                          ('ohe', OneHotEncoder(categories="auto", handle_unknown='ignore'))])
             impute_ohe_ct = ColumnTransformer([('impute_ohe', impute_ohe_pipe, self.cat_columns)],
@@ -81,25 +100,7 @@ class Objective(object):
             else:
                 pipeline = Pipeline([('impute_ohe', impute_ohe_ct)])
 
-        can_lower_complexity = self.estimator.get_tags()["adjustable model complexity"]
-        
-        ## choose estimator from list
-        estimator_list = []
-
-        ## set params on main estimator
-        if self.estimator.param_dict is not None:
-            user_params = _get_params(trial, self.estimator.param_dict)
-
-        estimator = deepcopy(self.estimator)
-        estimator.choose_and_set_params(trial, self.y_stats)
-
-        # overwrite params with user dictionary
-        # to avoid hp's that don't comply to the structure of other sampled HPs
-        if self.estimator.param_dict is not None:
-            for (key, value) in user_params.items():
-                if key in estimator.model_params.keys():
-                    estimator.model_params[key] = value
-                #TODO: 'else:' warn user that the key is not compatible with the structure of the other sampled HPs
+        can_lower_complexity = estimator.get_tags()["adjustable model complexity"]
 
         ## create k folds and estimators
         folds = []
@@ -123,8 +124,6 @@ class Objective(object):
             best_score = -np.inf
         else:
             best_score = np.inf
-
-        save_cv_embeddings = (self.save_cv_model_embeddings) and (estimator.get_tags()["has model embeddings"])
 
         for step in range(self.max_iter):
             # print("Iteration #", step)
@@ -179,8 +178,6 @@ class Objective(object):
                         # self.cv is repeated cross validation. then we should perhaps choose one cover of the whole dataset
                         fold["raw_predictions"] = raw_preds_list[i]
 
-                    if save_cv_embeddings:
-                        fold["model_embeddings"] = estimator.get_model_embeddings(fold["X_test"])
             else:
                 fail_count += 1
                 if (can_lower_complexity == False) or (fail_count >= self.max_fails):
@@ -209,14 +206,6 @@ class Objective(object):
                 raw_preds[fold["test_idx"],:] = fold['raw_predictions']
             trial.set_user_attr("cv_preds", raw_preds)
 
-        if save_cv_embeddings:
-            n_rows = self.X.shape[0]
-            n_columns = folds[0]["model_embeddings"].shape
-            embeddings = np.zeros(n_rows, n_columns)
-            for fold in folds:
-                embeddings[fold["test_idx"]] = fold['model_embeddings']
-            trial.set_user_attr("cv_model_embeddings", embeddings)
-
         return best_score
 
 def _get_params(trial, params):
@@ -237,15 +226,14 @@ class HyPSTEREstimator():
                  agg_func=np.mean,
                  refit=True,
                  tol=1e-5,
-                 max_iter=100,
+                 max_iter=50,
                  time_limit=None, max_fails=3,
                  study_name="",
                  save_cv_preds=False,
-                 save_cv_model_embeddings=False,
                  pruner=SuccessiveHalvingPruner(min_resource=3, reduction_factor=3),
                  sampler=TPESampler(**TPESampler.hyperopt_parameters()),
                  n_jobs=1,
-                 verbose=1, #TODO Add support for verbosity
+                 verbose=1,
                  random_state=None):
 
         self.estimators = estimators
@@ -259,9 +247,8 @@ class HyPSTEREstimator():
         self.max_iter = max_iter
         self.time_limit = time_limit
         self.max_fails = max_fails
-        self.study_name = study_name #TODO:needed? maybe replace with "resume last study"?
+        self.study_name = study_name
         self.save_cv_preds = save_cv_preds
-        self.save_cv_model_embeddings = save_cv_model_embeddings
         self.pruner = pruner
         self.sampler = sampler
         self.n_jobs = n_jobs
@@ -305,7 +292,7 @@ class HyPSTEREstimator():
         return
 
 class HyPSTERClassifier(HyPSTEREstimator):
-    def fit(self, X, y, groups=None, cat_columns=None, n_trials=10): #dataset_name
+    def fit(self, X, y, sample_weight=None, groups=None, cat_columns=None, n_trials=10): #dataset_name
 
         ##initialize seeds
         if self.sampler.seed is None:
@@ -348,20 +335,19 @@ class HyPSTERClassifier(HyPSTEREstimator):
         for i in range(len(self.estimators)):
             estimator = self.estimators[i]
 
+            print(estimator.get_name())
+
             if estimator.get_seed() == 1: #TODO make it nice and consider removing setters and getters
                 estimator.set_seed(self.random_state)
 
             estimator.n_jobs =  self.n_jobs #TODO make it nice and consider removing setters and getters
 
-            print(estimator.get_tags()["name"]) #TODO: convert to static method?
-
             #TODO cat_columns = list of indices or names?
-            objective = Objective(X, y, groups, cat_columns, objective_type="classification",
-                                  y_stats=class_counts, estimator=estimator,
+            objective = Objective(X, y, estimator, sample_weight, groups, cat_columns,
+                                  objective_type="classification", y_stats=class_counts,
                                   pipeline=self.pipeline, pipe_params=self.pipe_params,
                                   greater_is_better=greater_is_better,
                                   cv=self.cv, save_cv_preds=self.save_cv_preds,
-                                  save_cv_model_embeddings = self.save_cv_model_embeddings,
                                   scoring=scorer._score_func,
                                   scorer_type = scorer_type,
                                   agg_func=self.agg_func, tol=self.tol,

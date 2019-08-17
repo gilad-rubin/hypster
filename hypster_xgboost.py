@@ -4,6 +4,38 @@ import numpy as np
 from sklearn.base import clone
 from copy import deepcopy
 
+import umap
+import numba
+
+@numba.njit()
+def jaccard_categorical(x, y):
+    num_non_zero = 0.0
+    num_equal = 0.0
+    num_non_zero = x.shape[0]
+    for i in range(x.shape[0]):
+        num_equal += x[i] == y[i]
+
+    if num_non_zero == 0.0:
+        return 0.0
+    else:
+        return float(num_non_zero - num_equal) / num_non_zero
+
+def tree_ensemble_embeddings(X, model, reducer=None, n_componenets=2, random_state=1):
+    leaves = model.apply(X)
+    if reducer is None:
+        reducer = umap.UMAP(metric=jaccard_categorical,
+                            n_components=n_componenets,
+                            random_state=random_state,
+                            verbose=False)
+        embeddings = reducer.fit_transform(leaves)
+        return embeddings, reducer
+    else:
+        embeddings = reducer.transform(leaves)
+    return embeddings
+
+#train_emb, reducer = tree_ensemble_embeddings(X_train, model=rf, random_state=SEED)
+#test_emb = tree_ensemble_embeddings(X_test, model=rf, reducer=reducer ,random_state=SEED)
+
 class HypsterEstimator:
     def __init__(self, random_state, n_jobs, n_iter_per_round, param_dict={}):
         self.random_state = random_state
@@ -78,25 +110,31 @@ class XGBModelHypster(HypsterEstimator):
 
 
 class XGBClassifierHypster(XGBModelHypster):
+    def get_name(self):
+        return 'XGBoost Classifier'
+
+    # TODO: convert to static method?
+    def set_tags(self):
+        self.tags={'alias' : ['xgb', 'xgboost'],
+                   'supports regression': False,
+                   'supports ranking': False,
+                   'supports classification': True,
+                   'supports multiclass': True,
+                   'supports multilabel': False,
+                   'handles categorical' : False,
+                   'handles sparse': True,
+                   'handles nan': True,
+                   'default nan value when sparse': 0,
+                   'requires positive data' : False,
+                   'sensitive to feature scaling': self.model_params["booster"] == "gblinear",
+                   'has predict_proba' : True,
+                   'has model embeddings': True,
+                   'adjustable model complexity' : True,
+                   'greedy algorithm': self.model_params["booster"] in ["gbtree", "dart"]
+                   }
+
     def get_tags(self):
-        return {'name': 'XGBoost Classifier',
-                'alias' : ['xgb', 'xgboost'],
-                'supports regression': False,
-                'supports ranking': False,
-                'supports classification': True,
-                'supports multiclass': True,
-                'supports multilabel': False,
-                'handles categorical' : False,
-                'handles sparse': True,
-                'handles nan': True,
-                'default nan value when sparse': 0,
-                'requires positive data' : False,
-                'sensitive to feature scaling': False,
-                'has predict_proba' : True,
-                'has model embeddings': True,
-                'adjustable model complexity' : True,
-                'greedy algorithm': True #TODO find a better phrase. something to do with global vs. local optimized
-                }
+        return self.tags
 
     def choose_and_set_params(self, trial, class_counts):
         #included on autosklearn
@@ -164,7 +202,8 @@ class XGBClassifierHypster(XGBModelHypster):
 
         self.model_params = model_params
 
-    def fit(self, X, y, warm_start):
+    def fit(self, X, y, sample_weight=None, warm_start=False):
+        #TODO: check if need to initialize learning rate
         #if self.best_model is None:
         #    init_model = None
             #self.init_eta = self.model_params["eta"]
@@ -177,7 +216,7 @@ class XGBClassifierHypster(XGBModelHypster):
         else:
             xgb_model = None
 
-        dtrain = xgb.DMatrix(X, y)
+        dtrain = xgb.DMatrix(X, y, weight=sample_weight) #TODO: test sample_weight
         self.current_model = xgb.train(self.model_params
                                , dtrain
                                , xgb_model=xgb_model
@@ -200,8 +239,11 @@ class XGBClassifierHypster(XGBModelHypster):
         return np.vstack((classzero_probs, classone_probs)).transpose()
 
     def get_model_embeddings(self, X):
-        return
-        #TODO complete
+        train_leaves = rf.apply(X_train)
+        test_leaves = rf.apply(X_test)
+        reducer = umap.UMAP(metric=jaccard_categorical, n_components=2, random_state=SEED, verbose=False)
+        train_emb = reducer.fit_transform(train_leaves)
+        test_embedding = reducer.transform(test_leaves)
 
     # def predict(self, X):
     #     X = xgb.DMatrix(X)
