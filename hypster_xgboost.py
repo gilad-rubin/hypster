@@ -70,7 +70,36 @@ class XGBModelHypster(HypsterEstimator):
         self.best_n_iterations = 0
         self.learning_rates = []
 
-        super(XGBModelHypster, self).__init__(random_state, n_jobs, n_iter_per_round, param_dict)
+        super(XGBModelHypster, self).__init__(n_iter_per_round=n_iter_per_round, n_jobs=n_jobs,
+                                              random_state=random_state, param_dict=param_dict)
+
+    def update_tags(self):
+        self.tags['sensitive to feature scaling'] = self.model_params["booster"] == "gblinear"
+        self.tags['greedy algorithm'] = self.model_params["booster"] in ["gbtree", "dart"]
+
+    def set_train(self, X, y, sample_weight=None, missing=None):
+        # TODO make sample_weight works with class_weight
+        self.dtrain = xgb.DMatrix(X, y, weight=sample_weight, missing=missing, nthread=self.n_jobs)
+
+    def set_test(self, X, y, sample_weight=None, missing=None):
+        # TODO make sample_weight works with class_weight
+        # TODO make sure sample_weight passes to XGBClassifierLR
+        self.dtest = xgb.DMatrix(X, y, weight=sample_weight, missing=missing, nthread=self.n_jobs)
+
+    def fit(self, sample_weight=None, warm_start=False):
+        if warm_start==True:
+            xgb_model = self.current_model
+        else:
+            xgb_model = None
+
+        learning_rates = [self.model_params['eta']] * self.n_iter_per_round
+
+        self.current_model = xgb.train(self.model_params
+                               , self.dtrain
+                               , xgb_model=xgb_model
+                               , num_boost_round=self.n_iter_per_round
+                               , callbacks=[xgb.callback.reset_learning_rate(learning_rates)]
+                               )
 
     def set_learning_rates(self, learning_rates):
         self.learning_rates = learning_rates
@@ -84,7 +113,7 @@ class XGBModelHypster(HypsterEstimator):
     def save_best(self):
         self.learning_rates += [self.model_params['eta']] * self.n_iter_per_round
         self.best_n_iterations = len(self.learning_rates)
-        self.set_best_model(self.current_model.copy())
+        self.set_best_model(self.get_current_model().copy())
 
 class XGBClassifierHypster(XGBModelHypster):
     @staticmethod
@@ -109,26 +138,14 @@ class XGBClassifierHypster(XGBModelHypster):
                     'greedy algorithm': True
                     }
 
-    def update_tags(self):
-        self.tags['sensitive to feature scaling'] = self.model_params["booster"] == "gblinear"
-        self.tags['greedy algorithm'] = self.model_params["booster"] in ["gbtree", "dart"]
-
-    def set_train(self, X, y, sample_weight=None):
-        # TODO make sample_weight works with class_weight
-        self.dtrain = xgb.DMatrix(X, y, weight=sample_weight, nthread=self.n_jobs)
-
-    def set_test(self, X, y, sample_weight=None):
-        # TODO make sample_weight works with class_weight
-        # TODO make sure sample_weight passes to XGBClassifierLR
-        self.dtest = xgb.DMatrix(X, y, weight=sample_weight, nthread=self.n_jobs)
-
-    def choose_and_set_params(self, trial, class_counts):
+    def choose_and_set_params(self, trial, class_counts, missing):
         n_classes = len(class_counts)
 
         #TODO change according to Laurae
         model_params = {'seed': self.random_state
             , 'verbosity': 1
             , 'nthread': self.n_jobs
+            , 'missing' : missing
             , 'eta': trial.suggest_loguniform('eta', 1e-3, 1.0)
             , 'booster': trial.suggest_categorical('booster', self.booster_list)
             , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
@@ -182,21 +199,6 @@ class XGBClassifierHypster(XGBModelHypster):
 
         self.model_params = model_params
 
-    def fit(self, sample_weight=None, warm_start=False):
-        if warm_start==True:
-            xgb_model = self.current_model
-        else:
-            xgb_model = None
-
-        learning_rates = [self.model_params['eta']] * self.n_iter_per_round
-
-        self.current_model = xgb.train(self.model_params
-                               , self.dtrain
-                               , xgb_model=xgb_model
-                               , num_boost_round=self.n_iter_per_round
-                               , callbacks=[xgb.callback.reset_learning_rate(learning_rates)]
-                               )
-
     def predict_proba(self):
         if self.model_params["booster"] == "dart":
             class_probs = self.current_model.predict(self.dtest, output_margin=False, ntree_limit=0)
@@ -210,7 +212,7 @@ class XGBClassifierHypster(XGBModelHypster):
         classzero_probs = 1.0 - classone_probs
         return np.vstack((classzero_probs, classone_probs)).transpose()
 
-    def get_best_model(self):
+    def create_model(self):
         self.model_params['n_estimators'] = self.best_n_iterations
         self.model_params['learning_rate'] = self.model_params["eta"]
 
@@ -222,89 +224,7 @@ class XGBClassifierHypster(XGBModelHypster):
         final_model = XGBClassifierLR(learning_rates=self.learning_rates, **self.model_params)
         return final_model
 
-class XGBRegressorHypster(XGBModelHypster):
-    def get_properties(self):
-        return {'alias' : ['xgb', 'xgboost', 'xgbregressor'],
-                'name': 'XGBoost Regressor',
-                'handles_regression': True,
-                'handles_classification': False,
-                'handles_categorical' : False,
-                'handles_multiclass': False,
-                'handles_multilabel': False,
-                'is_deterministic': False,
-                'can_lower_complexity' : True
-                }
-
-    def choose_and_set_params(self, trial):
-        #base_score = np.mean(self.dtrain.get_label()) #TODO get it before train/test
-
-        model_params = {'seed': self.random_state
-            , 'verbosity': 1
-            , 'nthread': self.n_jobs
-            , 'objective': 'reg:squarederror'
-            #, 'base_score' : base_score
-            , 'eta': trial.suggest_loguniform('init_eta', 1e-4, 1.0)
-            , 'booster': trial.suggest_categorical('booster', self.booster_list)
-            , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
-            , 'alpha': trial.suggest_loguniform('alpha', 1e-10, 1.0)
-            }
-
-        if model_params['booster'] in ['gbtree', 'dart']:
-            tree_dict = {'max_depth': trial.suggest_int('max_depth', 2, 20) #TODO: maybe change to higher range?
-                , 'min_child_weight': trial.suggest_int('min_child_weight', 1, 20)
-                , 'gamma': trial.suggest_loguniform('gamma', 1e-10, 10.0)
-                , 'grow_policy': trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
-                , 'subsample': trial.suggest_uniform('subsample', 0.5, 1.0)
-                , 'colsample_bytree': trial.suggest_uniform('colsample_bytree', 0.1, 1.0)
-                , 'colsample_bynode': trial.suggest_uniform('colsample_bynode', 0.1, 1.0)
-                }
-
-            forest_boosting = trial.suggest_categorical('forest_boosting', [True, False])
-            if forest_boosting:
-                model_params['num_parallel_tree'] = trial.suggest_int('num_parallel_tree', 2, 20)
-            else:
-                model_params['num_parallel_tree'] = 1
-
-            model_params.update(tree_dict)
-
-        else:  # gblinear
-            model_params['feature_selector'] = trial.suggest_categorical('shotgun_feature_selector',
-                                                                         ['cyclic', 'shuffle'])
-
-        if model_params['booster'] == 'dart':
-            dart_dict = {'sample_type': trial.suggest_categorical('sample_type', ['uniform', 'weighted'])
-                , 'normalize_type': trial.suggest_categorical('normalize_type', ['tree', 'forest'])
-                , 'rate_drop': trial.suggest_loguniform('rate_drop', 1e-8, 1.0)
-                , 'skip_drop': trial.suggest_loguniform('skip_drop', 1e-8, 1.0)
-                }
-
-            model_params.update(dart_dict)
-
-        self.model_params = model_params
-    
-    def score_test(self, scorer, scorer_type):
-        if self.model_params["booster"] == "dart":
-            preds = self.model.predict(self.dtest, output_margin=False, ntree_limit=self.n_estimators + 1)
-        else:
-            preds = self.model.predict(self.dtest, output_margin=False)
-
-        return scorer(self.dtest.get_label(), preds)
-
-    def create_model(self):
-        self.model_params['n_estimators'] = self.n_estimators
-        self.model_params['learning_rate'] = self.init_eta
-
-        self.model_params['n_jobs'] = self.model_params.pop('nthread')
-        self.model_params['random_state'] = self.model_params.pop('seed')
-        self.model_params['reg_lambda'] = self.model_params.pop('lambda')
-        self.model_params['reg_alpha'] = self.model_params.pop('alpha')
-
-        final_model = XGBRegressorLR(learning_rates=self.learning_rates, **self.model_params)
-
-        return final_model
-
 class XGBClassifierLR(XGBClassifier):
-    #TODO add support for class and sample weight
     def __init__(self, learning_rates = None,
                  max_depth=3, learning_rate=0.1, n_estimators=100,
                  verbosity=1, silent=True,
@@ -334,28 +254,113 @@ class XGBClassifierLR(XGBClassifier):
             early_stopping_rounds=None, verbose=True, xgb_model=None,
             sample_weight_eval_set=None, callbacks=None):
 
-        if self.learning_rates is not None: #TODO check that it works when initializing without learning rates
+        # TODO add support for class and sample weight for multilabel
+        if self.learning_rates is not None:
             lr_callback = [xgb.callback.reset_learning_rate(self.learning_rates)]
         else:
             lr_callback = None
 
         if callbacks is not None:
+            callbacks = [callback for callback in callbacks if 'reset_learning_rate' not in str(callback)]
             callbacks = callbacks + lr_callback
         else:
             callbacks = lr_callback
 
-        #TODO: check if there's already a "reset_learning_rate" callback and decide what to do
-
         return super(XGBClassifierLR, self).fit(X, y, callbacks = callbacks)
-    #TODO implement get_params,set_params, score & decision_function?
-    #from sklearn.utils.estimator_checks import check_estimator
-    #check_estimator(LinearSVC)
+
+class XGBRegressorHypster(XGBModelHypster):
+    @staticmethod
+    def get_name():
+        return 'XGBoost Regressor'
+
+    def set_default_tags(self):
+        self.tags = {'alias' : ['xgb', 'xgboost'],
+                    'supports regression': True,
+                    'supports ranking': False,
+                    'supports classification': False,
+                    'supports multiclass': False,
+                    'supports multilabel': False,
+                    'handles categorical' : False,
+                    'handles sparse': True,
+                    'handles nan': True,
+                    'default nan value when sparse': 0,
+                    'sensitive to feature scaling': False,
+                    'has predict_proba' : False,
+                    'has model embeddings': True,
+                    'adjustable model complexity' : True,
+                    'greedy algorithm': True
+                    }
+
+    def choose_and_set_params(self, trial, y_mean, missing):
+        model_params = {'seed': self.random_state
+            , 'verbosity': 1
+            , 'nthread': self.n_jobs
+            , 'objective' : 'reg:linear'
+            , 'base_score' : y_mean
+            , 'missing' : missing
+            , 'eta': trial.suggest_loguniform('eta', 1e-3, 1.0)
+            , 'booster': trial.suggest_categorical('booster', self.booster_list)
+            , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
+            , 'alpha': trial.suggest_loguniform('alpha', 1e-10, 1.0)
+            }
+
+        if model_params['booster'] in ['gbtree', 'dart']:
+            tree_dict = {'max_depth': trial.suggest_int('max_depth', 2, 20) #TODO: maybe change to higher range?
+                , 'min_child_weight': trial.suggest_int('min_child_weight', 1, 20)
+                , 'gamma': trial.suggest_loguniform('gamma', 1e-10, 5.0)
+                , 'grow_policy': trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
+                , 'subsample': trial.suggest_uniform('subsample', 0.5, 1.0)
+                , 'colsample_bytree': trial.suggest_uniform('colsample_bytree', 0.1, 1.0)
+                , 'colsample_bynode': trial.suggest_uniform('colsample_bynode', 0.1, 1.0)
+                }
+
+            forest_boosting = trial.suggest_categorical('forest_boosting', [True, False])
+            if forest_boosting:
+                model_params['num_parallel_tree'] = trial.suggest_int('num_parallel_tree', 2, 20)
+            else:
+                model_params['num_parallel_tree'] = 1
+
+            model_params.update(tree_dict)
+
+        else:  # gblinear
+            model_params['feature_selector'] = trial.suggest_categorical('shotgun_feature_selector',
+                                                                         ['cyclic', 'shuffle'])
+
+        if model_params['booster'] == 'dart':
+            dart_dict = {'sample_type': trial.suggest_categorical('sample_type', ['uniform', 'weighted'])
+                , 'normalize_type': trial.suggest_categorical('normalize_type', ['tree', 'forest'])
+                , 'rate_drop': trial.suggest_loguniform('rate_drop', 1e-8, 1.0)
+                , 'skip_drop': trial.suggest_loguniform('skip_drop', 1e-8, 1.0)
+                }
+
+            model_params.update(dart_dict)
+
+        self.model_params = model_params
+
+    def predict(self):
+        if self.model_params["booster"] == "dart":
+            preds = self.current_model.predict(self.dtest, output_margin=False, ntree_limit=0)
+        else:
+            preds= self.current_model.predict(self.dtest, output_margin=False)
+
+        return preds
+
+    def create_model(self):
+        self.model_params['n_estimators'] = self.best_n_iterations
+        self.model_params['learning_rate'] = self.model_params["eta"]
+
+        self.model_params['n_jobs'] = self.model_params.pop('nthread')
+        self.model_params['random_state'] = self.model_params.pop('seed')
+        self.model_params['reg_lambda'] = self.model_params.pop('lambda')
+        self.model_params['reg_alpha'] = self.model_params.pop('alpha')
+
+        final_model = XGBRegressorLR(learning_rates=self.learning_rates, **self.model_params)
+        return final_model
 
 class XGBRegressorLR(XGBRegressor):
-    #TODO add get_params with learning_rates
     def __init__(self, learning_rates = None,
                  max_depth=3, learning_rate=1, n_estimators=100,
-                 verbosity=1, silent=None,
+                 verbosity=1, silent=True,
                  objective="reg:squarederror", booster="gbtree", n_jobs=1, nthread=None, gamma=0,
                  min_child_weight=1, max_delta_step=0, subsample=0.8, colsample_bytree=1,
                  colsample_bylevel=1, colsample_bynode=0.8, reg_alpha=0, reg_lambda=1,
@@ -383,21 +388,20 @@ class XGBRegressorLR(XGBRegressor):
             early_stopping_rounds=None, verbose=True, xgb_model=None,
             sample_weight_eval_set=None, callbacks=None):
 
-        y = np.array(y) #TODO fix
+        y = np.array(y)
+
         if self.learning_rates is not None:
             lr_callback = [xgb.callback.reset_learning_rate(self.learning_rates)]
         else:
             lr_callback = None
 
         if callbacks is not None:
+            callbacks = [callback for callback in callbacks if 'reset_learning_rate' not in str(callback)]
             callbacks = callbacks + lr_callback
         else:
             callbacks = lr_callback
 
-        #TODO: check if there's already a "reset_learning_rate" callback and decide what to do
-
         return super(XGBRegressorLR, self).fit(X, y, callbacks = callbacks)
-
 
 import umap
 import numba
