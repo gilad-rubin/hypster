@@ -27,7 +27,7 @@ from hypster import *
 
 from scipy.sparse import csr_matrix, save_npz, load_npz
 
-dataset = "boston" #adult, boston
+dataset = "newsgroup" #adult, boston
 
 if dataset=="adult":
     X_train = pd.read_pickle("./data/adult_X_train.pkl")
@@ -82,52 +82,51 @@ xgb_linear = XGBClassifierHypster(booster_list=['gblinear'], lr_decay=0.1, n_ite
 xgb_tree = XGBClassifierHypster(booster_list=['gbtree', 'dart'],
                                 n_iter_per_round=3
                                 )
-
-xgb_linear = XGBRegressorHypster(booster_list=['gblinear'], lr_decay=0.1, n_iter_per_round=2
-                                 #,param_dict={#'subsample' : 0.9,
-                                              #'eta' : optuna.distributions.LogUniformDistribution(0.8, 1.0)
-                                 #            }
-                                 )
-#gb_dart = XGBClassifierHypster(booster_list=['dart'])
-#xgb_tree = XGBClassifierHypster(booster_list=['gbtree', 'dart'], user_param_dict={'max_depth' : 2})
-xgb_tree = XGBRegressorHypster(booster_list=['gbtree', 'dart'],
-                                n_iter_per_round=2
-                                )
+#
+# xgb_linear = XGBRegressorHypster(booster_list=['gblinear'], lr_decay=0.1, n_iter_per_round=2
+#                                  #,param_dict={#'subsample' : 0.9,
+#                                               #'eta' : optuna.distributions.LogUniformDistribution(0.8, 1.0)
+#                                  #            }
+#                                  )
+#
+# xgb_tree = XGBRegressorHypster(booster_list=['gbtree', 'dart'],
+#                                 n_iter_per_round=2
+#                                 )
 
 #lgb_estimator = LGBClassifierOptuna()
 #sgd_estimator = SGDClassifierOptuna()
 #rf_estimator  = RFClassifierOptuna()
 
 #estimators = [xgb_linear, xgb_tree]#, sgd|_estimator]
-estimators = [xgb_tree, xgb_linear]#, sgd|_estimator]
+estimators = [xgb_tree]#, xgb_linear]#, sgd|_estimator]
 
-# model = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
-#                         scoring="roc_auc", cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED), tol=1e-5,
-#                         sampler=sampler, refit=False, random_state=SEED, n_jobs=1, max_iter=2)
+model = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
+                        scoring="roc_auc", cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED), tol=1e-5,
+                        sampler=sampler, refit=False, random_state=SEED, n_jobs=1, max_iter=30)
 
-model = HyPSTERRegressor(estimators, pipeline, pipe_params, save_cv_preds=True,
-                        scoring="neg_mean_squared_error", cv=KFold(n_splits=3, random_state=SEED), tol=1e-5,
-                        sampler=sampler, refit=False, random_state=SEED, n_jobs=-1, max_iter=50)
+# model = HyPSTERRegressor(estimators, pipeline, pipe_params, save_cv_preds=True,
+#                         scoring="neg_mean_squared_error", cv=KFold(n_splits=5, random_state=SEED), tol=1e-5,
+#                         sampler=sampler, refit=False, random_state=SEED, n_jobs=1, max_iter=30)
 
 import time
 start_time = time.time()
 
-model.fit(X_train, y_train, cat_columns=cat_columns, n_trials_per_estimator=100)
+model.fit(X_train, y_train, cat_cols=cat_columns, n_trials_per_estimator=1)
 
 print("time elapsed: {:.2f}s".format(time.time() - start_time))
 print(model.best_score_)
 
-model.best_params_
+#model.best_params_
 
 model.refit(X_train, y_train)
 
-#test_preds = model.predict(X_test)
-#sklearn.metrics.accuracy_score(y_test, test_preds)
+test_preds = model.predict(X_test)
+sklearn.metrics.accuracy_score(LabelEncoder().fit_transform(    y_test), test_preds)
 print(model.best_estimator_.named_steps["model"].get_params()['learning_rates'])
 
-test_preds = model.predict(X_test)
-sklearn.metrics.mean_absolute_error(y_test, test_preds)
-np.sqrt(sklearn.metrics.mean_squared_error(y_test, test_preds))
+# test_preds = model.predict(X_test)
+# print(sklearn.metrics.mean_absolute_error(y_test, test_preds))
+# print(np.sqrt(sklearn.metrics.mean_squared_error(y_test, test_preds)))
 
 # test_probs = model.predict_proba(X_test)
 # test_probs = test_probs[:,1]

@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 import scipy
+import scipy.sparse as sp
 import sklearn
 import optuna
 from optuna.samplers import TPESampler
@@ -20,7 +21,9 @@ from sklearn.exceptions import NotFittedError
 from sklearn.model_selection import check_cv
 from sklearn.utils.validation import indexable
 from sklearn.base import BaseEstimator, TransformerMixin
-
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, MaxAbsScaler, RobustScaler
+from category_encoders import OneHotEncoder, BinaryEncoder, CatBoostEncoder, TargetEncoder, WOEEncoder
+from sklearn.pipeline import FeatureUnion
 from scipy.sparse import issparse
 
 def _init_pipeline(pipeline, pipe_params, trial):
@@ -41,12 +44,49 @@ def _get_params(trial, params):
             param_dict[key] = params[key]
     return param_dict
 
+def _contains_nan(X):
+    if isinstance(X, pd.DataFrame):
+        return pd.isnull(X).values.any()
+    elif sp.issparse(X):
+        return pd.isnull(X.data).any()
+    else:
+        return pd.isnull(X).any() #numpy
+
+def add_to_pipe(pipe, name, step, cols=None, cols_name=None,
+                remainder="passthrough", n_jobs=1):
+    if cols is not None:
+        step = ColumnTransformer(transformers=[(name, step, cols)],
+                                 remainder=remainder,
+                                 sparse_threshold=0,
+                                 n_jobs=n_jobs)
+
+        name = cols_name if cols_name is not None else name
+    if pipe is None:
+        pipe_res = Pipeline([(name, step)])
+    else:
+        pipe_res = clone(pipe)
+        step_names = [step[0] for step in pipe_res.steps]
+        if name not in step_names:
+            pipe_res.steps.append([name, step])
+    return pipe_res
+
+
+def contains_nan(X):
+    if isinstance(X, pd.DataFrame):
+        return pd.isnull(X).values.any()
+    elif sp.issparse(X):
+        return pd.isnull(X.data).any()
+    else:
+        return pd.isnull(X).any()  # numpy
+
 class Objective(object):
-    def __init__(self, X, y, estimator, sample_weight=None, missing=None, groups=None, cat_columns=None, #TODO add missing
+    def __init__(self, X, y, estimator, sample_weight=None,
+                 missing=None, groups=None, cat_cols=None,
+                 numeric_cols=None,#TODO add missing
                  objective_type="classification", y_stats=None, pipeline=None,
                  pipe_params=None, greater_is_better=True,
                  cv='warn', save_cv_preds=False, scoring=None, scorer_type=None,
-                 refit=False, tol=1e-5, agg_func=np.mean, max_iter=30, max_fails=3):
+                 refit=False, tol=1e-5, agg_func=np.mean, max_iter=30, max_fails=3, random_state=1):
 
         self.X = X
         self.y = y
@@ -54,7 +94,8 @@ class Objective(object):
         self.sample_weight = sample_weight
         self.groups = groups
         self.missing = missing
-        self.cat_columns = cat_columns
+        self.cat_cols = cat_cols
+        self.numeric_cols = numeric_cols
         self.objective_type = objective_type
         self.y_stats = y_stats
         self.pipeline = pipeline
@@ -69,6 +110,7 @@ class Objective(object):
         self.tol = tol
         self.max_iter = max_iter
         self.max_fails = max_fails
+        self.random_state=random_state
 
     def __call__(self, trial):
         pipeline = _init_pipeline(self.pipeline, self.pipe_params, trial)
@@ -92,21 +134,136 @@ class Objective(object):
 
         estimator.update_tags()
 
-        ## impute & convert categorical columns
-        # TODO cat_columns = list of indices or names?
-        # TODO add imputation for numeric columns
-        if (self.cat_columns is not None) and (estimator.get_tags()['handles categorical'] == False):
-            impute_ohe_pipe = Pipeline([('impute', SimpleImputer(strategy="constant", fill_value="unknown")),
-                                         ('ohe', OneHotEncoder(categories="auto", handle_unknown='ignore'))])
-            impute_ohe_ct = ColumnTransformer([('impute_ohe', impute_ohe_pipe, self.cat_columns)],
-                                              remainder="passthrough")
-            if pipeline is not None:
-                #TODO where to append? at the beginning or end?
-                pipeline.steps.append(['impute_ohe', impute_ohe_ct])
-            else:
-                pipeline = Pipeline([('impute_ohe', impute_ohe_ct)])
+        # TODO replace with self.""?
+        X = self.X
+        y = self.y
+        cat_cols = self.cat_cols
+        numeric_cols = self.numeric_cols
+        random_state = self.random_state
+        tags = estimator.get_tags()
 
-        can_lower_complexity = estimator.get_tags()["adjustable model complexity"]
+        cat_transforms = None
+        cat_pipe = None
+
+        #TODO: move before objective
+        ## get numeric columns
+        numeric_cols = None
+        if cat_cols is None:
+            if isinstance(X, pd.DataFrame):
+                numeric_cols = X.columns
+            else:
+                numeric_cols = list(range(X.shape[1]))
+        else:
+            if len(cat_cols) < X.shape[1]:
+                if (isinstance(X, pd.DataFrame)) and (isinstance(cat_cols[0], str)):
+                    numeric_cols = list(set(X.columns).difference(cat_cols))
+                else:
+                    numeric_cols = np.array(list(set(range(X.shape[1])).difference(cat_cols)))
+
+        if (cat_cols is not None):
+            if tags["handles categorical"] == False:
+
+                # TODO: fix category encoders dealing with string labels in y
+                cat_enc_types = ["binary", "catboost", "woe", "target"]
+                large_threshold = 6
+                large_cardinal_cats = [col for col in X[cat_cols].columns if X[col].nunique() > large_threshold]
+                small_cardinal_cats = [col for col in X[cat_cols].columns if X[col].nunique() <= large_threshold]
+                if small_cardinal_cats is not None:
+                    cat_transforms = add_to_pipe(cat_transforms, "ohe",
+                                                 OneHotEncoder(cols=small_cardinal_cats, drop_invariant=True))
+                if large_cardinal_cats is not None:
+                    if (self.objective_type == "classification" and len(self.y_stats) > 2): #multiclass
+                        cat_enc_types = ["binary"]
+                    cat_enc_type = trial.suggest_categorical("cat_enc_type", cat_enc_types)
+                    if cat_enc_type == "binary":
+                        # mapping = get_mapping(X, large_cardinal_cats)
+                        enc = BinaryEncoder(cols=large_cardinal_cats,
+                                            drop_invariant=True,
+                                            # mapping=mapping
+                                            )
+                    elif cat_enc_type == "woe":  # slow!
+                        enc = WOEEncoder(cols=large_cardinal_cats, drop_invariant=True)
+                    elif cat_enc_type == "target":
+                        min_samples_leaf = 10  # TODO: calculate percentage or something else
+                        enc = TargetEncoder(min_samples_leaf=min_samples_leaf,
+                                            cols=large_cardinal_cats,
+                                            drop_invariant=True)
+                    else: # catboost
+                        enc = CatBoostEncoder(cols=large_cardinal_cats,
+                                              drop_invariant=True,
+                                              random_state=random_state)  # TODO: replace SEED
+                        # TODO: permute to the dataset beforehand
+                    cat_transforms = add_to_pipe(cat_transforms, cat_enc_type + "_encoder", enc)
+                    cat_transform_name = "cat_encoder"
+            #TODO: move contains_nan before Objective
+            elif (contains_nan(X[cat_cols])) and (tags["handles categorical nan"] == False):
+                cat_transforms = ("imputer", SimpleImputer(strategy="constant", fill_value="unknown"))
+                cat_transform_name = "imputer"
+
+        if cat_transforms is not None:
+            if numeric_cols is None:
+                cat_pipe = add_to_pipe(cat_pipe, cat_transform_name, cat_transforms)
+            else:
+                cat_pipe = add_to_pipe(cat_pipe, cat_transform_name, cat_transforms, cols=cat_cols,
+                                       cols_name="cat_transforms", remainder="drop")
+
+        if numeric_cols is not None:
+            if cat_cols is None:
+                X_numeric = X
+            elif isinstance(numeric_cols[0], str):
+                X_numeric = X[numeric_cols]
+            else:
+                col_indices = np.asarray([index for (index, name) in enumerate(X.columns) if name in numeric_cols])
+                X_numeric = X[:, col_indices]
+
+        numeric_pipe = None
+        numeric_transforms = None
+        if (contains_nan(X_numeric)):
+            if (sp.issparse(X) and tags["nan value when sparse"] != np.nan) or \
+                    (not sp.issparse(X) and tags["handles numeric nan"] == False):
+                imputer = SimpleImputer(strategy="median", add_indicator=True)
+                numeric_transforms = add_to_pipe(numeric_transforms, "imputer", imputer)
+
+        scaler_types = ["robust", "standard", "minmax", "maxabs"]
+        if issparse(X):
+            scaler_types.remove("minmax")
+            center = False
+
+        if (numeric_cols is not None) and tags["sensitive to feature scaling"]:
+            scaler_type = trial.suggest_categorical("scaler", scaler_types)
+            if scaler_type == "standard":
+                scaler = StandardScaler(with_mean=center)
+            elif scaler_type == "robust":
+                scaler = RobustScaler(with_centering=center)
+            elif scaler_type == "maxabs":
+                scaler = MaxAbsScaler()
+            else:  # minmax
+                scaler = MinMaxScaler()
+            numeric_transforms = add_to_pipe(numeric_transforms, scaler_type + "_scaler", scaler)
+
+        if numeric_transforms is not None:
+            if cat_cols is None:
+                numeric_pipe = add_to_pipe(numeric_pipe, "numeric_pipe", numeric_transforms)
+            else:
+                numeric_pipe = add_to_pipe(numeric_pipe, "numeric_pipe", numeric_transforms,
+                                           cols=numeric_cols, cols_name="numeric_transforms", remainder="drop")
+
+        pipeline = None
+
+        if cat_pipe is not None and numeric_pipe is not None:
+            pipeline = add_to_pipe(pipeline, "cat_num_pipes", FeatureUnion([("cat", cat_pipe), ("numeric", numeric_pipe)]))
+        elif cat_pipe is not None:
+            pipeline = cat_pipe
+        elif numeric_pipe is not None:
+            pipeline = numeric_pipe
+
+        #     if pipeline is not None:
+        #         #TODO where to append? at the beginning or end?
+        #         pipeline.steps.append(['impute_ohe', impute_ohe_ct])
+        #     else:
+        #         pipeline = Pipeline([('impute_ohe', impute_ohe_ct)])
+
+        can_lower_complexity = tags["adjustable model complexity"]
 
         ## create k folds and estimators
         folds = []
@@ -184,7 +341,6 @@ class Objective(object):
             if trial.should_prune(step):
                 raise optuna.structs.TrialPruned()
 
-            fail_count = 0
             if self.greater_is_better:
                 # TODO: should I make it self.tol * estimator.n_iter_per_round?
                 condition = (np.isnan(best_score)) or (intermediate_value - best_score >= self.tol)
@@ -227,13 +383,17 @@ class Objective(object):
             n_rows = self.X.shape[0]
 
             if self.objective_type=="regression":
-                n_columns = folds[0]["raw_predictions"].shape[0]
+                n_columns = 1
             else:
                 n_columns = folds[0]["raw_predictions"].shape[1]
 
             raw_preds = np.zeros((n_rows, n_columns))
             for fold in folds:
-                raw_preds[fold["test_idx"],:] = fold['raw_predictions']
+                if n_columns == 1:
+                    fold_raw_preds = fold['raw_predictions'].reshape(-1, 1)
+                else:
+                    fold_raw_preds = fold['raw_predictions']
+                raw_preds[fold["test_idx"],:] = fold_raw_preds
             trial.set_user_attr("cv_preds", raw_preds)
 
         return best_score
@@ -249,10 +409,11 @@ class HyPSTEREstimator():
                  tol=1e-5,
                  max_iter=50,
                  time_limit=None, max_fails=3,
-                 study_name="",
+                 study_name=None,
                  save_cv_preds=False,
                  pruner=SuccessiveHalvingPruner(min_resource=3, reduction_factor=3),
                  sampler=TPESampler(**TPESampler.hyperopt_parameters()),
+                 storage=None,
                  n_jobs=1,
                  verbose=1,
                  random_state=None):
@@ -272,18 +433,14 @@ class HyPSTEREstimator():
         self.save_cv_preds = save_cv_preds
         self.pruner = pruner
         self.sampler = sampler
+        self.storage = storage
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.random_state = random_state
         self.best_estimator_ = None
 
-    def fit(self, X=None, y=None, sample_weight=None, groups=None, missing=None, cat_columns=None, n_trials=10):
+    def fit(self, X=None, y=None, sample_weight=None, groups=None, missing=None, cat_cols=None, n_trials=10):
         raise NotImplementedError
-
-    def refit(self, X, y):
-        #TODO check if best_estimator exists
-        self.refit_=True
-        self.best_estimator_.fit(X, y)
 
     def _check_is_fitted(self, method_name):
         if not self.refit_:
@@ -313,8 +470,8 @@ class HyPSTEREstimator():
         return
 
 class HyPSTERClassifier(HyPSTEREstimator):
-    def fit(self, X, y, sample_weight=None, groups=None, missing=None, cat_columns=None,
-            n_trials_per_estimator=10):
+    def fit(self, X, y, sample_weight=None, groups=None, missing=None, cat_cols=None,
+            n_trials_per_estimator=10, timeout_per_estimator=None):
 
         if isinstance(n_trials_per_estimator, list) and (len(n_trials_per_estimator) < len(self.estimators)):
             print("n_trials_per_estimator size is smaller than the number of estimators!") #TODO error
@@ -351,7 +508,7 @@ class HyPSTERClassifier(HyPSTEREstimator):
         class_counts = np.bincount(y)
 
         valid_estimators = []
-        ## filter out estimators & transformer
+        ## filter out estimators
         for i in range(len(self.estimators)):
             remove_estimator=False
             estimator = self.estimators[i]
@@ -384,7 +541,7 @@ class HyPSTERClassifier(HyPSTEREstimator):
 
             estimator.set_n_jobs(self.n_jobs)
 
-            objective = Objective(X, y, estimator, sample_weight, groups, missing, cat_columns,
+            objective = Objective(X, y, estimator, sample_weight, groups, missing, cat_cols,
                                   objective_type="classification", y_stats=class_counts,
                                   pipeline=self.pipeline, pipe_params=self.pipe_params,
                                   greater_is_better=greater_is_better,
@@ -392,15 +549,18 @@ class HyPSTERClassifier(HyPSTEREstimator):
                                   scoring=scorer._score_func,
                                   scorer_type = scorer_type,
                                   agg_func=self.agg_func, tol=self.tol,
-                                  max_iter=self.max_iter, max_fails=self.max_fails)
+                                  max_iter=self.max_iter, max_fails=self.max_fails,
+                                  random_state=self.random_state)
 
             if self.verbose > 0:
                 optuna.logging.set_verbosity(optuna.logging.WARN)
 
             if study is None:
-                study = optuna.create_study(pruner=self.pruner,
+                study_name = self.study_name if self.study_name else "study"
+                study = optuna.create_study(storage=self.storage,
+                                            pruner=self.pruner,
                                             sampler=self.sampler,
-                                            study_name="study",
+                                            study_name=study_name,
                                             load_if_exists=True,
                                             direction=direction)
             else:
@@ -413,7 +573,7 @@ class HyPSTERClassifier(HyPSTEREstimator):
             else:
                 n_trials = n_trials_per_estimator
 
-            study.optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs)
+            study.optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs, timeout=timeout_per_estimator)
 
         self.study = study
         self.best_estimator_ = study.best_trial.user_attrs['pipeline']
@@ -431,6 +591,13 @@ class HyPSTERClassifier(HyPSTEREstimator):
 
         self.best_model_ = self.best_estimator_.named_steps["model"]
 
+    def refit(self, X, y):
+        #TODO check if best_estimator exists
+        le = LabelEncoder()
+        y = le.fit_transform(y)
+        self.refit_ = True
+        self.best_estimator_.fit(X, y)
+
     def predict(self, X):
         self._check_is_fitted('predict')
         return self.best_estimator_.predict(X)
@@ -441,8 +608,8 @@ class HyPSTERClassifier(HyPSTEREstimator):
 
 
 class HyPSTERRegressor(HyPSTEREstimator):
-    def fit(self, X, y, sample_weight=None, groups=None, missing=None, cat_columns=None,
-            n_trials_per_estimator=10):
+    def fit(self, X, y, sample_weight=None, groups=None, missing=None, cat_cols=None,
+            n_trials_per_estimator=10, timeout_per_estimator=None):
 
         #TODO check that y is regression and not classification
         #TODO: consider log-transform y?
@@ -517,7 +684,7 @@ class HyPSTERRegressor(HyPSTEREstimator):
 
             estimator.set_n_jobs(self.n_jobs)
 
-            objective = Objective(X, y, estimator, sample_weight, groups, missing, cat_columns,
+            objective = Objective(X, y, estimator, sample_weight, groups, missing, cat_cols,
                                   objective_type="regression", y_stats=y_mean,
                                   pipeline=self.pipeline, pipe_params=self.pipe_params,
                                   greater_is_better=greater_is_better,
@@ -525,15 +692,18 @@ class HyPSTERRegressor(HyPSTEREstimator):
                                   scoring=scorer._score_func,
                                   scorer_type=scorer_type,
                                   agg_func=self.agg_func, tol=self.tol,
-                                  max_iter=self.max_iter, max_fails=self.max_fails)
+                                  max_iter=self.max_iter, max_fails=self.max_fails,
+                                  random_state = self.random_state)
 
             if self.verbose > 0:
                 optuna.logging.set_verbosity(optuna.logging.WARN)
 
             if study is None:
-                study = optuna.create_study(pruner=self.pruner,
+                study_name = self.study_name if self.study_name else "study"
+                study = optuna.create_study(storage=self.storage,
+                                            pruner=self.pruner,
                                             sampler=self.sampler,
-                                            study_name="study",
+                                            study_name=study_name,
                                             load_if_exists=True,
                                             direction=direction)
             else:
@@ -546,7 +716,7 @@ class HyPSTERRegressor(HyPSTEREstimator):
             else:
                 n_trials = n_trials_per_estimator
 
-            study.optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs)
+            study.optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs, timeout=timeout_per_estimator)
 
         self.study = study
         self.best_estimator_ = study.best_trial.user_attrs['pipeline']
@@ -563,6 +733,12 @@ class HyPSTERRegressor(HyPSTEREstimator):
             self.best_transformer_ = IdentityTransformer()  # TODO check if it's neccessary
 
         self.best_model_ = self.best_estimator_.named_steps["model"]
+
+    def refit(self, X, y):
+        #TODO check if best_estimator exists
+        y = np.array(y)
+        self.refit_ = True
+        self.best_estimator_.fit(X, y)
 
     def predict(self, X):
         self._check_is_fitted('predict')

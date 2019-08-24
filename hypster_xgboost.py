@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.base import clone
 from copy import deepcopy
 
-class HypsterEstimator:
+class HypsterEstimator():
     def __init__(self, n_iter_per_round=1, n_jobs=1, random_state=1, param_dict={}):
         self.n_iter_per_round = n_iter_per_round
         self.n_jobs = n_jobs
@@ -75,7 +75,7 @@ class XGBModelHypster(HypsterEstimator):
 
     def update_tags(self):
         self.tags['sensitive to feature scaling'] = self.model_params["booster"] == "gblinear"
-        self.tags['greedy algorithm'] = self.model_params["booster"] in ["gbtree", "dart"]
+        self.tags['tree based'] = self.model_params["booster"] in ["gbtree", "dart"]
 
     def set_train(self, X, y, sample_weight=None, missing=None):
         # TODO make sample_weight works with class_weight
@@ -128,14 +128,15 @@ class XGBClassifierHypster(XGBModelHypster):
                     'supports multiclass': True,
                     'supports multilabel': False,
                     'handles categorical' : False,
+                    'handles categorical nan': False,
                     'handles sparse': True,
-                    'handles nan': True,
-                    'default nan value when sparse': 0,
+                    'handles numeric nan': True,
+                    'nan value when sparse': 0,
                     'sensitive to feature scaling': False,
                     'has predict_proba' : True,
                     'has model embeddings': True,
                     'adjustable model complexity' : True,
-                    'greedy algorithm': True
+                    'tree based': True
                     }
 
     def choose_and_set_params(self, trial, class_counts, missing):
@@ -288,21 +289,21 @@ class XGBRegressorHypster(XGBModelHypster):
                     'has predict_proba' : False,
                     'has model embeddings': True,
                     'adjustable model complexity' : True,
-                    'greedy algorithm': True
+                    'tree based': True
                     }
 
     def choose_and_set_params(self, trial, y_mean, missing):
         model_params = {'seed': self.random_state
-            , 'verbosity': 1
-            , 'nthread': self.n_jobs
-            , 'objective' : 'reg:linear'
-            , 'base_score' : y_mean
-            , 'missing' : missing
-            , 'eta': trial.suggest_loguniform('eta', 1e-3, 1.0)
-            , 'booster': trial.suggest_categorical('booster', self.booster_list)
-            , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
-            , 'alpha': trial.suggest_loguniform('alpha', 1e-10, 1.0)
-            }
+                        , 'verbosity': 1
+                        , 'nthread': self.n_jobs
+                        , 'objective' : 'reg:squarederror'
+                        , 'base_score' : y_mean
+                        , 'missing' : missing
+                        , 'eta': trial.suggest_loguniform('eta', 1e-3, 1.0)
+                        , 'booster': trial.suggest_categorical('booster', self.booster_list)
+                        , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
+                        , 'alpha': trial.suggest_loguniform('alpha', 1e-10, 1.0)
+                        }
 
         if model_params['booster'] in ['gbtree', 'dart']:
             tree_dict = {'max_depth': trial.suggest_int('max_depth', 2, 20) #TODO: maybe change to higher range?
