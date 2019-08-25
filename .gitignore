@@ -1,11 +1,7 @@
 .*
 __*
-news/
-*.pkl
 *.csv
 *.npz
 *.pyc
-*.pyc
 *.lock
-*.pkl
 *.pkl
