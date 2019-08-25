@@ -224,6 +224,7 @@ class Objective(object):
                 imputer = SimpleImputer(strategy="median", add_indicator=True)
                 numeric_transforms = add_to_pipe(numeric_transforms, "imputer", imputer)
 
+        center = True
         scaler_types = ["robust", "standard", "minmax", "maxabs"]
         if issparse(X):
             scaler_types.remove("minmax")
@@ -294,9 +295,8 @@ class Objective(object):
 
 
         best_score = np.nan
-
         for step in range(self.max_iter):
-            # print("Iteration #", step)
+            #print("Iteration #", step)
             scores = []
             raw_preds_list = []
             for fold in folds:
@@ -545,7 +545,7 @@ class HyPSTERClassifier(HyPSTEREstimator):
                                   objective_type="classification", y_stats=class_counts,
                                   pipeline=self.pipeline, pipe_params=self.pipe_params,
                                   greater_is_better=greater_is_better,
-                                  cv=self.cv, save_cv_preds=self.save_cv_preds,
+                                  cv=cv, save_cv_preds=self.save_cv_preds,
                                   scoring=scorer._score_func,
                                   scorer_type = scorer_type,
                                   agg_func=self.agg_func, tol=self.tol,
@@ -688,7 +688,7 @@ class HyPSTERRegressor(HyPSTEREstimator):
                                   objective_type="regression", y_stats=y_mean,
                                   pipeline=self.pipeline, pipe_params=self.pipe_params,
                                   greater_is_better=greater_is_better,
-                                  cv=self.cv, save_cv_preds=self.save_cv_preds,
+                                  cv=cv, save_cv_preds=self.save_cv_preds,
                                   scoring=scorer._score_func,
                                   scorer_type=scorer_type,
                                   agg_func=self.agg_func, tol=self.tol,

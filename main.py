@@ -102,7 +102,7 @@ estimators = [xgb_tree]#, xgb_linear]#, sgd|_estimator]
 
 model = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
                         scoring="roc_auc", cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED), tol=1e-5,
-                        sampler=sampler, refit=False, random_state=SEED, n_jobs=1, max_iter=30)
+                        sampler=sampler, refit=False, random_state=SEED, n_jobs=-1, max_iter=30)
 
 # model = HyPSTERRegressor(estimators, pipeline, pipe_params, save_cv_preds=True,
 #                         scoring="neg_mean_squared_error", cv=KFold(n_splits=5, random_state=SEED), tol=1e-5,
