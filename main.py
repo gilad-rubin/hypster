@@ -16,7 +16,6 @@ from optuna.visualization import plot_intermediate_values
 
 import numpy as np
 import xgboost as xgb
-#import lightgbm as lgb
 
 SEED = 85
 
@@ -27,7 +26,7 @@ from hypster import *
 
 from scipy.sparse import csr_matrix, save_npz, load_npz
 
-dataset = "newsgroup" #adult, boston
+dataset = "adult" #adult, boston
 
 if dataset=="adult":
     X_train = pd.read_pickle("./data/adult_X_train.pkl")
@@ -102,7 +101,7 @@ estimators = [xgb_tree]#, xgb_linear]#, sgd|_estimator]
 
 model = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
                         scoring="roc_auc", cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED), tol=1e-5,
-                        sampler=sampler, refit=False, random_state=SEED, n_jobs=-1, max_iter=30)
+                        sampler=sampler, refit=False, random_state=SEED, n_jobs=1, max_iter=5)
 
 # model = HyPSTERRegressor(estimators, pipeline, pipe_params, save_cv_preds=True,
 #                         scoring="neg_mean_squared_error", cv=KFold(n_splits=5, random_state=SEED), tol=1e-5,
@@ -111,7 +110,7 @@ model = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
 import time
 start_time = time.time()
 
-model.fit(X_train, y_train, cat_cols=cat_columns, n_trials_per_estimator=1)
+model.fit(X_train, y_train, cat_cols=cat_columns, n_trials_per_estimator=20)
 
 print("time elapsed: {:.2f}s".format(time.time() - start_time))
 print(model.best_score_)
@@ -121,7 +120,7 @@ print(model.best_score_)
 model.refit(X_train, y_train)
 
 test_preds = model.predict(X_test)
-sklearn.metrics.accuracy_score(LabelEncoder().fit_transform(    y_test), test_preds)
+sklearn.metrics.accuracy_score(LabelEncoder().fit_transform(y_test), test_preds)
 print(model.best_estimator_.named_steps["model"].get_params()['learning_rates'])
 
 # test_preds = model.predict(X_test)

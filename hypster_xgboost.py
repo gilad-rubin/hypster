@@ -179,7 +179,7 @@ class XGBClassifierHypster(XGBModelHypster):
 
             forest_boosting = trial.suggest_categorical('forest_boosting', [True, False])
             if forest_boosting:
-                model_params['num_parallel_tree'] = trial.suggest_int('num_parallel_tree', 2, 20)
+                model_params['num_parallel_tree'] = trial.suggest_int('num_parallel_tree', 2, 10)
             else:
                 model_params['num_parallel_tree'] = 1
 
@@ -214,6 +214,8 @@ class XGBClassifierHypster(XGBModelHypster):
         return np.vstack((classzero_probs, classone_probs)).transpose()
 
     def create_model(self):
+        #TODO: if learning rates are identical throughout - create a regular Classifier
+
         self.model_params['n_estimators'] = self.best_n_iterations
         self.model_params['learning_rate'] = self.model_params["eta"]
 
@@ -317,7 +319,7 @@ class XGBRegressorHypster(XGBModelHypster):
 
             forest_boosting = trial.suggest_categorical('forest_boosting', [True, False])
             if forest_boosting:
-                model_params['num_parallel_tree'] = trial.suggest_int('num_parallel_tree', 2, 20)
+                model_params['num_parallel_tree'] = trial.suggest_int('num_parallel_tree', 2, 10)
             else:
                 model_params['num_parallel_tree'] = 1
 
@@ -347,6 +349,8 @@ class XGBRegressorHypster(XGBModelHypster):
         return preds
 
     def create_model(self):
+        # TODO: if learning rates are identical throughout - create a regular Classifier
+
         self.model_params['n_estimators'] = self.best_n_iterations
         self.model_params['learning_rate'] = self.model_params["eta"]
 
@@ -403,35 +407,3 @@ class XGBRegressorLR(XGBRegressor):
             callbacks = lr_callback
 
         return super(XGBRegressorLR, self).fit(X, y, callbacks = callbacks)
-
-import umap
-import numba
-
-@numba.njit()
-def jaccard_categorical(x, y):
-    num_non_zero = 0.0
-    num_equal = 0.0
-    num_non_zero = x.shape[0]
-    for i in range(x.shape[0]):
-        num_equal += x[i] == y[i]
-
-    if num_non_zero == 0.0:
-        return 0.0
-    else:
-        return float(num_non_zero - num_equal) / num_non_zero
-
-def tree_ensemble_embeddings(X, model, reducer=None, n_componenets=2, random_state=1):
-    leaves = model.apply(X)
-    if reducer is None:
-        reducer = umap.UMAP(metric=jaccard_categorical,
-                            n_components=n_componenets,
-                            random_state=random_state,
-                            verbose=False)
-        embeddings = reducer.fit_transform(leaves)
-        return embeddings, reducer
-    else:
-        embeddings = reducer.transform(leaves)
-    return embeddings
-
-#train_emb, reducer = tree_ensemble_embeddings(X_train, model=rf, random_state=SEED)
-#test_emb = tree_ensemble_embeddings(X_test, model=rf, reducer=reducer ,random_state=SEED)
