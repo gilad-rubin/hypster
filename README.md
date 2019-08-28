@@ -18,7 +18,7 @@ Easy extensibility
 
 Work with Python
 
-## Getting started: 30 seconds to Keras
+## Getting started
 an XGBoost example:
 
 ```python
@@ -43,4 +43,5 @@ clf.predict_proba(X_test)
 ## Contributors
 
 Gilad Rubin
+
 [Tal Peretz](https://www.linkedin.com/in/talper/)
