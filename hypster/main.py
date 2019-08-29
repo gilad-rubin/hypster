@@ -1,35 +1,50 @@
 import pandas as pd
+import numpy as np
+import scipy
 import sklearn
 
-from sklearn.model_selection import StratifiedKFold
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
+from sklearn.pipeline import Pipeline
+from sklearn.feature_selection import SelectFromModel, SelectPercentile, chi2, VarianceThreshold
+from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
+from sklearn import metrics
+from sklearn.preprocessing import LabelEncoder
+
+import optuna
+from optuna.visualization import plot_intermediate_values
+
+import numpy as np
+import xgboost as xgb
 
 SEED = 85
 
-from hypster.hypster_xgboost import *
-
+from hypster import HyPSTERClassifier
+from hypster.classification.xgb_hyptser import XGBClassifierHypster
 # Get Dataset
 
-from scipy.sparse import load_npz
+from scipy.sparse import csr_matrix, save_npz, load_npz
 
 dataset = "adult" #adult, boston
 
 if dataset=="adult":
-    X_train = pd.read_pickle("./data/adult_X_train.pkl")
-    y_train = pd.read_pickle("./data/adult_y_train.pkl")
-    X_test = pd.read_pickle("./data/adult_X_test.pkl")
-    y_test = pd.read_pickle("./data/adult_y_test.pkl")
+    X_train = pd.read_pickle("../data/adult_X_train.pkl")
+    y_train = pd.read_pickle("../data/adult_y_train.pkl")
+    X_test = pd.read_pickle("../data/adult_X_test.pkl")
+    y_test = pd.read_pickle("../data/adult_y_test.pkl")
     cat_columns = X_train.select_dtypes(include="object").columns
 elif dataset=="newsgroup":
-    X_train = load_npz("./data/X_train.npz")
-    y_train = pd.read_pickle("./data/y_train.pkl")
-    X_test = load_npz("./data/X_test.npz")
-    y_test = pd.read_pickle("./data/y_test.pkl")
+    X_train = load_npz("../data/X_train.npz")
+    y_train = pd.read_pickle("../data/y_train.pkl")
+    X_test = load_npz("../data/X_test.npz")
+    y_test = pd.read_pickle("../data/y_test.pkl")
     cat_columns=None
 else:
-    X_train = pd.read_pickle("./data/boston_X_train.pkl")
-    y_train = pd.read_pickle("./data/boston_y_train.pkl")
-    X_test = pd.read_pickle("./data/boston_X_test.pkl")
-    y_test = pd.read_pickle("./data/boston_y_test.pkl")
+    X_train = pd.read_pickle("../data/boston_X_train.pkl")
+    y_train = pd.read_pickle("../data/boston_y_train.pkl")
+    X_test = pd.read_pickle("../data/boston_X_test.pkl")
+    y_test = pd.read_pickle("../data/boston_y_test.pkl")
     cat_columns = None
 
 #X_train = X_train.sample(n=10000, random_state=SEED, axis=0)
@@ -86,7 +101,7 @@ estimators = [xgb_tree]#, xgb_linear]#, sgd|_estimator]
 
 model = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
                         scoring="roc_auc", cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED), tol=1e-5,
-                        sampler=sampler, refit=False, random_state=SEED, n_jobs=1, max_iter=5)
+                        sampler=sampler, refit=False, random_state=SEED, n_jobs=-1, max_iter=100)
 
 # model = HyPSTERRegressor(estimators, pipeline, pipe_params, save_cv_preds=True,
 #                         scoring="neg_mean_squared_error", cv=KFold(n_splits=5, random_state=SEED), tol=1e-5,
@@ -95,7 +110,7 @@ model = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
 import time
 start_time = time.time()
 
-model.fit(X_train, y_train, cat_cols=cat_columns, n_trials_per_estimator=20)
+model.fit(X_train, y_train, cat_cols=cat_columns, n_trials_per_estimator=50)
 
 print("time elapsed: {:.2f}s".format(time.time() - start_time))
 print(model.best_score_)
@@ -112,7 +127,7 @@ print(model.best_estimator_.named_steps["model"].get_params()['learning_rates'])
 # print(sklearn.metrics.mean_absolute_error(y_test, test_preds))
 # print(np.sqrt(sklearn.metrics.mean_squared_error(y_test, test_preds)))
 
-# test_probs = model.predict_proba(X_test)
-# test_probs = test_probs[:,1]
-#
-# print(sklearn.metrics.roc_auc_score(y_test, test_probs))
+test_probs = model.predict_proba(X_test)
+test_probs = test_probs[:,1]
+
+print(sklearn.metrics.roc_auc_score(y_test, test_probs))
