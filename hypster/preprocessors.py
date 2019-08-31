@@ -39,19 +39,19 @@ def CatEncoder(X, cat_cols, tags, objective_type, trial, n_classes, random_state
     if tags["handles categorical"] == False:
         large_threshold = 6
         #TODO: handle numpy arrays with categorical?
+        #TODO: handle multiclass / Regression
         large_cardinal_cats = [col for col in X[cat_cols].columns if X[col].nunique() > large_threshold]
         small_cardinal_cats = [col for col in X[cat_cols].columns if X[col].nunique() <= large_threshold]
 
         enc_pipe = None
-        cat_enc_types = ["binary", "catboost", "target"]#, "woe"]
-        #cat_enc_types = ["target", "binary"]  # , "catboost", "woe", "target"]
+        cat_enc_types = ["binary", "catboost", "target"]
 
         if small_cardinal_cats is not None:
             enc_pipe = add_to_pipe(enc_pipe, "ohe", OneHotEncoder(cols=small_cardinal_cats, drop_invariant=True))
 
         if large_cardinal_cats is not None:
-            if (objective_type == "classification" and n_classes > 2): #multiclass
-                cat_enc_types = ["binary"]
+            if (objective_type == "classification" and n_classes == 1):
+                cat_enc_types.append("woe")
 
             cat_enc_type = trial.suggest_categorical("cat_enc_type", cat_enc_types)
 
@@ -80,8 +80,8 @@ def CatEncoder(X, cat_cols, tags, objective_type, trial, n_classes, random_state
 def NumericImputer(X, numeric_cols, trial, tags):
     imputer = None
     if (contains_nan(safe_column_indexing(X, numeric_cols))):
-        if (sp.issparse(X) and tags["nan value when sparse"] != np.nan) or \
-                (not sp.issparse(X) and tags["handles numeric nan"] == False):
+        if (not sp.issparse(X) and tags["handles numeric nan"] == False) or\
+                (sp.issparse(X) and tags["nan value when sparse"] != np.nan):
             imputer = SimpleImputer(strategy="median", add_indicator=True)
     return imputer
 

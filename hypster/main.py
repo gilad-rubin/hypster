@@ -1,30 +1,15 @@
 import pandas as pd
-import numpy as np
-import scipy
 import sklearn
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-
-from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
-from sklearn.pipeline import Pipeline
-from sklearn.feature_selection import SelectFromModel, SelectPercentile, chi2, VarianceThreshold
-from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
-from sklearn import metrics
 from sklearn.preprocessing import LabelEncoder
-
-import optuna
-from optuna.visualization import plot_intermediate_values
-
-import numpy as np
-import xgboost as xgb
 
 SEED = 85
 
 from hypster import HyPSTERClassifier
-from hypster.classification.xgb_hyptser import XGBClassifierHypster
+from hypster.estimators.classification.xgboost import XGBClassifierHypster
 # Get Dataset
 
-from scipy.sparse import csr_matrix, save_npz, load_npz
+from scipy.sparse import load_npz
 
 dataset = "adult" #adult, boston
 
@@ -61,9 +46,7 @@ else:
 pipeline = None
 pipe_params = None
 
-from optuna.samplers import TPESampler
-
-sampler = TPESampler(**TPESampler.hyperopt_parameters(), seed=SEED)
+#sampler = TPESampler(**TPESampler.hyperopt_parameters(), seed=SEED)
 
 # sampler = optuna.integration.CmaEsSampler(n_startup_trials=40,
 #                       independent_sampler=TPESampler(**TPESampler.hyperopt_parameters()),
@@ -97,11 +80,12 @@ xgb_tree = XGBClassifierHypster(booster_list=['gbtree', 'dart'],
 #rf_estimator  = RFClassifierOptuna()
 
 #estimators = [xgb_linear, xgb_tree]#, sgd|_estimator]
-estimators = [xgb_tree]#, xgb_linear]#, sgd|_estimator]
+estimators = [xgb_tree, xgb_linear]#, sgd|_estimator]
 
 model = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
-                        scoring="roc_auc", cv=StratifiedKFold(n_splits=3, shuffle=True, random_state=SEED), tol=1e-5,
-                        sampler=sampler, refit=False, random_state=SEED, n_jobs=-1, max_iter=100)
+                          scoring="roc_auc",
+                          cv=3, tol=1e-5,
+                          refit=False, random_state=SEED, n_jobs=-1, max_iter=5)
 
 # model = HyPSTERRegressor(estimators, pipeline, pipe_params, save_cv_preds=True,
 #                         scoring="neg_mean_squared_error", cv=KFold(n_splits=5, random_state=SEED), tol=1e-5,
@@ -110,7 +94,7 @@ model = HyPSTERClassifier(estimators, pipeline, pipe_params, save_cv_preds=True,
 import time
 start_time = time.time()
 
-model.fit(X_train, y_train, cat_cols=cat_columns, n_trials_per_estimator=50)
+model.fit(X_train, y_train, cat_cols=cat_columns, n_trials=10)
 
 print("time elapsed: {:.2f}s".format(time.time() - start_time))
 print(model.best_score_)
@@ -121,7 +105,7 @@ model.refit(X_train, y_train)
 
 test_preds = model.predict(X_test)
 sklearn.metrics.accuracy_score(LabelEncoder().fit_transform(y_test), test_preds)
-print(model.best_estimator_.named_steps["model"].get_params()['learning_rates'])
+print(model.best_pipeline_.named_steps["model"].get_params()['learning_rates'])
 
 # test_preds = model.predict(X_test)
 # print(sklearn.metrics.mean_absolute_error(y_test, test_preds))

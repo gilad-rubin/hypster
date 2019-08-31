@@ -47,8 +47,10 @@ def _get_params(trial, params):
             param_dict[key] = params[key]
     return param_dict
 
+
+
 class Objective(object):
-    def __init__(self, X, y, estimator, sample_weight=None,
+    def __init__(self, X, y, estimators, sample_weight=None,
                  missing=None, groups=None, cat_cols=None,
                  numeric_cols=None,#TODO add missing
                  objective_type="classification", y_stats=None, pipeline=None,
@@ -58,7 +60,7 @@ class Objective(object):
 
         self.X = X
         self.y = y
-        self.estimator = estimator
+        self.estimators = estimators
         self.sample_weight = sample_weight
         self.groups = groups
         self.missing = missing
@@ -81,11 +83,15 @@ class Objective(object):
         self.random_state=random_state
 
     def __call__(self, trial):
+        estimator = deepcopy(trial.suggest_categorical("estimator", self.estimators))
+
+        #print(estimator.get_name())
+
         pipeline = _init_pipeline(self.pipeline, self.pipe_params, trial)
 
         ## choose estimator from list
         estimator_list = []
-        estimator = deepcopy(self.estimator)
+        #estimator = deepcopy(self.estimator)
         estimator.choose_and_set_params(trial, self.y_stats, self.missing)
 
         ## set params on main estimator
@@ -110,8 +116,6 @@ class Objective(object):
         random_state = self.random_state
         tags = estimator.get_tags()
 
-        numeric_cols = get_numeric_cols(X, cat_cols)
-
         cat_transforms = ["encode"] #"impute" #TODO: fix numpy array output from imputation
         transformers = []
         cat_steps = None
@@ -122,7 +126,8 @@ class Objective(object):
                 if cat_imputer is not None:
                     transformers.append(("cat_imputer", cat_imputer))
             if "encode" in cat_transforms:
-                cat_encoder = CatEncoder(X, cat_cols, tags, self.objective_type, trial, len(self.y_stats), random_state)
+                n_classes = 1 if self.objective_type=="regression" else len(self.y_stats)
+                cat_encoder = CatEncoder(X, cat_cols, tags, self.objective_type, trial, n_classes, random_state)
                 if cat_encoder is not None:
                     transformers.append(("cat_encoder", cat_encoder))
             if len(transformers) == 1:
@@ -132,8 +137,9 @@ class Objective(object):
                 cat_steps_name = "cat_transforms"
                 cat_steps = Pipeline(transformers)
             if (numeric_cols is not None) and (cat_steps is not None):
-                ct_items = [(step[0], step[1], cat_cols) for step in transformers]
-                cat_steps = ColumnTransformer(ct_items, remainder="drop", sparse_threshold=0)
+                #ct_items = [(step[0], step[1], cat_cols) for step in transformers]
+                cat_steps = ColumnTransformer([(cat_steps_name, cat_steps, cat_cols)],
+                                              remainder="drop", sparse_threshold=0)
         numeric_transforms = ["impute", "scale"]
         transformers = []
         numeric_steps = None
@@ -153,9 +159,10 @@ class Objective(object):
             elif len(transformers) >= 2:
                 numeric_steps_name = "numeric_transforms"
                 numeric_steps = Pipeline(transformers)
-            if (numeric_cols is not None) and (cat_steps is not None):
-                ct_items = [(step[0], step[1], numeric_cols) for step in transformers]
-                numeric_steps = ColumnTransformer(ct_items, remainder="drop", sparse_threshold=0)
+            if (cat_cols is not None) and (numeric_steps is not None):
+                #ct_items = [(step[0], step[1], numeric_cols) for step in transformers]
+                numeric_steps = ColumnTransformer([(numeric_steps_name, numeric_steps, numeric_cols)],
+                                                  remainder="drop", sparse_threshold=0)
 
         if (cat_steps is not None) and (numeric_steps is not None):
             union = FeatureUnion([("cat", cat_steps), ("numeric", numeric_steps)])
@@ -196,7 +203,7 @@ class Objective(object):
 
         best_score = np.nan
         for step in range(self.max_iter):
-            print("Iteration #", step)
+            #print("Iteration #", step)
             scores = []
             raw_preds_list = []
             for fold in folds:
@@ -309,7 +316,8 @@ class HyPSTEREstimator():
                  refit=True,
                  tol=1e-5,
                  max_iter=50,
-                 time_limit=None, max_fails=3,
+                 max_fails=3,
+                 time_limit=None,
                  study_name=None,
                  save_cv_preds=False,
                  pruner=SuccessiveHalvingPruner(min_resource=3, reduction_factor=3),
@@ -319,7 +327,7 @@ class HyPSTEREstimator():
                  verbose=1,
                  random_state=None):
 
-        self.estimators = estimators
+        self.estimators = estimators if isinstance(estimators, list) else [estimators]
         self.pipeline = pipeline
         self.pipe_params = pipe_params
         self.scoring = scoring
@@ -338,10 +346,69 @@ class HyPSTEREstimator():
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.random_state = random_state
-        self.best_estimator_ = None
+        self.best_pipeline_ = None
 
     def fit(self, X=None, y=None, sample_weight=None, groups=None, missing=None, cat_cols=None, n_trials=10):
         raise NotImplementedError
+
+    def run_study_save_results(self, X, y, valid_estimators, cv, scorer, scorer_type,
+                              greater_is_better, y_stats, objective_type, sample_weight,
+                              groups, missing, cat_cols, timeout_per_estimator, n_trials):
+
+        direction = "maximize" if greater_is_better else "minimize"
+        #study = None
+        for i in range(len(valid_estimators)):
+            estimator = valid_estimators[i]
+
+            # print(estimator.get_name())
+            #
+            if estimator.get_seed() == 1:
+                estimator.set_seed(self.random_state)
+
+            estimator.set_n_jobs(self.n_jobs)
+
+        numeric_cols = get_numeric_cols(X, cat_cols)
+
+        objective = Objective(X, y, valid_estimators, sample_weight, groups, missing, cat_cols,
+                              numeric_cols=numeric_cols, objective_type=objective_type, y_stats=y_stats,
+                              pipeline=self.pipeline, pipe_params=self.pipe_params,
+                              greater_is_better=greater_is_better,
+                              cv=cv, save_cv_preds=self.save_cv_preds,
+                              scoring=scorer._score_func,
+                              scorer_type = scorer_type,
+                              agg_func=self.agg_func, tol=self.tol,
+                              max_iter=self.max_iter, max_fails=self.max_fails,
+                              random_state=self.random_state)
+
+        if self.verbose > 0:
+            optuna.logging.set_verbosity(optuna.logging.WARN)
+
+        #if study is None:
+        study_name = self.study_name if self.study_name else "study"
+        study = optuna.create_study(storage=self.storage,
+                                    pruner=self.pruner,
+                                    sampler=self.sampler,
+                                    study_name=study_name,
+                                    load_if_exists=True,
+                                    direction=direction)
+
+        study.optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs, timeout=timeout_per_estimator)
+
+        self.study = study
+        self.best_pipeline_ = study.best_trial.user_attrs['pipeline']
+        self.best_score_ = study.best_value
+        self.best_params_ = study.best_params
+        self.best_index_ = study.best_trial.trial_id
+
+        if self.refit_:
+            self.best_pipeline_.fit(X, y)
+
+        if len(self.best_pipeline_.steps) > 1: #pipeline has more than just a classifier
+            self.best_transformer_ = Pipeline(self.best_pipeline_.steps[:-1]) #return all steps but last (classifier)
+        else:
+            self.best_transformer_ = IdentityTransformer()
+
+        self.best_model_ = self.best_pipeline_.named_steps["model"]
 
     def _check_is_fitted(self, method_name):
         if not self.refit_:
@@ -352,11 +419,11 @@ class HyPSTEREstimator():
                                  'by using applying the ".refit" method manually'
                                  % (method_name))
         else:
-            check_is_fitted(self, 'best_estimator_')
+            check_is_fitted(self, 'best_pipeline_')
 
     def predict(self, X):
         self._check_is_fitted('predict')
-        return self.best_estimator_.predict(X)
+        return self.best_pipeline_.predict(X)
     
     #TODO: check if we should implement "score" and "predict_log_proba"
 
@@ -372,41 +439,23 @@ class HyPSTEREstimator():
 
 class HyPSTERClassifier(HyPSTEREstimator):
     def fit(self, X, y, sample_weight=None, groups=None, missing=None, cat_cols=None,
-            n_trials_per_estimator=10, timeout_per_estimator=None):
-
-        if isinstance(n_trials_per_estimator, list) and (len(n_trials_per_estimator) < len(self.estimators)):
-            print("n_trials_per_estimator size is smaller than the number of estimators!") #TODO error
-            return
-
-        ##initialize seeds
-        if self.sampler.seed is None:
-            self.sampler.seed = self.random_state
+            n_trials=10, timeout_per_estimator=None):
 
         X, y, groups = indexable(X, y, groups)
-        cv = check_cv(self.cv, y, classifier=True)
-        if cv.random_state is None:
-            cv.random_state = self.random_state
-
-        scorer = sklearn.metrics.get_scorer(self.scoring)
-        # https://github.com/scikit-learn/scikit-learn/blob/1495f6924/sklearn/metrics/scorer.py
-        if "_Threshold" in str(type(scorer)):
-            scorer_type = "threshold"
-        elif "_Predict" in str(type(scorer)):
-            scorer_type = "predict"
-        else:
-            scorer_type = "proba"
-
-        if "greater_is_better=False" in str(scorer):
-            greater_is_better = False
-            direction = "minimize"
-        else:
-            greater_is_better = True
-            direction = "maximize"
 
         ## convert labels to np.array
         le = LabelEncoder()
         y = le.fit_transform(y)
         class_counts = np.bincount(y)
+
+        cv = check_cv(self.cv, y, classifier=True)
+        if cv.random_state is None:
+            cv.random_state = self.random_state
+
+        if self.sampler.seed is None:
+            self.sampler.seed = self.random_state
+
+        scorer, scorer_type, greater_is_better = get_scorer_type(self.scoring)
 
         valid_estimators = []
         ## filter out estimators
@@ -422,8 +471,8 @@ class HyPSTERClassifier(HyPSTEREstimator):
                 remove_estimator = True
                 # TODO add logging
             if remove_estimator:
-                if isinstance(n_trials_per_estimator, list):
-                    del n_trials_per_estimator[i]
+                if isinstance(n_trials, list):
+                    del n_trials[i]
             else:
                 valid_estimators.append(estimator)
 
@@ -431,123 +480,50 @@ class HyPSTERClassifier(HyPSTEREstimator):
             print("No valid estimators available for this type of input") #TODO convert to error
             return
 
-        study = None
-        for i in range(len(valid_estimators)):
-            estimator = valid_estimators[i]
-
-            print(estimator.get_name())
-
-            if estimator.get_seed() == 1:
-                estimator.set_seed(self.random_state)
-
-            estimator.set_n_jobs(self.n_jobs)
-
-            objective = Objective(X, y, estimator, sample_weight, groups, missing, cat_cols,
-                                  objective_type="classification", y_stats=class_counts,
-                                  pipeline=self.pipeline, pipe_params=self.pipe_params,
-                                  greater_is_better=greater_is_better,
-                                  cv=cv, save_cv_preds=self.save_cv_preds,
-                                  scoring=scorer._score_func,
-                                  scorer_type = scorer_type,
-                                  agg_func=self.agg_func, tol=self.tol,
-                                  max_iter=self.max_iter, max_fails=self.max_fails,
-                                  random_state=self.random_state)
-
-            if self.verbose > 0:
-                optuna.logging.set_verbosity(optuna.logging.WARN)
-
-            if study is None:
-                study_name = self.study_name if self.study_name else "study"
-                study = optuna.create_study(storage=self.storage,
-                                            pruner=self.pruner,
-                                            sampler=self.sampler,
-                                            study_name=study_name,
-                                            load_if_exists=True,
-                                            direction=direction)
-            else:
-                #currently there's a bug in optuna that doesn't allow changes in distribution options
-                #this is a temporary fix
-                study.storage.param_distribution = {}
-
-            if isinstance(n_trials_per_estimator, list):
-                n_trials = n_trials_per_estimator[i]
-            else:
-                n_trials = n_trials_per_estimator
-
-            study.optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs, timeout=timeout_per_estimator)
-
-        self.study = study
-        self.best_estimator_ = study.best_trial.user_attrs['pipeline']
-        self.best_score_ = study.best_value
-        self.best_params_ = study.best_params
-        self.best_index_ = study.best_trial.trial_id
-
-        if self.refit_:
-            self.best_estimator_.fit(X, y)
-
-        if len(self.best_estimator_.steps) > 1: #pipeline has more than just a classifier
-            self.best_transformer_ = Pipeline(self.best_estimator_.steps[:-1]) #return all steps but last (classifier)
-        else:
-            self.best_transformer_ = IdentityTransformer()
-
-        self.best_model_ = self.best_estimator_.named_steps["model"]
+        self.run_study_save_results(X, y, valid_estimators, cv, scorer, scorer_type,
+                                    greater_is_better, y_stats=class_counts, objective_type="classification",
+                                    sample_weight=sample_weight, groups=groups, missing=missing,
+                                    cat_cols=cat_cols, timeout_per_estimator=timeout_per_estimator,
+                                    n_trials=n_trials)
 
     def refit(self, X, y):
-        #TODO check if best_estimator exists
+        #TODO check if best_pipeline exists
         le = LabelEncoder()
         y = le.fit_transform(y)
         self.refit_ = True
-        self.best_estimator_.fit(X, y)
+        self.best_pipeline_.fit(X, y)
 
     def predict(self, X):
         self._check_is_fitted('predict')
-        return self.best_estimator_.predict(X)
+        return self.best_pipeline_.predict(X)
 
     def predict_proba(self, X):
         self._check_is_fitted('predict_proba')
-        return self.best_estimator_.predict_proba(X)
+        return self.best_pipeline_.predict_proba(X)
 
 
 class HyPSTERRegressor(HyPSTEREstimator):
     def fit(self, X, y, sample_weight=None, groups=None, missing=None, cat_cols=None,
-            n_trials_per_estimator=10, timeout_per_estimator=None):
+            n_trials=10, timeout_per_estimator=None):
 
         #TODO check that y is regression and not classification
         #TODO: consider log-transform y?
 
-        if isinstance(n_trials_per_estimator, list) and (len(n_trials_per_estimator) < len(self.estimators)):
-            print("n_trials_per_estimator size is smaller than the number of estimators!")  # TODO error
-            return
+        X, y, groups = indexable(X, y, groups)
+
+        ## convert labels to np.array
+        y = np.array(y)
+        y_mean = np.mean(y)
+
+        cv = check_cv(self.cv, y, classifier=False)
+        if cv.random_state is None:
+            cv.random_state = self.random_state
 
         ##initialize seeds
         if self.sampler.seed is None:
             self.sampler.seed = self.random_state
 
-        X, y, groups = indexable(X, y, groups)
-        cv = check_cv(self.cv, y, classifier=False)
-        if cv.random_state is None:
-            cv.random_state = self.random_state
-
-        scorer = sklearn.metrics.get_scorer(self.scoring)
-        # https://github.com/scikit-learn/scikit-learn/blob/1495f6924/sklearn/metrics/scorer.py
-        if "_Threshold" in str(type(scorer)):
-            scorer_type = "threshold"
-        elif "_Predict" in str(type(scorer)):
-            scorer_type = "predict"
-        else:
-            scorer_type = "proba"
-
-        # TODO check if we can make it a bit nicer
-        if "greater_is_better=False" in str(scorer):
-            greater_is_better = False
-            direction = "minimize"
-        else:
-            greater_is_better = True
-            direction = "maximize"
-
-        ## convert labels to np.array
-        y = np.array(y)
-        y_mean = np.mean(y)
+        scorer, scorer_type, greater_is_better = get_scorer_type(self.scoring)
 
         valid_estimators = []
         ## filter out estimators & transformer
@@ -564,86 +540,28 @@ class HyPSTERRegressor(HyPSTEREstimator):
                 remove_estimator = True
                 # TODO add logging
 
-            if remove_estimator:
-                if isinstance(n_trials_per_estimator, list):
-                    del n_trials_per_estimator[i]
-            else:
+            if not remove_estimator:
                 valid_estimators.append(estimator)
 
         if len(valid_estimators) == 0:
             print("No valid estimators available for this type of input")  # TODO convert to error
             return
 
-        study = None
-        for i in range(len(valid_estimators)):
-            estimator = valid_estimators[i]
-
-            print(estimator.get_name())
-
-            if estimator.get_seed() == 1:
-                estimator.set_seed(self.random_state)
-
-            estimator.set_n_jobs(self.n_jobs)
-
-            objective = Objective(X, y, estimator, sample_weight, groups, missing, cat_cols,
-                                  objective_type="regression", y_stats=y_mean,
-                                  pipeline=self.pipeline, pipe_params=self.pipe_params,
-                                  greater_is_better=greater_is_better,
-                                  cv=cv, save_cv_preds=self.save_cv_preds,
-                                  scoring=scorer._score_func,
-                                  scorer_type=scorer_type,
-                                  agg_func=self.agg_func, tol=self.tol,
-                                  max_iter=self.max_iter, max_fails=self.max_fails,
-                                  random_state = self.random_state)
-
-            if self.verbose > 0:
-                optuna.logging.set_verbosity(optuna.logging.WARN)
-
-            if study is None:
-                study_name = self.study_name if self.study_name else "study"
-                study = optuna.create_study(storage=self.storage,
-                                            pruner=self.pruner,
-                                            sampler=self.sampler,
-                                            study_name=study_name,
-                                            load_if_exists=True,
-                                            direction=direction)
-            else:
-                # currently there's a bug in optuna that doesn't allow changes in distribution options
-                # this is a temporary fix
-                study.storage.param_distribution = {}
-
-            if isinstance(n_trials_per_estimator, list):
-                n_trials = n_trials_per_estimator[i]
-            else:
-                n_trials = n_trials_per_estimator
-
-            study.optimize(objective, n_trials=n_trials, n_jobs=self.n_jobs, timeout=timeout_per_estimator)
-
-        self.study = study
-        self.best_estimator_ = study.best_trial.user_attrs['pipeline']
-        self.best_score_ = study.best_value
-        self.best_params_ = study.best_params
-        self.best_index_ = study.best_trial.trial_id
-
-        if self.refit_:
-            self.best_estimator_.fit(X, y)
-
-        if len(self.best_estimator_.steps) > 1:  # pipeline has more than just a classifier
-            self.best_transformer_ = Pipeline(self.best_estimator_.steps[:-1])  # return all steps but last (classifier)
-        else:
-            self.best_transformer_ = IdentityTransformer()  # TODO check if it's neccessary
-
-        self.best_model_ = self.best_estimator_.named_steps["model"]
+        self.run_study_save_results(X, y, valid_estimators, cv, scorer, scorer_type,
+                                    greater_is_better, y_stats=y_mean, objective_type="regression",
+                                    sample_weight=sample_weight, groups=groups, missing=missing,
+                                    cat_cols=cat_cols, timeout_per_estimator=timeout_per_estimator,
+                                    n_trials=n_trials)
 
     def refit(self, X, y):
-        #TODO check if best_estimator exists
+        #TODO check if best_pipeline exists
         y = np.array(y)
         self.refit_ = True
-        self.best_estimator_.fit(X, y)
+        self.best_pipeline_.fit(X, y)
 
     def predict(self, X):
         self._check_is_fitted('predict')
-        return self.best_estimator_.predict(X)
+        return self.best_pipeline_.predict(X)
 
 class IdentityTransformer(BaseEstimator, TransformerMixin):
     def __init__(self):
