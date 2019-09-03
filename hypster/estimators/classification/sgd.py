@@ -117,6 +117,3 @@ class SGDClassifierLR(SGDClassifier):
             preds = self.model.decision_function(X)
 
         return preds
-
-    # def get_params(self):
-    #     return self.learning_rates

@@ -137,13 +137,11 @@ class Objective(object):
                 cat_steps_name = "cat_transforms"
                 cat_steps = Pipeline(transformers)
             if (numeric_cols is not None) and (cat_steps is not None):
-                #ct_items = [(step[0], step[1], cat_cols) for step in transformers]
                 cat_steps = ColumnTransformer([(cat_steps_name, cat_steps, cat_cols)],
                                               remainder="drop", sparse_threshold=0)
         numeric_transforms = ["impute", "scale"]
         transformers = []
         numeric_steps = None
-
         if numeric_cols is not None:
             if "impute" in numeric_transforms:
                 imputer = NumericImputer(X, numeric_cols, trial, tags)
@@ -160,7 +158,6 @@ class Objective(object):
                 numeric_steps_name = "numeric_transforms"
                 numeric_steps = Pipeline(transformers)
             if (cat_cols is not None) and (numeric_steps is not None):
-                #ct_items = [(step[0], step[1], numeric_cols) for step in transformers]
                 numeric_steps = ColumnTransformer([(numeric_steps_name, numeric_steps, numeric_cols)],
                                                   remainder="drop", sparse_threshold=0)
 
@@ -199,7 +196,6 @@ class Objective(object):
             folds.append({"y_test" : y_test,
                           "train_idx" : train_idx, "test_idx" : test_idx,
                           "estimator": fold_estimator})
-
 
         best_score = np.nan
         for step in range(self.max_iter):
@@ -368,7 +364,6 @@ class HyPSTEREstimator():
             estimator.set_n_jobs(self.n_jobs)
 
         numeric_cols = get_numeric_cols(X, cat_cols)
-
         objective = Objective(X, y, valid_estimators, sample_weight, groups, missing, cat_cols,
                               numeric_cols=numeric_cols, objective_type=objective_type, y_stats=y_stats,
                               pipeline=self.pipeline, pipe_params=self.pipe_params,
