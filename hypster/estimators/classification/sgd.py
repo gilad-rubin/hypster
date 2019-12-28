@@ -6,12 +6,9 @@ from ..sgd import SGDModelHypster
 from sklearn.base import ClassifierMixin
 
 class SGDClassifierHypster(SGDModelHypster):
-    @staticmethod
-    def get_name():
-        return 'SGD Classifier'
-
-    def set_default_tags(self):
-        self.tags = {'alias' : ['sgd'],
+    def get_tags(self):
+        self.tags = {'name' : "SGD Classifier",
+                     'model type': "linear",
                     'supports regression': False,
                     'supports ranking': False,
                     'supports classification': True,
@@ -25,40 +22,41 @@ class SGDClassifierHypster(SGDModelHypster):
                     'sensitive to feature scaling': True,
                     'has predict_proba' : True,
                     'has model embeddings': True,
-                    'adjustable model complexity' : True,
-                    'tree based': False
+                    'adjustable model complexity' : True
                     }
+        return self.tags
 
     def choose_and_set_params(self, trial, class_counts, missing):
+        self.trial = trial #TODO move to core
         n_classes = len(class_counts)
         n_samples = sum(class_counts)
         lst = n_samples / (n_classes * class_counts)
         scale_dict = {i:lst[i] for i in range(len(lst))}
 
-        losses = ['log', 'modified_huber'] #, 'squared_hinge', 'perceptron', 'hinge'
+        losses = ['log'] #'modified_huber' 'squared_hinge', 'perceptron', 'hinge'
         #learning_rates = ['constant'] #, 'optimal', 'invscaling'
 
         model_params = {'random_state': self.random_state
                         ,'n_jobs' : self.n_jobs
                         ,'verbose' : 0
-                        ,'loss': trial.suggest_categorical('loss', losses)
-                        ,'penalty': trial.suggest_categorical('penalty', ['none', 'l1', 'l2', 'elasticnet'])
-                        ,'alpha': trial.suggest_loguniform('alpha', 1e-8, 1.0)
+                        ,'loss': self.sample_hp('loss', "categorical", losses)
+                        ,'penalty': self.sample_hp('penalty', "categorical", ['none', 'l1', 'l2', 'elasticnet'])
+                        ,'alpha': self.sample_hp('alpha', "log-uniform", [1e-8, 1.0])
                         ,'learning_rate': 'constant'
-                        ,'eta0': trial.suggest_loguniform('eta0', 1e-3, 1.0)
-                        ,'class_weight': trial.suggest_categorical("class_weight", [None, scale_dict])
-                        ,'shuffle' : trial.suggest_categorical("shuffle", [True, False])
+                        ,'eta0': self.sample_hp('eta0', "log-uniform", [1e-3, 1.0])
+                        ,'class_weight': self.sample_hp("class_weight", "categroical", [None, scale_dict])
+                        ,'shuffle' : self.sample_hp("shuffle", "categorical", [True, False])
                         }
 
         if model_params['penalty'] == 'elasticnet':
-            model_params['l1_ratio'] = trial.suggest_uniform('l1_ratio', 0, 1.0)
+            model_params['l1_ratio'] = self.sample_hp('l1_ratio', "uniform", [0, 1.0])
 
         # if model_params['learning_rate'] == 'invscaling':
-        #     model_params['power_t'] = trial.suggest_uniform('eta0', 0.2, 1.0)
+        #     model_params['power_t'] = self.sample_hp('eta0', "uniform", [0.2, 1.0])
 
         self.model_params = model_params
 
-    def fit(self, sample_weight=None, warm_start=False):
+    def fit(self, sample_weight=None, warm_start=True):
         if (warm_start==False) or (self.current_model is None):
             self.current_model = SGDClassifier(**self.model_params
                                               ,max_iter=self.n_iter_per_round

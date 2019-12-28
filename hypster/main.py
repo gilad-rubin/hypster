@@ -4,7 +4,8 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 
 from hypster import HyPSTERClassifier
-from hypster.estimators.classification.xgboost import XGBClassifierHypster
+from hypster.estimators.classification.xgboost import XGBTreeClassifierHypster, XGBLinearClassifierHypster
+from hypster.estimators.classification.lightgbm import LGBClassifierHypster
 from hypster.estimators.classification.sgd import SGDClassifierHypster
 
 SEED = 50
@@ -24,11 +25,39 @@ elif dataset=="newsgroup":
     y_test = pd.read_pickle("../data/y_test.pkl")
     cat_cols=None
 
-xgb = XGBClassifierHypster(n_iter_per_round=2, param_dict={'verbosity' : 1})
-sgd = SGDClassifierHypster(n_iter_per_round=2)
-estimators = [xgb]#[xgb_tree, xgb_linear]sgd
-clf = HyPSTERClassifier(estimators, scoring="roc_auc", max_iter=50, cv=3, n_jobs=-1, random_state=SEED)
-clf.fit(X_train, y_train, cat_cols=cat_cols, n_trials=30)
+n_iters = 2
+xgb_tree = XGBTreeClassifierHypster(n_iter_per_round=n_iters, n_jobs=-1)
+xgb_linear = XGBLinearClassifierHypster(n_iter_per_round=n_iters, n_jobs=-1)
+lgb = LGBClassifierHypster(n_iter_per_round=n_iters, n_jobs=-1)
+sgd = SGDClassifierHypster(n_iter_per_round=n_iters, n_jobs=-1)
+estimators = [xgb_linear, sgd, lgb, xgb_tree]#, lgb]# xgb_tree, xgb_linear, lgb]
+
+
+import optuna
+from optuna.samplers import TPESampler
+
+n_trials = 30
+
+sampler = optuna.integration.CmaEsSampler(n_startup_trials=int(n_trials/3),
+                       independent_sampler=TPESampler(**TPESampler.hyperopt_parameters()),
+                       warn_independent_sampling=False, seed=SEED)
+
+sampler = TPESampler(**TPESampler.hyperopt_parameters())
+from hypster.linear_extrapolation_pruner import LinearExtrapolationPruner
+pruner = LinearExtrapolationPruner(n_steps_back=2, n_steps_forward=10, percentage_from_best=90)
+
+clf = HyPSTERClassifier(estimators,
+                        scoring="roc_auc",
+                        sampler=sampler,
+                        pruner=pruner,
+                        max_iter=30,
+                        cv=5,
+                        n_jobs=-1,
+                        tol=1e-7,
+                        max_fails=0,
+                        random_state=SEED)
+
+clf.fit(X_train, y_train, cat_cols=cat_cols, n_trials=n_trials)
 print(clf.best_score_)
 preds = clf.predict_proba(X_test)
 roc_score = sklearn.metrics.roc_auc_score(y_test, preds[:, 1])
@@ -152,3 +181,36 @@ print(clf.best_model_.get_params())
 # test_probs = test_probs[:,1]
 #
 # print(sklearn.metrics.roc_auc_score(y_test, test_probs))
+
+requirements = {"include model frameworks" : ["xgboost", "lightgbm", "sklearn",
+                                              "catboost", "tf", "keras", "fastai", "all"],
+                "exclude model frameworks" : ["xgboost", "lightgbm", "sklearn",
+                                              "catboost", "tf", "keras", "fastai", "none"],
+                "model types" : ["tree_based", "linear", "deep_learning"],
+                "use_cpu" : [True, False],
+                "use_gpu" : [True, False],
+                "create new features" : [True, False],
+                "create uninterpretable features" : [True, False],
+                #"pipeline complexity" : ["low", "medium", "high"],
+                #"training_speed" : ["fast", "medium", "slow"],
+                #"inference speed" : ["fast", "medium", "slow"],
+                }
+
+requirements = {"include model frameworks" : ["xgboost", "lightgbm", "sklearn"],
+                "exclude model frameworks" : "none",
+                "model types" : "all",
+                "use_cpu" : True,
+                "use_gpu" : False,
+                "create new features" : False,
+                "create uninterpretable features" : False,
+                #"pipeline complexity" : "low",
+                # "training_speed" : "medium",
+                # "inference speed" : "medium",
+                }
+
+# get requested frameworks + check versions (by requirements)
+# filter relevant models (types) + initialize if needed by type (e.g. gblinear)
+# check if system gpu is compatible. create a list of models with gpu
+# initialize based on gpu/cpu
+
+# filter based on speed + cpu/gpu (?)

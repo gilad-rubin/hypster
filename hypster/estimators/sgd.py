@@ -12,9 +12,6 @@ class SGDModelHypster(HypsterEstimator):
         super(SGDModelHypster, self).__init__(n_iter_per_round=n_iter_per_round, n_jobs=n_jobs,
                                               random_state=random_state, param_dict=param_dict)
 
-    def update_tags(self):
-        return
-
     def set_train(self, X, y, sample_weight=None, missing=None):
         self.X_train = X
         self.y_train = y
@@ -23,12 +20,6 @@ class SGDModelHypster(HypsterEstimator):
     def set_test(self, X, y, sample_weight=None, missing=None):
         self.X_test = X
         self.y_test = y
-
-    def set_learning_rates(self, learning_rates):
-        self.learning_rates = learning_rates
-
-    def get_learning_rates(self):
-        return self.learning_rates
 
     def lower_complexity(self):
         self.model_params['eta0'] = self.model_params['eta0'] * self.lr_decay

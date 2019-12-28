@@ -5,13 +5,10 @@ from sklearn.base import clone
 from copy import deepcopy
 from ..xgboost import XGBModelHypster
 
-class XGBClassifierHypster(XGBModelHypster):
-    @staticmethod
-    def get_name():
-        return 'XGBoost Classifier'
-
-    def set_default_tags(self):
-        self.tags = {'alias' : ['xgb', 'xgboost'],
+class XGBTreeClassifierHypster(XGBModelHypster):
+    def get_tags(self):
+        self.tags = {'name' : "XGBoost Tree-Based Classifier",
+                    'model type': "tree",
                     'supports regression': False,
                     'supports ranking': False,
                     'supports classification': True,
@@ -24,30 +21,38 @@ class XGBClassifierHypster(XGBModelHypster):
                     'nan value when sparse': 0,
                     'sensitive to feature scaling': False,
                     'has predict_proba' : True,
-                    'has model embeddings': True,
-                    'adjustable model complexity' : True,
-                    'tree based': True
+                    'has model embeddings': False,
+                    'adjustable model complexity' : True
                     }
+        return self.tags
 
     def choose_and_set_params(self, trial, class_counts, missing):
+        self.trial = trial
         n_classes = len(class_counts)
 
         #TODO change according to Laurae
-        model_params = {'seed': self.random_state
-            , 'verbosity': 1
-            , 'nthread': self.n_jobs
-            , 'missing' : missing
-            , 'eta': trial.suggest_loguniform('eta', 1e-3, 1.0)
-            , 'booster': trial.suggest_categorical('booster', self.booster_list)
-            , 'lambda': trial.suggest_loguniform('lambda', 1e-10, 1.0)
-            , 'alpha': trial.suggest_loguniform('alpha', 1e-10, 1.0)
+        model_params = {'seed': self.random_state,
+            'verbosity': 1,
+            'nthread': self.n_jobs,
+            'missing' : missing,
+            'eta': self.sample_hp('eta', "log-uniform", [1e-4, 1.0]), #TODO: change to global lr
+            'booster': self.sample_hp('booster', "categorical", ["gbtree", "dart"]), #TODO: make sure gblinear not here
+            'lambda': self.sample_hp('lambda', "log-uniform", [1e-10, 1.0]),
+            'alpha': self.sample_hp('alpha', "log-uniform", [1e-10, 1.0]),
+            'max_depth': self.sample_hp('max_depth', "int", [2, 20]), # TODO: maybe change to higher range? (for competition or production mode)
+            'min_child_weight': self.sample_hp('min_child_weight', "int", [1, 20]),
+            'gamma': self.sample_hp('gamma', "log-uniform", [1e-10, 5.0]),
+            'grow_policy': self.sample_hp('grow_policy', "categorical", ['depthwise', 'lossguide']),
+            'subsample': self.sample_hp('subsample', "uniform", [0.5, 1.0]),
+            'colsample_bytree': self.sample_hp('colsample_bytree', "uniform", [0.1, 1.0]),
+            'colsample_bynode': self.sample_hp('colsample_bynode', "uniform", [0.1, 1.0]),
             }
 
         if n_classes == 2:
             model_params['objective'] = 'binary:logistic'
 
             pos_weight = class_counts[0] / class_counts[1]
-            model_params['scale_pos_weight'] = trial.suggest_categorical("scale_pos_weight", [1.0, pos_weight])
+            model_params['scale_pos_weight'] = self.sample_hp("scale_pos_weight", "categorical", [1.0, pos_weight])
 
             base_score = class_counts[1] / (class_counts[0] + class_counts[1])  # equivalent to np.mean(y)
             model_params['base_score'] = base_score
@@ -57,33 +62,18 @@ class XGBClassifierHypster(XGBModelHypster):
             #change base score to class priors (https://github.com/dmlc/xgboost/issues/1380)
             #change sample weight by multiplying class_weight and sample weight
 
-        if model_params['booster'] in ['gbtree', 'dart']:
-            tree_dict = {'max_depth': trial.suggest_int('max_depth', 2, 20) #TODO: maybe change to higher range?
-                , 'min_child_weight': trial.suggest_int('min_child_weight', 1, 20)
-                , 'gamma': trial.suggest_loguniform('gamma', 1e-10, 5.0)
-                , 'grow_policy': trial.suggest_categorical('grow_policy', ['depthwise', 'lossguide'])
-                , 'subsample': trial.suggest_uniform('subsample', 0.5, 1.0)
-                , 'colsample_bytree': trial.suggest_uniform('colsample_bytree', 0.1, 1.0)
-                , 'colsample_bynode': trial.suggest_uniform('colsample_bynode', 0.1, 1.0)
-                }
-
-            forest_boosting = trial.suggest_categorical('forest_boosting', [True, False])
-            if forest_boosting:
-                model_params['num_parallel_tree'] = trial.suggest_int('num_parallel_tree', 2, 10)
-            else:
-                model_params['num_parallel_tree'] = 1
-
-            model_params.update(tree_dict)
-
-        else:  # gblinear
-            model_params['feature_selector'] = trial.suggest_categorical('shotgun_feature_selector',
-                                                                         ['cyclic', 'shuffle'])
+        forest_boosting = self.sample_hp('forest_boosting', "categorical", [True, False])
+        if forest_boosting:
+            model_params['num_parallel_tree'] = self.sample_hp('num_parallel_tree', "int", [2, 10])
+        else:
+            model_params['num_parallel_tree'] = 1
 
         if model_params['booster'] == 'dart':
-            dart_dict = {'sample_type': trial.suggest_categorical('sample_type', ['uniform', 'weighted'])
-                , 'normalize_type': trial.suggest_categorical('normalize_type', ['tree', 'forest'])
-                , 'rate_drop': trial.suggest_loguniform('rate_drop', 1e-8, 1.0)
-                , 'skip_drop': trial.suggest_loguniform('skip_drop', 1e-8, 1.0)
+            dart_dict = {
+                'sample_type': self.sample_hp('sample_type', "categorical", ['uniform', 'weighted']),
+                'normalize_type': self.sample_hp('normalize_type', "categorical", ['tree', 'forest']),
+                'rate_drop': self.sample_hp('rate_drop', "log-uniform", [1e-8, 1.0]),
+                'skip_drop': self.sample_hp('skip_drop', "log-uniform", [1e-8, 1.0])
                 }
 
             model_params.update(dart_dict)
@@ -107,14 +97,93 @@ class XGBClassifierHypster(XGBModelHypster):
         #TODO: if learning rates are identical throughout - create a regular Classifier
 
         self.model_params['n_estimators'] = self.best_n_iterations
-        self.model_params['learning_rate'] = self.model_params["eta"]
+        self.model_params['learning_rate'] = self.learning_rates[0]
 
         self.model_params['n_jobs'] = self.model_params.pop('nthread')
         self.model_params['random_state'] = self.model_params.pop('seed')
         self.model_params['reg_lambda'] = self.model_params.pop('lambda')
         self.model_params['reg_alpha'] = self.model_params.pop('alpha')
 
-        final_model = XGBClassifierLR(learning_rates=self.learning_rates, **self.model_params)
+        #final_model = XGBClassifierLR(learning_rates=self.learning_rates, **self.model_params)
+        final_model = XGBClassifier(**self.model_params)
+        return final_model
+
+class XGBLinearClassifierHypster(XGBModelHypster):
+    def get_tags(self):
+        self.tags = {'name' : "XGBoost Linear Classifier",
+                    'model type': "linear",
+                    'supports regression': False,
+                    'supports ranking': False,
+                    'supports classification': True,
+                    'supports multiclass': True,
+                    'supports multilabel': False,
+                    'handles categorical' : False,
+                    'handles categorical nan': False,
+                    'handles sparse': True,
+                    'handles numeric nan': True,
+                    'nan value when sparse': 0,
+                    'sensitive to feature scaling': True,
+                    'has predict_proba' : True,
+                    'has model embeddings': False,
+                    'adjustable model complexity' : True
+                    }
+        return self.tags
+
+    def choose_and_set_params(self, trial, class_counts, missing):
+        self.trial = trial
+        n_classes = len(class_counts)
+
+        #TODO change according to Laurae
+        model_params = {'seed': self.random_state,
+            'verbosity': 1,
+            'nthread': self.n_jobs,
+            'missing' : missing,
+            'eta': self.sample_hp('eta', "log-uniform", [1e-3, 1.0]),
+            'booster': "gblinear",
+            'lambda': self.sample_hp('lambda', "log-uniform", [1e-10, 1.0]),
+            'alpha': self.sample_hp('alpha', "log-uniform", [1e-10, 1.0]),
+            'feature_selector' : self.sample_hp('shotgun_feature_selector', "categorical", ['cyclic', 'shuffle'])
+            }
+
+        if n_classes == 2:
+            model_params['objective'] = 'binary:logistic'
+
+            pos_weight = class_counts[0] / class_counts[1]
+            model_params['scale_pos_weight'] = self.sample_hp("scale_pos_weight", "categorical", [1.0, pos_weight])
+
+            base_score = class_counts[1] / (class_counts[0] + class_counts[1])  # equivalent to np.mean(y)
+            model_params['base_score'] = base_score
+        else:  # multiclass
+            model_params['objective'] = 'multi:softprob'
+            #TODO change base and sample weight on DMatrix
+            #change base score to class priors (https://github.com/dmlc/xgboost/issues/1380)
+            #change sample weight by multiplying class_weight and sample weight
+
+        self.model_params = model_params
+
+    def predict_proba(self):
+        class_probs = self.current_model.predict(self.dtest, output_margin=False)
+
+        if self.model_params['objective'] == "multi:softprob":
+            return class_probs
+
+        classone_probs = class_probs
+        classzero_probs = 1.0 - classone_probs
+        return np.vstack((classzero_probs, classone_probs)).transpose()
+
+    def create_model(self):
+        #TODO: if learning rates are identical throughout - create a regular Classifier
+
+        self.model_params['n_estimators'] = self.best_n_iterations
+        self.model_params['learning_rate'] = self.learning_rates[0]
+
+        self.model_params['n_jobs'] = self.model_params.pop('nthread')
+        self.model_params['random_state'] = self.model_params.pop('seed')
+        self.model_params['reg_lambda'] = self.model_params.pop('lambda')
+        self.model_params['reg_alpha'] = self.model_params.pop('alpha')
+
+        #final_model = XGBClassifierLR(learning_rates=self.learning_rates, **self.model_params)
+        final_model = XGBClassifierLR(**self.model_params)
         return final_model
 
 class XGBClassifierLR(XGBClassifier):

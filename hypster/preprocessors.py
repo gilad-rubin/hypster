@@ -35,16 +35,19 @@ def CatImputer(X, cat_cols, tags, trial, random_state):
         imputer = SimpleImputer(strategy="constant", fill_value="unknown")
     return imputer
 
-def CatEncoder(X, cat_cols, tags, objective_type, trial, n_classes, random_state):
+def CatEncoder(X, cat_cols, tags, estimator_name, objective_type, trial, n_classes, random_state):
     if tags["handles categorical"] == False:
         large_threshold = 6
         #TODO: handle numpy arrays with categorical?
         #TODO: handle multiclass / Regression
-        large_cardinal_cats = [col for col in X[cat_cols].columns if X[col].nunique() > large_threshold]
-        small_cardinal_cats = [col for col in X[cat_cols].columns if X[col].nunique() <= large_threshold]
+        if (isinstance(X, pd.DataFrame) and isinstance(cat_cols[0], str):
+            large_cardinal_cats = [col for col in X[cat_cols].columns if X[col].nunique() > large_threshold]
+            small_cardinal_cats = [col for col in X[cat_cols].columns if X[col].nunique() <= large_threshold]
+        else:
+            small_cardinal_cats = None
 
         enc_pipe = None
-        cat_enc_types = ["binary", "catboost", "target"]
+        cat_enc_types = ["binary", "catboost"] #"binary"
 
         if small_cardinal_cats is not None:
             enc_pipe = add_to_pipe(enc_pipe, "ohe", OneHotEncoder(cols=small_cardinal_cats, drop_invariant=True))
@@ -53,7 +56,7 @@ def CatEncoder(X, cat_cols, tags, objective_type, trial, n_classes, random_state
             if (objective_type == "classification" and n_classes == 1):
                 cat_enc_types.append("woe")
 
-            cat_enc_type = trial.suggest_categorical("cat_enc_type", cat_enc_types)
+            cat_enc_type = trial.suggest_categorical(estimator_name + " cat_enc_type", cat_enc_types)
 
             if cat_enc_type == "binary":
                 # mapping = get_mapping(X, large_cardinal_cats)
@@ -85,17 +88,18 @@ def NumericImputer(X, numeric_cols, trial, tags):
             imputer = SimpleImputer(strategy="median", add_indicator=True)
     return imputer
 
-def Scaler(X, numeric_cols, trial, tags):
+def Scaler(X, numeric_cols, trial, estimator_name, tags):
     scaler = None
 
     center = True
-    scaler_types = ["robust", "standard", "minmax", "maxabs"]
+    #scaler_types = ["robust", "standard", "minmax", "maxabs"]
+    scaler_types = ["standard", "minmax", "maxabs"]
     if sp.issparse(X):
         scaler_types.remove("minmax")
         center = False
 
     if (numeric_cols is not None) and tags["sensitive to feature scaling"]:
-        scaler_type = trial.suggest_categorical("scaler", scaler_types)
+        scaler_type = trial.suggest_categorical(estimator_name + " scaler", scaler_types)
         if scaler_type == "standard":
             scaler = StandardScaler(with_mean=center)
         elif scaler_type == "robust":

@@ -5,7 +5,7 @@ from sklearn.base import clone
 from copy import deepcopy
 
 class HypsterEstimator():
-    def __init__(self, n_iter_per_round=1, n_jobs=1, random_state=1, param_dict={}):
+    def __init__(self, n_iter_per_round=1, n_jobs=None, random_state=1, param_dict=None):
         self.n_iter_per_round = n_iter_per_round
         self.n_jobs = n_jobs
         self.random_state = random_state
@@ -13,6 +13,17 @@ class HypsterEstimator():
         self.best_model = None
         self.current_model = None
         self.tags = {}
+
+    def sample_hp(self, name, type, values):
+        prefix = self.get_tags()["name"] + " "
+        if type.startswith("cat"):
+            return self.trial.suggest_categorical(prefix + name, values)
+        elif type.startswith("log"):
+            return self.trial.suggest_loguniform(prefix + name, values[0], values[1])
+        elif type.startswith("uniform"):
+            return self.trial.suggest_uniform(prefix + name, values[0], values[1])
+        elif type.startswith("int"):
+            return self.trial.suggest_int(prefix + name, values[0], values[1])
 
     def get_name(self):
         raise NotImplementedError
