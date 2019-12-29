@@ -1,5 +1,5 @@
 ![HyPSTER](https://github.com/gilad-rubin/hypster/blob/master/images/hypster.png)
-# HyPSTER - **Hy**perParameter optimization on **STER**oids
+# HyPSTER - HyperParameter optimization on STERoids
 
 ### You have just found HyPSTER.
 HyPSTER is a brand new Python package built on top of Optuna.
