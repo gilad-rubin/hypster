@@ -27,8 +27,8 @@ frameworks = ["xgboost", "lightgbm", "sklearn"]
 model_types = ["linear", "tree-based"]
 
 clf = HyPSTERClassifier(frameworks, model_types, 
-						scoring="roc_auc", max_iter=30, 
-						n_jobs=-1, random_state=SEED)
+			scoring="roc_auc", max_iter=30, 
+			n_jobs=-1, random_state=SEED)
 						
 clf.fit(X_train, y_train, cat_cols=cat_cols, n_trials=30)
 clf.predict_proba(X_test)
