@@ -1,14 +1,14 @@
 [tool.poetry]
 name = "hypster"
-version = "0.0.3"
+version = "0.0.4"
 description = "HyPSTER is a brand new Python package that helps you find compact and accurate ML Pipelines while staying light and efficient"
 authors = ["Gilad Rubin <gilad.rubin@gmail.com>"]
 maintainers = ["Tal Peretz"]
-homepage = "https://github.com/gilad-rubin"
+homepage = "https://github.com/gilad-rubin/hypster"
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.6"
 scikit-learn = "^0.22"
 pandas = "^0.25.3"
 optuna = "^0.19.0"

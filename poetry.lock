@@ -561,8 +561,8 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["pathlib2", "contextlib2", "unittest2"]
 
 [metadata]
-content-hash = "cda25ef1d95dd0d8ce655e12385f1e627459fca6e8537baa13f956510435e5ff"
-python-versions = "^3.7"
+content-hash = "9cbbc44e00a1d5d7c7e199b1c85db7435a9859148e8caaf1e8a59acdaec834a4"
+python-versions = "^3.6"
 
 [metadata.files]
 alembic = [
