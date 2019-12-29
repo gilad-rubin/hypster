@@ -41,6 +41,6 @@ clf.predict_proba(X_test)
 
 ## Contributors
 
-Gilad Rubin
+Gilad Rubin(https://github.com/gilad-rubin/)
 
 [Tal Peretz](https://www.linkedin.com/in/talper/)
