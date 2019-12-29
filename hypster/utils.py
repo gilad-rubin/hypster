@@ -1,5 +1,7 @@
+import re
 import pandas as pd
 import numpy as np
+import sklearn
 import scipy.sparse as sp
 from sklearn.base import clone
 
@@ -8,9 +10,11 @@ def get_numeric_cols(X, cat_cols):
         return "all"
     elif len(cat_cols) < X.shape[1]:
         if (isinstance(X, pd.DataFrame)) and (isinstance(cat_cols[0], str)):
-            numeric_cols = list(set(X.columns).difference(cat_cols))
+            return list((set(X.columns)).difference(cat_cols))
         else:
-            numeric_cols = np.array(list(set(range(X.shape[1])).difference(cat_cols)))
+            return np.array(list(set(range(X.shape[1])).difference(cat_cols)))
+    else:
+        return []
 
 def safe_column_indexing(X, columns):
     if columns is None:
@@ -53,3 +57,31 @@ def contains_nan(X):
         return pd.isnull(X.data).any()
     else:
         return pd.isnull(X).any() #numpy
+
+def get_scorer_type(scoring):
+    if isinstance(scoring, str):
+        scorer = sklearn.metrics.get_scorer(scoring)
+        # https://github.com/scikit-learn/scikit-learn/blob/1495f6924/sklearn/metrics/scorer.py
+    elif "sklearn.metrics.scorer" in str(type(scoring)):
+        scorer = scoring
+    else:  # TODO: error
+        print("invalid scoring function. please see: "
+              "https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-parameter or "
+              "use the 'make_scorer' function in sklearn")
+        return
+
+    if "_Threshold" in str(type(scorer)):
+        scorer_type = "threshold"
+    elif "_Predict" in str(type(scorer)):
+        scorer_type = "predict"
+    else:
+        scorer_type = "proba"
+
+    greater_is_better = False if ("greater_is_better=False" in str(scorer)) else True
+
+    return scorer, scorer_type, greater_is_better
+
+def ge_version(version1, version2):
+    def normalize(v):
+        return [int(x) for x in re.sub(r'(\.0+)*$','', v).split(".")]
+    return normalize(version1) >= normalize(version2)
