@@ -1,3 +1,4 @@
+![HyPSTER](https://github.com/gilad-rubin/hypster/images/hypster.png)
 # HyPSTER - HyperParameter optimization on STERoids
 
 ### You have just found HyPSTER.

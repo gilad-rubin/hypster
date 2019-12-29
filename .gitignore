@@ -112,3 +112,4 @@ dmypy.json
 deprecated/
 data/
 .idea
+dist/
