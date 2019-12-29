@@ -1,8 +1,5 @@
-import lightgbm as lgb
 from lightgbm.sklearn import LGBMClassifier
 import numpy as np
-from sklearn.base import clone
-from copy import deepcopy
 from ..lightgbm import LGBModelHypster
 
 class LGBClassifierHypster(LGBModelHypster):
@@ -32,7 +29,7 @@ class LGBClassifierHypster(LGBModelHypster):
 
         #TODO change according to Laurae
         model_params = {'n_jobs': -1,
-                        'verbosity' : -1,
+                        'verbose' : -1,
                         'random_state': self.random_state,
                         #'use_missing' 'zero_as_missing'
                         'learning_rate': self.sample_hp('learning_rate', "log-uniform", [1e-3, 1.0]),
@@ -111,7 +108,7 @@ class LGBClassifierHypster(LGBModelHypster):
         if "is_unbalance" in self.model_params:
             is_unbalance = self.model_params.pop("is_unbalance")
             self.model_params["class_weight"] = "balanced" if is_unbalance else None
-            
+
         self.model_params['n_estimators'] = self.best_n_iterations
         self.model_params["learning_rate"] = self.learning_rates[0] #TODO change
         

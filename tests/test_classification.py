@@ -1,62 +1,81 @@
 import sklearn
+import scipy
 import pandas as pd
-import optuna
-from optuna.samplers import TPESampler
+import numpy as np
 from sklearn.model_selection import train_test_split
+from sklearn.datasets import make_classification
 
 from hypster import HyPSTERClassifier
-from hypster.estimators.classification.xgboost import XGBTreeClassifierHypster, XGBLinearClassifierHypster
-from hypster.estimators.classification.lightgbm import LGBClassifierHypster
-from hypster.estimators.classification.sgd import SGDClassifierHypster
 
 SEED = 50
 
-dataset="newsgroup" #adult
-if dataset == "adult":
-    adult = pd.read_csv("../data/adult.csv")
-    cat_cols = ["workclass", "education", "marital-status", "occupation", "relationship", "race", "sex", "native-country"]
-    X = adult.drop("class", axis=1).copy()
-    y = adult["class"].copy()
+def test_dense():
+    X, y = make_classification(n_samples=300, n_features=40, n_informative=30, random_state=SEED)
+    X = pd.DataFrame(X)
+
+    #TODO add categorical
+    # n = X.shape[0]
+    # X['A'] = pd.Series(['alpha', 'beta', 'gamma'] * int(n / 4)).head(n)
+    # X['B'] = pd.Series(np.random.random_integers(0, 20, n)).astype(str)
+    # cat_cols = ["A"] #"B"
+    cat_cols = None
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=SEED)
-elif dataset=="newsgroup":
-    from scipy.sparse import load_npz
-    X_train = load_npz("../data/X_train.npz")
-    y_train = pd.read_pickle("../data/y_train.pkl")
-    X_test = load_npz("../data/X_test.npz")
-    y_test = pd.read_pickle("../data/y_test.pkl")
-    cat_cols=None
 
-def test_classification():
-    n_iters = 1
-    xgb_tree = XGBTreeClassifierHypster(n_iter_per_round=n_iters)
-    xgb_linear = XGBLinearClassifierHypster(n_iter_per_round=n_iters)
-    lgb = LGBClassifierHypster(n_iter_per_round=n_iters)
-    sgd = SGDClassifierHypster(n_iter_per_round=n_iters)
-    estimators = [sgd, lgb, xgb_tree, xgb_linear]
 
-    n_trials = 30
-    # sampler = optuna.integration.CmaEsSampler(n_startup_trials=int(n_trials / 3),
-    #                                           independent_sampler=TPESampler(**TPESampler.hyperopt_parameters()),
-    #                                           warn_independent_sampling=False, seed=SEED)
-    sampler = TPESampler(**TPESampler.hyperopt_parameters())
-    from hypster.linear_extrapolation_pruner import LinearExtrapolationPruner
-    pruner = LinearExtrapolationPruner(n_steps_back=2, n_steps_forward=10, percentage_from_best=90)
+    frameworks = ["xgboost", "lightgbm", "sklearn"]
+    model_types = ["linear", "tree_based"]
 
-    clf = HyPSTERClassifier(estimators,
+    n_trials = 20
+
+    clf = HyPSTERClassifier(frameworks=frameworks,
+                            model_types=model_types,
                             scoring="roc_auc",
-                            sampler=sampler,
-                            pruner=pruner,
-                            max_iter=10,
                             cv=3,
-                            n_jobs=-1,
+                            max_iter=10,
                             tol=1e-5,
                             max_fails=0,
+                            n_jobs=-1,
                             random_state=SEED)
 
     clf.fit(X_train, y_train, cat_cols=cat_cols, n_trials=n_trials)
     preds = clf.predict_proba(X_test)
     roc_score = sklearn.metrics.roc_auc_score(y_test, preds[:, 1])
-    print(roc_score)
-    print(clf.best_model_.get_params())
+    # print(clf.best_model_)
+    # print(clf.best_score_)
+    # print(roc_score)
+    # print(clf.best_model_.get_params())
 
-    assert roc_score > 0.8
+    assert roc_score > 0.5
+
+def test_sparse():
+    X, y = make_classification(n_samples=500, n_features=40, n_informative=30, random_state=SEED)
+    X = scipy.sparse.coo_matrix(X)
+    #TODO: add categorical columns
+    cat_cols = None
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=SEED)
+
+
+    frameworks = ["xgboost", "lightgbm", "sklearn"]
+    model_types = ["linear", "tree_based"]
+
+    n_trials = 20
+
+    clf = HyPSTERClassifier(frameworks=frameworks,
+                            model_types=model_types,
+                            scoring="roc_auc",
+                            cv=3,
+                            max_iter=10,
+                            tol=1e-5,
+                            max_fails=0,
+                            n_jobs=-1,
+                            random_state=SEED)
+
+    clf.fit(X_train, y_train, cat_cols=cat_cols, n_trials=n_trials)
+    preds = clf.predict_proba(X_test)
+    roc_score = sklearn.metrics.roc_auc_score(y_test, preds[:, 1])
+    # print(clf.best_model_)
+    # print(clf.best_score_)
+    # print(roc_score)
+    # print(clf.best_model_.get_params())
+
+    assert roc_score > 0.6

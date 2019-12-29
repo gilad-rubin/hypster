@@ -1,3 +1,4 @@
+import re
 import pandas as pd
 import numpy as np
 import sklearn
@@ -11,7 +12,7 @@ def get_numeric_cols(X, cat_cols):
         if (isinstance(X, pd.DataFrame)) and (isinstance(cat_cols[0], str)):
             return list((set(X.columns)).difference(cat_cols))
         else:
-            numeric_cols = np.array(list(set(range(X.shape[1])).difference(cat_cols)))
+            return np.array(list(set(range(X.shape[1])).difference(cat_cols)))
     else:
         return []
 
@@ -79,3 +80,8 @@ def get_scorer_type(scoring):
     greater_is_better = False if ("greater_is_better=False" in str(scorer)) else True
 
     return scorer, scorer_type, greater_is_better
+
+def ge_version(version1, version2):
+    def normalize(v):
+        return [int(x) for x in re.sub(r'(\.0+)*$','', v).split(".")]
+    return normalize(version1) >= normalize(version2)

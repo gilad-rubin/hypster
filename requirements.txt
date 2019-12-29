@@ -1,9 +1,0 @@
-numpy>=1.18.0
-pandas>=0.25.0
-scikit-learn>=0.22.0
-scipy>=1.4.1
-optuna>=0.19.0
-category-encoders>=2.1.0
-xgboost>=0.90
-lightgbm>=2.3.1
-cma>=2.7.0

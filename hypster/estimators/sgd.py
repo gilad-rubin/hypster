@@ -1,5 +1,4 @@
 import numpy as np
-from sklearn.base import clone
 from copy import deepcopy
 from .base import HypsterEstimator
 

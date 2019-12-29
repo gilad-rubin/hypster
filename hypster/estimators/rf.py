@@ -1,3 +1,4 @@
+#TODO: finish
 class RFClassifierOptuna(object):
     def __init__(self, n_trees_per_iter=20, seed=42):
         self.random_state = seed

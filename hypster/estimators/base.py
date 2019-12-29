@@ -1,18 +1,12 @@
-import xgboost as xgb
-from xgboost import XGBClassifier, XGBRegressor
-import numpy as np
-from sklearn.base import clone
-from copy import deepcopy
-
 class HypsterEstimator():
-    def __init__(self, n_iter_per_round=1, n_jobs=None, random_state=1, param_dict=None):
+    def __init__(self, n_iter_per_round=1, n_jobs=1, random_state=1, param_dict=None):
         self.n_iter_per_round = n_iter_per_round
         self.n_jobs = n_jobs
         self.random_state = random_state
         self.param_dict = param_dict
         self.best_model = None
         self.current_model = None
-        self.tags = {}
+        self.tags = None
 
     def sample_hp(self, name, type, values):
         prefix = self.get_tags()["name"] + " "
@@ -24,6 +18,9 @@ class HypsterEstimator():
             return self.trial.suggest_uniform(prefix + name, values[0], values[1])
         elif type.startswith("int"):
             return self.trial.suggest_int(prefix + name, values[0], values[1])
+
+    def remove_trial(self):
+        self.trial = None
 
     def get_name(self):
         raise NotImplementedError

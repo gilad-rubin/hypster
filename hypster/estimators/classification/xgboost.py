@@ -1,8 +1,6 @@
 import xgboost as xgb
 from xgboost import XGBClassifier
 import numpy as np
-from sklearn.base import clone
-from copy import deepcopy
 from ..xgboost import XGBModelHypster
 
 class XGBTreeClassifierHypster(XGBModelHypster):
@@ -27,26 +25,26 @@ class XGBTreeClassifierHypster(XGBModelHypster):
         return self.tags
 
     def choose_and_set_params(self, trial, class_counts, missing):
-        self.trial = trial
+        self.trial = trial #TODO: change
         n_classes = len(class_counts)
 
         #TODO change according to Laurae
         model_params = {'seed': self.random_state,
-            'verbosity': 1,
-            'nthread': self.n_jobs,
-            'missing' : missing,
-            'eta': self.sample_hp('eta', "log-uniform", [1e-4, 1.0]), #TODO: change to global lr
-            'booster': self.sample_hp('booster', "categorical", ["gbtree", "dart"]), #TODO: make sure gblinear not here
-            'lambda': self.sample_hp('lambda', "log-uniform", [1e-10, 1.0]),
-            'alpha': self.sample_hp('alpha', "log-uniform", [1e-10, 1.0]),
-            'max_depth': self.sample_hp('max_depth', "int", [2, 20]), # TODO: maybe change to higher range? (for competition or production mode)
-            'min_child_weight': self.sample_hp('min_child_weight', "int", [1, 20]),
-            'gamma': self.sample_hp('gamma', "log-uniform", [1e-10, 5.0]),
-            'grow_policy': self.sample_hp('grow_policy', "categorical", ['depthwise', 'lossguide']),
-            'subsample': self.sample_hp('subsample', "uniform", [0.5, 1.0]),
-            'colsample_bytree': self.sample_hp('colsample_bytree', "uniform", [0.1, 1.0]),
-            'colsample_bynode': self.sample_hp('colsample_bynode', "uniform", [0.1, 1.0]),
-            }
+                        'verbosity': 0,
+                        'nthread': self.n_jobs,
+                        'missing' : missing,
+                        'eta': self.sample_hp('eta', "log-uniform", [1e-4, 1.0]), #TODO: change to global lr
+                        'booster': self.sample_hp('booster', "categorical", ["gbtree", "dart"]), #TODO: make sure gblinear not here
+                        'lambda': self.sample_hp('lambda', "log-uniform", [1e-10, 1.0]),
+                        'alpha': self.sample_hp('alpha', "log-uniform", [1e-10, 1.0]),
+                        'max_depth': self.sample_hp('max_depth', "int", [2, 20]), # TODO: maybe change to higher range? (for competition or production mode)
+                        'min_child_weight': self.sample_hp('min_child_weight', "int", [1, 20]),
+                        'gamma': self.sample_hp('gamma', "log-uniform", [1e-10, 5.0]),
+                        'grow_policy': self.sample_hp('grow_policy', "categorical", ['depthwise', 'lossguide']),
+                        'subsample': self.sample_hp('subsample', "uniform", [0.5, 1.0]),
+                        'colsample_bytree': self.sample_hp('colsample_bytree', "uniform", [0.1, 1.0]),
+                        'colsample_bynode': self.sample_hp('colsample_bynode', "uniform", [0.1, 1.0]),
+                        }
 
         if n_classes == 2:
             model_params['objective'] = 'binary:logistic'
@@ -104,6 +102,7 @@ class XGBTreeClassifierHypster(XGBModelHypster):
         self.model_params['reg_lambda'] = self.model_params.pop('lambda')
         self.model_params['reg_alpha'] = self.model_params.pop('alpha')
 
+        #TODO: handle adaptive learning rate
         #final_model = XGBClassifierLR(learning_rates=self.learning_rates, **self.model_params)
         final_model = XGBClassifier(**self.model_params)
         return final_model
@@ -183,7 +182,7 @@ class XGBLinearClassifierHypster(XGBModelHypster):
         self.model_params['reg_alpha'] = self.model_params.pop('alpha')
 
         #final_model = XGBClassifierLR(learning_rates=self.learning_rates, **self.model_params)
-        final_model = XGBClassifierLR(**self.model_params)
+        final_model = XGBClassifier(**self.model_params)
         return final_model
 
 class XGBClassifierLR(XGBClassifier):

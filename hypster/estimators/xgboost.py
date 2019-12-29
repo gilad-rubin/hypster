@@ -1,6 +1,4 @@
 import xgboost as xgb
-import numpy as np
-from sklearn.base import clone
 from copy import deepcopy
 from .base import HypsterEstimator
 
@@ -41,12 +39,6 @@ class XGBModelHypster(HypsterEstimator):
                                            ,num_boost_round=self.n_iter_per_round
                                            ,callbacks=[xgb.callback.reset_learning_rate(learning_rates)]
                                            )
-
-    # def set_learning_rates(self, learning_rates):
-    #     self.learning_rates = learning_rates
-    #
-    # def get_learning_rates(self):
-    #     return self.learning_rates
 
     def lower_complexity(self):
         self.model_params['eta'] = self.model_params['eta'] * self.lr_decay
