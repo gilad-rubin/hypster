@@ -109,7 +109,6 @@ dmypy.json
 # End of https://www.gitignore.io/api/python
 
 # Additional files
-main.py
 deprecated/
 data/
-.idea/
+.idea
