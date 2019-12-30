@@ -138,9 +138,7 @@ class Objective(object):
             elif len(transformers) >= 2:
                 cat_steps_name = "cat_transforms"
                 cat_steps = Pipeline(transformers)
-            if (numeric_cols is not None) and (cat_steps is not None):
-                cat_steps = ColumnTransformer([(cat_steps_name, cat_steps, cat_cols)],
-                                              remainder="drop", sparse_threshold=0)
+
         numeric_transforms = ["impute"]  # , "scale"]
         transformers = []
         numeric_steps = None
@@ -159,9 +157,21 @@ class Objective(object):
             elif len(transformers) >= 2:
                 numeric_steps_name = "numeric_transforms"
                 numeric_steps = Pipeline(transformers)
-            if (cat_cols is not None) and (numeric_steps is not None):
+
+        if cat_steps is not None:
+            if numeric_steps is not None:
+                cat_steps = ColumnTransformer([(cat_steps_name, cat_steps, cat_cols)],
+                                              remainder="drop", sparse_threshold=0)
+            else:
+                cat_steps = ColumnTransformer([(cat_steps_name, cat_steps, cat_cols)],
+                                              remainder="passthrough", sparse_threshold=0)
+        if numeric_steps is not None:
+            if cat_steps is not None:
                 numeric_steps = ColumnTransformer([(numeric_steps_name, numeric_steps, numeric_cols)],
                                                   remainder="drop", sparse_threshold=0)
+            else:
+                numeric_steps = ColumnTransformer([(numeric_steps_name, numeric_steps, numeric_cols)],
+                                                  remainder="passthrough", sparse_threshold=0)
 
         if (cat_steps is not None) and (numeric_steps is not None):
             union = FeatureUnion([("cat", cat_steps), ("numeric", numeric_steps)])
@@ -344,7 +354,7 @@ class HyPSTEREstimator():
                  time_limit=None,
                  study_name=None,
                  save_cv_preds=False,
-                 pruner=LinearExtrapolationPruner(n_steps_back=2, n_steps_forward=10, percentage_from_best=90),
+                 pruner=LinearExtrapolationPruner(n_steps_back=2, n_steps_forward=15, percentage_from_best=90),
                  sampler=TPESampler(**TPESampler.hyperopt_parameters()),
                  storage=None,
                  refit=True,
@@ -383,6 +393,7 @@ class HyPSTEREstimator():
                   greater_is_better, y_stats, objective_type, sample_weight,
                   groups, missing, cat_cols, timeout_per_estimator, n_trials):
 
+        cat_cols = cat_cols if isinstance(cat_cols, list) or cat_cols is None else [cat_cols]
         direction = "maximize" if greater_is_better else "minimize"
 
         for i, estimator in enumerate(valid_estimators):
@@ -467,7 +478,6 @@ class HyPSTEREstimator():
 class HyPSTERClassifier(HyPSTEREstimator):
     def fit(self, X, y, sample_weight=None, groups=None,
             missing=None, cat_cols=None, n_trials=10, timeout_per_estimator=None):
-
         X, y, groups = indexable(X, y, groups)
 
         ## convertc labels to np.array
@@ -479,8 +489,8 @@ class HyPSTERClassifier(HyPSTEREstimator):
         if cv.random_state is None:
             cv.random_state = self.random_state
 
-        if self.sampler.seed is None: #TODO: check for CMA
-            self.sampler.seed = self.random_state
+        # if self.sampler.seed is None: #TODO: check for CMA
+        #     self.sampler.seed = self.random_state
 
         scorer, scorer_type, greater_is_better = get_scorer_type(self.scoring)
 
@@ -518,10 +528,8 @@ class HyPSTERClassifier(HyPSTEREstimator):
 class HyPSTERRegressor(HyPSTEREstimator):
     def fit(self, X, y, sample_weight=None, groups=None, missing=None, cat_cols=None,
             n_trials=10, timeout_per_estimator=None):
-
         # TODO check that y is regression and not classification
         # TODO: consider log-transform y?
-
         X, y, groups = indexable(X, y, groups)
 
         y = np.array(y)
@@ -531,8 +539,8 @@ class HyPSTERRegressor(HyPSTEREstimator):
         if cv.random_state is None:
             cv.random_state = self.random_state
 
-        if self.sampler.seed is None:
-            self.sampler.seed = self.random_state
+        # if self.sampler.seed is None:
+        #     self.sampler.seed = self.random_state
 
         scorer, scorer_type, greater_is_better = get_scorer_type(self.scoring)
 

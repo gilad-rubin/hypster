@@ -9,7 +9,6 @@ from hypster import HyPSTERRegressor
 
 SEED = 50
 
-
 def test_dense():
     X, y = make_regression(n_samples=300, n_features=40, n_informative=10, random_state=SEED)
     X = pd.DataFrame(X)

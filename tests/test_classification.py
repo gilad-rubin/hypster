@@ -14,10 +14,10 @@ def test_dense():
     X = pd.DataFrame(X)
 
     #TODO add categorical
-    # n = X.shape[0]
-    # X['A'] = pd.Series(['alpha', 'beta', 'gamma'] * int(n / 4)).head(n)
-    # X['B'] = pd.Series(np.random.random_integers(0, 20, n)).astype(str)
-    # cat_cols = ["A"] #"B"
+    #n = X.shape[0]
+    #X['A'] = pd.Series(['alpha', 'beta', 'gamma'] * int(n / 4)).head(n)
+    #X['B'] = pd.Series(np.random.random_integers(0, 20, n)).astype(str)
+    #cat_cols = ["A"] #"B"
     cat_cols = None
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=SEED)
 
@@ -40,11 +40,6 @@ def test_dense():
     clf.fit(X_train, y_train, cat_cols=cat_cols, n_trials=n_trials)
     preds = clf.predict_proba(X_test)
     roc_score = sklearn.metrics.roc_auc_score(y_test, preds[:, 1])
-    # print(clf.best_model_)
-    # print(clf.best_score_)
-    # print(roc_score)
-    # print(clf.best_model_.get_params())
-
     assert roc_score > 0.5
 
 def test_sparse():
@@ -73,9 +68,4 @@ def test_sparse():
     clf.fit(X_train, y_train, cat_cols=cat_cols, n_trials=n_trials)
     preds = clf.predict_proba(X_test)
     roc_score = sklearn.metrics.roc_auc_score(y_test, preds[:, 1])
-    # print(clf.best_model_)
-    # print(clf.best_score_)
-    # print(roc_score)
-    # print(clf.best_model_.get_params())
-
     assert roc_score > 0.6

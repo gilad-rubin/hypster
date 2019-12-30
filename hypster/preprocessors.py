@@ -22,7 +22,7 @@ def add_to_pipe(pipe, name, step, cols=None, cols_name=None,
         pipe_res = clone(pipe)
         step_names = [step[0] for step in pipe_res.steps]
         if name not in step_names:
-            pipe_res.steps.append([name, step])
+            pipe_res.steps.append((name, step))
     return pipe_res
 
 def CatImputer(X, cat_cols, tags, trial, random_state):
@@ -46,12 +46,12 @@ def CatEncoder(X, cat_cols, tags, estimator_name, objective_type, trial, n_class
             small_cardinal_cats = [col for col in cat_cols if len(np.unique(X[:,col])) <= large_threshold]
 
         enc_pipe = None
-        cat_enc_types = ["target", "catboost"] #TODO: add "binary" and fix error that kiils terminal
+        cat_enc_types = ["target", "binary", "catboost"]
 
-        if small_cardinal_cats is not None:
+        if len(small_cardinal_cats) > 0:
             enc_pipe = add_to_pipe(enc_pipe, "ohe", OneHotEncoder(cols=small_cardinal_cats, drop_invariant=True))
 
-        if large_cardinal_cats is not None:
+        if len(large_cardinal_cats) > 0:
             if (objective_type == "classification" and n_classes == 1):
                 cat_enc_types.append("woe")
 
@@ -67,7 +67,7 @@ def CatEncoder(X, cat_cols, tags, estimator_name, objective_type, trial, n_class
                 enc = WOEEncoder(cols=large_cardinal_cats, drop_invariant=True)
 
             elif cat_enc_type == "target":
-                min_samples_leaf = 10  # TODO: calculate percentage or something else
+                min_samples_leaf = 6  # TODO: calculate percentage or something else
                 enc = TargetEncoder(min_samples_leaf=min_samples_leaf,
                                     cols=large_cardinal_cats)
 

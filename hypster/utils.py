@@ -14,7 +14,7 @@ def get_numeric_cols(X, cat_cols):
         else:
             return np.array(list(set(range(X.shape[1])).difference(cat_cols)))
     else:
-        return []
+        return None
 
 def safe_column_indexing(X, columns):
     if columns is None:
