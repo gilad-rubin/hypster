@@ -13,13 +13,11 @@ def test_dense():
     X, y = make_regression(n_samples=300, n_features=40, n_informative=10, random_state=SEED)
     X = pd.DataFrame(X)
 
-    # TODO add categorical
-    #n = X.shape[0]
-    #X['A'] = pd.Series(['alpha', 'beta', 'gamma'] * int(n / 4)).head(n)
-    #X['B'] = pd.Series(np.random.random_integers(0, 20, n)).astype(str)
-    #cat_cols = ["A", "B"]
+    n = X.shape[0]
+    X['A'] = pd.Series(['alpha', 'beta', 'gamma'] * int(n / 4)).head(n)
+    X['B'] = pd.Series(np.random.randint(0, 20, n)).astype(str)
+    cat_cols = ["A", "B"]
 
-    cat_cols = None
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=SEED)
 
     frameworks = ["sklearn", "lightgbm", "xgboost", "sklearn"]
