@@ -21,7 +21,7 @@ class LGBModelHypster(HypsterEstimator):
         self.dtest = X
 
     def fit(self, sample_weight=None, warm_start=True):
-        learning_rates = [self.model_params['learning_rate']] * self.n_iter_per_round
+        #learning_rates = [self.model_params['learning_rate']] * self.n_iter_per_round
 
         if warm_start:
            model = self.get_current_model()
@@ -31,14 +31,14 @@ class LGBModelHypster(HypsterEstimator):
                                            self.dtrain,
                                            num_boost_round=self.n_iter_per_round,
                                            keep_training_booster=True,
-                                           callbacks=[lgb.reset_parameter(learning_rate=learning_rates)]
+                                           #callbacks=[lgb.reset_parameter(learning_rate=learning_rates)]
                                            )
         else:
             self.current_model = lgb.train(self.model_params,
                                            self.dtrain,
                                            init_model=model,
                                            num_boost_round=self.n_iter_per_round,
-                                           callbacks=[lgb.reset_parameter(learning_rate=learning_rates)]
+                                           #callbacks=[lgb.reset_parameter(learning_rate=learning_rates)]
                                            )
 
     def lower_complexity(self):
