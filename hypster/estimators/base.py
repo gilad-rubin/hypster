@@ -8,7 +8,7 @@ class HypsterEstimator():
         self.current_model = None
         self.tags = None
 
-    def sample_hp(self, name, type, values):
+    def sample_hp(self, name, type, values, default_value=None):
         prefix = self.get_tags()["name"] + " "
         if type.startswith("cat"):
             return self.trial.suggest_categorical(prefix + name, values)
