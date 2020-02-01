@@ -43,11 +43,10 @@ def a_better_equal_b(a, b, greater_is_better):
 
 # TODO move objective into another file (?)
 class Objective(object):
-    def __init__(self, X, y, estimators, sample_weight=None,
-                 missing=None, groups=None, cat_cols=None,
+    def __init__(self, X, y, estimators, pre_proc=None, proc_dict=None, post_proc=None,
+                 sample_weight=None, missing=None, groups=None, cat_cols=None,
                  numeric_cols=None,  # TODO add missing
-                 objective_type="classification", y_stats=None, pipeline=None,
-                 pipe_params=None, greater_is_better=True,
+                 objective_type="classification", y_stats=None, greater_is_better=True,
                  cv='warn', save_cv_preds=False, scoring=None, scorer_type=None,
                  refit=False, tol=1e-7, agg_func=np.mean, max_iter=30, max_fails=0,
                  random_state=1):
@@ -55,6 +54,9 @@ class Objective(object):
         self.X = X
         self.y = y
         self.estimators = estimators
+        self.pre_proc = pre_proc, #TODO: redundant init?
+        self.proc_dict = proc_dict,
+        self.post_proc = post_proc,
         self.sample_weight = sample_weight
         self.groups = groups
         self.missing = missing
@@ -62,8 +64,6 @@ class Objective(object):
         self.numeric_cols = numeric_cols
         self.objective_type = objective_type
         self.y_stats = y_stats
-        self.pipeline = pipeline
-        self.pipe_params = pipe_params
         self.greater_is_better = greater_is_better
         self.cv = cv
         self.save_cv_preds = save_cv_preds
@@ -80,8 +80,6 @@ class Objective(object):
         #######################
         ### Initializations ###
         #######################
-
-        pipeline = _init_pipeline(self.pipeline, self.pipe_params, trial)
         # TODO replace with self.""?
         X = self.X
         y = self.y
@@ -93,6 +91,31 @@ class Objective(object):
         ### Choose Estimator & HPs ###
         ##############################
         estimator = deepcopy(trial.suggest_categorical("estimator", self.estimators))
+        if estimator == "SGDClassifier":
+            from hypster.estimators.classification.sgd import SGDClassifierHypster
+            estimator = SGDClassifierHypster()
+        if estimator == "SGDRegressor":
+            from hypster.estimators.regression.sgd import SGDRegressorHypster
+            estimator = SGDRegressorHypster()
+        if estimator == "XGBLinearClassifier":
+            from hypster.estimators.classification.xgboost import XGBLinearClassifierHypster
+            estimator = XGBLinearClassifierHypster()
+        if estimator == "XGBLinearRegression":
+            from hypster.estimators.regression.xgboost import XGBLinearRegressorHypster
+            estimator = XGBLinearRegressorHypster()
+        if estimator == "XGBTreeClassifier":
+            from hypster.estimators.classification.xgboost import XGBTreeClassifierHypster
+            estimator = XGBTreeClassifierHypster()
+        if estimator == "XGBTreeRegression":
+            from hypster.estimators.regression.xgboost import XGBTreeRegressorHypster
+            estimator = XGBTreeRegressorHypster()
+        if estimator == "LGBClassifier":
+            from hypster.estimators.classification.lightgbm import LGBClassifierHypster
+            estimator = LGBClassifierHypster()
+        if estimator == "LGBRegressor":
+            from hypster.estimators.regression.lightgbm import LGBRegressorHypster
+            estimator = LGBRegressorHypster()
+
         estimator.choose_and_set_params(trial, self.y_stats, self.missing)
         estimator.remove_trial() #TODO: change it to be more elegant
 
@@ -116,6 +139,38 @@ class Objective(object):
         ###########################
         ### Choose Transformers ###
         ###########################
+        def get_transformer(name, tags):
+            return IdentityTransformer()
+
+        def add_procs(pipeline, procs):
+            for proc in procs:
+                transformer = get_transformer(proc, tags)
+                pipeline = add_to_pipe(pipeline)
+            return pipeline
+
+        def add_proc_dict(pipeline, proc_dict):
+            ##Populate type transformers
+            transformers_dict = {}
+            for name, col_procs in proc_dict.items():
+                type_proc_list = []
+                cols = col_procs[0]
+                proc_list = col_procs[1]
+                for proc in proc_list:
+                    transformer = get_transformer(proc, tags)
+                    type_proc_list.append(transformer)
+                #if proc_list > 1 --> convert to pipeline
+                transformers_dict[name] = (cols, type_proc_list) #replace with pipeline
+
+            ##Build minimal Pipeline
+            # if there num_types > 1 --> create FeatureUnion(pipline0, pipeline1, ...)
+            # else pipeline0
+            # if some columns don't have transformers (#num unique cols < #num cols) -->
+                # add coltransformer(FU/pipeline0, cols=all_columns_with_transformers, "passthrough")
+
+        pipeline = None
+        if self.pre_procs is not None: pipeline = add_procs(pipeline, self.post_proc)
+        if self.proc_dict is not None: pipeline = add_proc_dict(pipeline, self.proc_dict)
+        if self.post_proc is not None: pipeline = add_procs(pipeline, self.post_proc)
 
         cat_transforms = ["encode"]  # "impute" #TODO: fix numpy array output from imputation
         transformers = []
@@ -165,7 +220,7 @@ class Objective(object):
             else:
                 cat_steps = ColumnTransformer([(cat_steps_name, cat_steps, cat_cols)],
                                               remainder="passthrough", sparse_threshold=0)
-        if numeric_steps is not None:
+        if numeric_steps is not None and cat_cols is not None:
             if cat_steps is not None:
                 numeric_steps = ColumnTransformer([(numeric_steps_name, numeric_steps, numeric_cols)],
                                                   remainder="drop", sparse_threshold=0)
@@ -343,8 +398,9 @@ class Objective(object):
 class HyPSTEREstimator():
     def __init__(self, frameworks,
                  model_types,
-                 pipeline=None,
-                 pipe_params=None,
+                 pre_proc=None,
+                 proc_dict=None,
+                 post_proc=None,
                  scoring=None,
                  cv=3,
                  agg_func=np.mean,
@@ -364,8 +420,9 @@ class HyPSTEREstimator():
 
         self.frameworks = frameworks if isinstance(frameworks, list) else [frameworks]
         self.model_types = model_types if isinstance(model_types, list) else [model_types]
-        self.pipeline = pipeline
-        self.pipe_params = pipe_params
+        self.pre_proc = pre_proc,
+        self.proc_dict = proc_dict,
+        self.post_proc = post_proc,
         self.scoring = scoring
         self.cv = cv
         self.agg_func = agg_func
@@ -403,9 +460,10 @@ class HyPSTEREstimator():
                 estimator.set_n_jobs(self.n_jobs)
 
         numeric_cols = get_numeric_cols(X, cat_cols)
-        objective = Objective(X, y, valid_estimators, sample_weight, groups, missing, cat_cols,
+        objective = Objective(X, y, valid_estimators,
+                              self.pre_proc, self.proc_dict, self.post_proc,
+                              sample_weight, groups, missing, cat_cols,
                               numeric_cols=numeric_cols, objective_type=objective_type, y_stats=y_stats,
-                              pipeline=self.pipeline, pipe_params=self.pipe_params,
                               greater_is_better=greater_is_better,
                               cv=cv, save_cv_preds=self.save_cv_preds,
                               scoring=scorer._score_func,
@@ -496,13 +554,12 @@ class HyPSTERClassifier(HyPSTEREstimator):
 
         valid_estimators = get_estimators(self.frameworks, self.model_types,
                                           objective_type="classification")
-        valid_estimators = filter_estimators(X, valid_estimators, class_counts, "classification")
+        #valid_estimators = filter_estimators(X, valid_estimators, class_counts, "classification")
 
-        self.run_study(X, y, valid_estimators, cv, scorer, scorer_type,
-                       greater_is_better, y_stats=class_counts, objective_type="classification",
-                       sample_weight=sample_weight, groups=groups, missing=missing,
-                       cat_cols=cat_cols, timeout_per_estimator=timeout_per_estimator,
-                       n_trials=n_trials)
+        self.run_study(X, y, valid_estimators, cv, scorer, scorer_type, greater_is_better,
+                       y_stats=class_counts, objective_type="classification", sample_weight=sample_weight,
+                       groups=groups, missing=missing, cat_cols=cat_cols,
+                       timeout_per_estimator=timeout_per_estimator, n_trials=n_trials)
 
         self.save_results()
 
@@ -547,7 +604,7 @@ class HyPSTERRegressor(HyPSTEREstimator):
         valid_estimators = get_estimators(self.frameworks, self.model_types,
                                           objective_type="regression")
 
-        valid_estimators = filter_estimators(X, valid_estimators, y_mean, "regression")
+        #valid_estimators = filter_estimators(X, valid_estimators, y_mean, "regression")
 
         self.run_study(X, y, valid_estimators, cv, scorer, scorer_type,
                        greater_is_better, y_stats=y_mean, objective_type="regression",
@@ -582,7 +639,6 @@ class IdentityTransformer(BaseEstimator, TransformerMixin):
     def transform(self, X, y=None):
         return X
 
-
 def get_estimators(frameworks, model_types, objective_type):
     # frameworks: ["xgboost", "lightgbm", "sklearn", "catboost", "tf", "keras", "fastai", "all"]
     # model types: ["tree_based", "linear", "deep_learning"]
@@ -599,18 +655,14 @@ def get_estimators(frameworks, model_types, objective_type):
                 if ge_version(xgb_ver, xgb_min_ver):
                     if any(item.startswith('linear') for item in model_types):
                         if objective_type == "classification":
-                            from hypster.estimators.classification.xgboost import XGBLinearClassifierHypster
-                            estimators.append(XGBLinearClassifierHypster())
+                            estimators.append("XGBLinearClassifier")
                         else:
-                            from hypster.estimators.regression.xgboost import XGBLinearRegressorHypster
-                            estimators.append(XGBLinearRegressorHypster())
+                            estimators.append("XGBLinearRegressor")
                     if any(item.startswith('tree') for item in model_types):
                         if objective_type == "classification":
-                            from hypster.estimators.classification.xgboost import XGBTreeClassifierHypster
-                            estimators.append(XGBTreeClassifierHypster())
+                            estimators.append("XGBTreeClassifier")
                         else:
-                            from hypster.estimators.regression.xgboost import XGBTreeRegressorHypster
-                            estimators.append(XGBTreeRegressorHypster())
+                            estimators.append("XGBTreeRegressor")
             except:
                 # TODO: log that xgboost is not installed in the right version
                 continue
@@ -622,11 +674,9 @@ def get_estimators(frameworks, model_types, objective_type):
                 if ge_version(lgb_ver, lgb_min_ver):
                     if any(item.startswith('tree') for item in model_types):
                         if objective_type == "classification":
-                            from hypster.estimators.classification.lightgbm import LGBClassifierHypster
-                            estimators.append(LGBClassifierHypster())
+                            estimators.append("LGBClassifier")
                         else:
-                            from hypster.estimators.regression.lightgbm import LGBRegressorHypster
-                            estimators.append(LGBRegressorHypster())
+                            estimators.append("LGBRegressor")
             except:
                 # TODO: log that lightgbm is not installed in the right version
                 continue
@@ -638,11 +688,9 @@ def get_estimators(frameworks, model_types, objective_type):
                 if ge_version(sklearn_ver, sklearn_min_ver):
                     if any(item.startswith('linear') for item in model_types):
                         if objective_type == "classification":
-                            from hypster.estimators.classification.sgd import SGDClassifierHypster
-                            estimators.append(SGDClassifierHypster())
+                            estimators.append("SGDClassifier")
                         else:
-                            from hypster.estimators.regression.sgd import SGDRegressorHypster
-                            estimators.append(SGDRegressorHypster())
+                            estimators.append("SGDRegressor")
                     # if any(item.startswith('tree') for item in model_types):
                     #     if objective_type == "classification":
                     #         from hypster.estimators.classification.ensembles import RFClassifierHyPSTER, \
