@@ -532,10 +532,22 @@ class HyPSTEREstimator():
         # TODO more statistics about estimators
         return
 
+def get_data_tags(X, y, objective_type, y_stats):
+    n_classes = 1
+    if objective_type=="classification":
+        #add support for multi-label
+        n_classes = len(y_stats)
+
+    return {"classification" : objective_type=="classification",
+            "regression"     : objective_type=="regression",
+            "sparse"         : issparse(X),
+            "multiclass"     : (objective_type=="classification") and (n_classes > 2)
+            }
 
 class HyPSTERClassifier(HyPSTEREstimator):
     def fit(self, X, y, sample_weight=None, groups=None,
-            missing=None, cat_cols=None, n_trials=10, timeout_per_estimator=None):
+            missing=None, cat_cols=None, n_trials=10,
+            timeout_per_estimator=None):
         X, y, groups = indexable(X, y, groups)
 
         ## convertc labels to np.array
@@ -551,9 +563,14 @@ class HyPSTERClassifier(HyPSTEREstimator):
         #     self.sampler.seed = self.random_state
 
         scorer, scorer_type, greater_is_better = get_scorer_type(self.scoring)
+        data_tags = get_data_tags(X, y, "classification", class_counts)
+        #get estimators by insatlled packages + version
+        #filter estimators by data & constraints
+        #("name", tags, class)
 
         valid_estimators = get_estimators(self.frameworks, self.model_types,
                                           objective_type="classification")
+
         #valid_estimators = filter_estimators(X, valid_estimators, class_counts, "classification")
 
         self.run_study(X, y, valid_estimators, cv, scorer, scorer_type, greater_is_better,

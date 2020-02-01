@@ -27,6 +27,11 @@ def test_dense():
 
     n_trials = 20
 
+    # constraints: Explainable / Interpretable
+    # cpu/gpu
+    # training/inference speed
+    # probs
+
     clf = HyPSTERClassifier(frameworks=frameworks,
                             model_types=model_types,
                             scoring="roc_auc",
