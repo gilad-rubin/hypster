@@ -564,9 +564,8 @@ class HyPSTERClassifier(HyPSTEREstimator):
 
         scorer, scorer_type, greater_is_better = get_scorer_type(self.scoring)
         data_tags = get_data_tags(X, y, "classification", class_counts)
-        #get estimators by insatlled packages + version
+        #get estimators ("name", tags, class) by insatlled packages + version
         #filter estimators by data & constraints
-        #("name", tags, class)
 
         valid_estimators = get_estimators(self.frameworks, self.model_types,
                                           objective_type="classification")
