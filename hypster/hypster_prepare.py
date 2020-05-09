@@ -13,35 +13,37 @@ from collections import OrderedDict
 # Cell
 class HypsterPrepare(HypsterBase):
     def __init__(self, call, base_call, *args, **kwargs):
-        self.call       = call
-        self.base_call  = base_call
-        self.args       = args
-        self.kwargs     = kwargs
-        self.is_sampled = False
+        self.call            = call
+        self.base_call       = base_call
+        self.args            = args
+        self.kwargs          = kwargs
+        self.trials_sampled  = set()
+        self.studies_sampled = set()
+        self.base_object     = None
 
     def sample(self, trial):
-#         print(self.call)
-#         print(self.args)
-#         print(self.kwargs)
-#         print(self.base_call)
-        base_object = None
+        if trial.study.study_name not in self.studies_sampled:
+            self.trials_sampled = set()
+        elif trial.number in self.trials_sampled:
+            return self.res
 
         if self.base_call is not None:
-            base_object = self.base_call.sample(trial)
+            self.base_object = self.base_call.sample(trial)
 
-        #if not self.is_sampled:
-        #TODO!: fix is_sampled
         self.sampled_args   = [sample_hp(arg, trial) for arg in self.args]
         sampled_kwargs      = [sample_hp(arg, trial) for arg in self.kwargs.values()]
         self.sampled_kwargs = OrderedDict(zip(self.kwargs.keys(), sampled_kwargs))
-        self.is_sampled     = True
+        self.trials_sampled.add(trial.number)
+        self.studies_sampled.add(trial.study.study_name)
 
-        if base_object:
-            #print(f"self.sampled_args: {self.sampled_args}")
-            #print(f"self.sampled_kwargs: {self.sampled_kwargs}")
-            return getattr(base_object, self.call)(*self.sampled_args, **self.sampled_kwargs)
+        if self.base_object:
+            if len(self.sampled_args) == 0 and len(self.sampled_kwargs) == 0:
+                self.res = getattr(self.base_object, self.call)
+            else:
+                self.res = getattr(self.base_object, self.call)(*self.sampled_args, **self.sampled_kwargs)
         else:
-            return self.call(*self.sampled_args, **self.sampled_kwargs)
+            self.res = self.call(*self.sampled_args, **self.sampled_kwargs)
+        return self.res
 
     def __call__(self, *args, **kwargs):
         #print(f"args {args}, kwargs {kwargs}")

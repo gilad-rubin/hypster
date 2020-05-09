@@ -2,7 +2,7 @@
 
 __all__ = ["index", "modules", "custom_doc_links", "git_url"]
 
-index = {"SEED": "02_oo_hp.ipynb",
+index = {"SEED": "04_tabular_api.ipynb",
          "auto_assign": "02_oo_hp.ipynb",
          "HypsterBase": "02_oo_hp.ipynb",
          "HpExpression": "02_oo_hp.ipynb",
@@ -28,7 +28,25 @@ index = {"SEED": "02_oo_hp.ipynb",
          "run_hp_test": "02_oo_hp.ipynb",
          "HypsterPrepare": "03_hypster_prepare.ipynb",
          "prepare": "03_hypster_prepare.ipynb",
-         "run_func_test": "04_tabular_api.ipynb"}
+         "run_func_test": "03_hypster_prepare.ipynb",
+         "path": "04_tabular_api.ipynb",
+         "df": "04_tabular_api.ipynb",
+         "cat_names": "04_tabular_api.ipynb",
+         "cont_names": "04_tabular_api.ipynb",
+         "dep_var": "04_tabular_api.ipynb",
+         "Normalize": "04_tabular_api.ipynb",
+         "norm": "04_tabular_api.ipynb",
+         "procs": "04_tabular_api.ipynb",
+         "TabularPandas": "04_tabular_api.ipynb",
+         "to": "04_tabular_api.ipynb",
+         "dls": "04_tabular_api.ipynb",
+         "cbs": "04_tabular_api.ipynb",
+         "start_mom": "04_tabular_api.ipynb",
+         "tabular_learner": "04_tabular_api.ipynb",
+         "learner": "04_tabular_api.ipynb",
+         "lr": "04_tabular_api.ipynb",
+         "run_learner": "04_tabular_api.ipynb",
+         "study": "04_tabular_api.ipynb"}
 
 modules = ["oo_hp.py",
            "hypster_prepare.py",
