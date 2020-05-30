@@ -20,12 +20,13 @@ class HypsterPrepare(HypsterBase):
         self.trials_sampled  = set()
         self.studies_sampled = set()
         self.base_object     = None
+        self.result          = None
 
     def sample(self, trial):
         if trial.study.study_name not in self.studies_sampled:
             self.trials_sampled = set()
         elif trial.number in self.trials_sampled:
-            return self.res
+            return self.result
 
         if self.base_call is not None:
             self.base_object = self.base_call.sample(trial)
@@ -43,12 +44,12 @@ class HypsterPrepare(HypsterBase):
 
         if self.base_object:
             if len(self.sampled_args) == 0 and len(self.sampled_kwargs) == 0:
-                self.res = getattr(self.base_object, self.call)
+                self.result = getattr(self.base_object, self.call)
             else:
-                self.res = getattr(self.base_object, self.call)(*self.sampled_args, **self.sampled_kwargs)
+                self.result = getattr(self.base_object, self.call)(*self.sampled_args, **self.sampled_kwargs)
         else:
-            self.res = self.call(*self.sampled_args, **self.sampled_kwargs)
-        return self.res
+            self.result = self.call(*self.sampled_args, **self.sampled_kwargs)
+        return self.result
 
     def __call__(self, *args, **kwargs):
         #print(f"args {args}, kwargs {kwargs}")

@@ -127,25 +127,21 @@ class PowExpression(HpExpression):
 # Cell
 class HpInt(HpExpression):
     @auto_assign
-    def __init__(self, name, low, high, step=1):
-        self.result = None
+    def __init__(self, name, low, high, step=1): pass
 
     def sample(self, trial):
-        self.result = trial.suggest_int(self.name, self.low, self.high, self.step)
-        return self.result
+        return trial.suggest_int(self.name, self.low, self.high, self.step)
 
 # Cell
 class HpFloat(HpExpression):
     @auto_assign
-    def __init__(self, name, low, high, log=False, step=None):
-        self.result = None
+    def __init__(self, name, low, high, log=False, step=None): pass
+        #self.result = None
         #TODO: check what's up with log and step
         #TODO: move result to HpExpression?
 
     def sample(self, trial):
-        #self.result = ifnone(self.result, trial.suggest_float(self.name, self.low, self.high))
-        self.result = trial.suggest_float(self.name, self.low, self.high)
-        return self.result
+        return trial.suggest_float(self.name, self.low, self.high)
 
     #TODO: warn if log=True & step is not None
     #TODO: check what is the "*" in the function definition
@@ -160,43 +156,38 @@ class HpFunc(HpExpression):
         self.name = name
         self.func = func
         self.kwargs = kwargs
-        self.result = None
 
     def sample(self, trial):
-        self.result = self.func(trial, **self.kwargs)
-        _log_optuna_param(self.name, self.result, trial)
-        return self.result
+        result = self.func(trial, **self.kwargs)
+        _log_optuna_param(self.name, result, trial)
+        return result
 
 # Cell
 class HpCategorical(HpExpression):
     @auto_assign
-    def __init__(self, name, choices):
-        self.result = None
+    def __init__(self, name, choices): pass
 
     def sample(self, trial):
-        #print(f"result = {self.result}")
-        #if self.result is not None:
-        #    return self.result
-
         choices           = self.choices
         name              = self.name
-        optuna_valid_cats = [str, int, float, bool] #TODO: add more + move to global area
+        optuna_valid_cats = [str, int, float, bool, NoneType] #TODO: add more + move to global area
 
         if any([type(choice) not in optuna_valid_cats for choice in self.choices]):
             #TODO: add check for "choice.__name__"
             self.items_str = [choice.__name__ for choice in choices]
             self.str_dict  = dict(zip(self.items_str, choices))
             chosen_hp      = trial.suggest_categorical(name, self.str_dict)
-            self.result    = self.str_dict[chosen_hp]
+            result         = self.str_dict[chosen_hp]
         else:
-            self.result = trial.suggest_categorical(name, choices)
-        return self.result
+            result = trial.suggest_categorical(name, choices)
+        return result
 
 # Cell
 class HpVarLenList(HpExpression):
     #TODO: think of a better name?
     @auto_assign
     def __init__(self, name, min_len, max_len, hp, same_value=False): pass
+        #self.result = None
 
     def sample(self, trial):
         lst_len = trial.suggest_int(self.name, self.min_len, self.max_len)
@@ -210,7 +201,7 @@ class HpVarLenList(HpExpression):
                 hp.name = f"{hp.get_name()}_{i+1}"
                 result = sample_hp(hp, trial)
                 lst.append(result)
-                #TODO keep self.result?
+
         return lst
 
 # Cell
@@ -305,8 +296,7 @@ def sample_hp(hp, trial):
     elif isinstance(hp, dict):
         hp = HpDict(hp)
     return hp.sample(trial)
-    #TODO: handle names
-    #TODO: handle list of lists
+#TODO: handle list of lists
 #TODO!: check if class attributes / methods? have hypster in them
 
 # Cell
