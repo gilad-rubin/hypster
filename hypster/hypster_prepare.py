@@ -30,9 +30,14 @@ class HypsterPrepare(HypsterBase):
         if self.base_call is not None:
             self.base_object = self.base_call.sample(trial)
 
-        self.sampled_args   = [sample_hp(arg, trial) for arg in self.args]
-        sampled_kwargs      = [sample_hp(arg, trial) for arg in self.kwargs.values()]
-        self.sampled_kwargs = OrderedDict(zip(self.kwargs.keys(), sampled_kwargs))
+        #TODO: add HpToggle Here
+        #self.sampled_args   = [sample_hp(arg, trial) for arg in self.args]
+        #sampled_kwargs      = [sample_hp(arg, trial) for arg in self.kwargs.values()]
+        #self.sampled_kwargs = OrderedDict(zip(self.kwargs.keys(), sampled_kwargs))
+
+        self.sampled_args   = populate_iterable(self.args, trial)
+        self.sampled_kwargs = populate_dict(self.kwargs, trial)
+
         self.trials_sampled.add(trial.number)
         self.studies_sampled.add(trial.study.study_name)
 
