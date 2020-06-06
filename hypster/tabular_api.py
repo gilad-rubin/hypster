@@ -43,10 +43,10 @@ train_df, test_df = train_test_split(df, test_size=0.6,
 
 # Cell
 Normalize = prepare(Normalize)
-norm = Normalize(mean=HpFloat("mean_norm", 0.001, 10.4))
+norm = Normalize(mean=HpFloat(0.001, 10.4))
 
 # Cell
-procs = [Categorify, imp, HpToggle("norm_bool", norm)]
+procs = [Categorify, imp, HpToggle(norm)]
 
 # Cell
 to = TabularPandas(train_df,
@@ -72,7 +72,7 @@ cbs = [TrackerCallback(monitor="roc_auc_score"),
        ReduceLROnPlateau("roc_auc_score", patience=3)]
 
 # Cell
-start_mom = HpFloat("start_mom", 0.85, 0.99)
+start_mom = HpFloat(0.85, 0.99)
 
 # Cell
 tabular_learner = prepare(tabular_learner)
@@ -80,15 +80,15 @@ tabular_learner = prepare(tabular_learner)
 # Cell
 learner = tabular_learner(dls,
                           metrics=RocAuc(),
-                          opt_func=HpCategorical("optimizer", [Adam, SGD, QHAdam]),
-                          layers=HpVarLenList("layers", 1, 4, HpInt("layer_size", 50, 300, 50), same_value=False),
+                          opt_func=HpCategorical([Adam, SGD, QHAdam]),
+                          layers=HpVarLenList(1, 4, HpInt(50, 300, 50, name="layer_size"), same_value=False),
                           cbs=cbs,
                           moms=(start_mom, start_mom-0.1, start_mom),
-                          wd_bn_bias=HpBool("wd_bn_bias"),
+                          wd_bn_bias=HpBool(),
                           )
 
 # Cell
-def run_learner(fit_method, get_metric, n_trials=5): #learner
+def run_learner(learner, fit_method, get_metric, n_trials=5): #learner
     class Objective():
         def __init__(self, fit_method, get_metric): #learner
             #self.learner   = learner
@@ -109,11 +109,15 @@ def run_learner(fit_method, get_metric, n_trials=5): #learner
     pruner = optuna.pruners.NopPruner()
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     study = optuna.create_study(direction="maximize", study_name = now, pruner=pruner)
+
+    #study.set_user_attr("names_db", {}) #TODO: Check what happens if n_jobs=-1
+    #set_names(learner, fit_method, get_metric, study)
+
     study.optimize(objective, n_trials=n_trials, n_jobs=1, timeout=600)
     return study
 
 # Cell
-study = run_learner(#learner    = learner,
+study = run_learner(learner    = learner,
                     fit_method = learner.fit_one_cycle(2, lr),
                     get_metric = learner.tracker.best,
                     n_trials   = 5
