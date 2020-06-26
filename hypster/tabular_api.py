@@ -68,8 +68,10 @@ to = TabularPandas(train_df,
 dls = to.dataloaders(batch_size=32)
 
 # Cell
-cbs = [TrackerCallback(monitor="roc_auc_score"),
-       ReduceLROnPlateau("roc_auc_score", patience=3)]
+cbs = [#TrackerCallback(monitor="roc_auc_score"),
+       TrackerCallback(monitor="accuracy"),
+       #ReduceLROnPlateau("roc_auc_score", patience=3)
+      ]
 
 # Cell
 start_mom = HpFloat(0.85, 0.99)
@@ -79,7 +81,8 @@ tabular_learner = prepare(tabular_learner)
 
 # Cell
 learner = tabular_learner(dls,
-                          metrics=RocAuc(),
+                          #metrics=RocAuc(),
+                          metrics=accuracy,
                           opt_func=HpCategorical([Adam, SGD, QHAdam]),
                           layers=HpVarLenList(1, 4, HpInt(50, 300, 50, name="layer_size"), same_value=False),
                           cbs=cbs,
@@ -118,9 +121,9 @@ def run_learner(learner, fit_method, get_metric, n_trials=5): #learner
 
 # Cell
 study = run_learner(learner    = learner,
-                    fit_method = learner.fit_one_cycle(2, lr),
+                    fit_method = learner.fit_one_cycle(2, 1e-3),#lr
                     get_metric = learner.tracker.best,
-                    n_trials   = 5
+                    n_trials   = 3
                    )
 
 # Cell
