@@ -140,3 +140,6 @@ checklink/cookies.txt
 .gitconfig
 
 *.pth
+*.yml
+*.html
+*.class

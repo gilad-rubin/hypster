@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "hypster"
+version = "0.1.0"
+description = "A flexible configuration system for Python projects"
+authors = ["Gilad Rubin <gilad.rubin@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "hypster", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+streamlit = "^1.0.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.0"
+ruff = "^0.0.261"
+mypy = "^0.910"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+select = ["E", "F", "I"]
+ignore = []
+line-length = 88
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.mypy]
+ignore_missing_imports = true
