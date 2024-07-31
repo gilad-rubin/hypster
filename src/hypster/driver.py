@@ -57,26 +57,26 @@ class HypsterDriver:
     def apply_selections(self, node: ConfigNode, selections: Dict[str, str]):
         for path, selection in selections.items():
             select_node = self._find_node(node, path)
-            if select_node and select_node.type == "Select":
-                selected_node = next((child for child in select_node.children.values() if child.name.split('__')[-1] == selection), None)
-                if selected_node:
-                    select_node.children = {selection: selected_node}
-
-    def apply_overrides(self, node: ConfigNode, overrides: Dict[str, Any]):
-        for path, value in overrides.items():
-            override_node = self._find_node(node, path)
-            if override_node:
-                override_node.value = value
+            if select_node:
+                if select_node.type == "Select":
+                    selected_node = next((child for child in self.root.children.values() if child.name.endswith(f"__{selection}")), None)
+                    if selected_node:
+                        select_node.children = {selection: selected_node}
+                else:
+                    select_node.value = selection
 
     def _instantiate_node(self, node: ConfigNode, config: Dict[str, Any]) -> Any:
         if node.type == "root":
             return {child.name: self._instantiate_node(child, config.get(child.name, {})) for child in node.children.values()}
         elif node.type == "Select":
             if not node.children:
+                # If no selection was made, return None or a default value
                 return None
             selected_option = next(iter(node.children.keys()))
             selected_node = node.children[selected_option]
             return self._instantiate_node(selected_node, config.get(selected_option, {}))
+        elif node.type == "value":
+            return node.value
         elif not node.children:
             return node.value
         else:
@@ -88,6 +88,12 @@ class HypsterDriver:
             for child_name, child_node in node.children.items():
                 args[child_name] = self._instantiate_node(child_node, config.get(child_name, {}))
             return class_(**args)
+
+    def apply_overrides(self, node: ConfigNode, overrides: Dict[str, Any]):
+        for path, value in overrides.items():
+            override_node = self._find_node(node, path)
+            if override_node:
+                override_node.value = value
 
     def _get_class(self, class_name: str) -> Optional[type]:
         return self.classes.get(class_name)

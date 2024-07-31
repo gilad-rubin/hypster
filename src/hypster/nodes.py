@@ -105,7 +105,6 @@ class TreeBuilder:
     def build_tree(self, prepped_objects, module_vars):
         self._create_nodes_from_prepped_objects(prepped_objects)
         self._create_nodes_from_module_vars(module_vars)
-        self._find_nested_select_nodes(self.root)
         self._connect_select_nodes()
         self._add_remaining_top_level_nodes()
         self.node_factory.mark_shared_values()
@@ -117,8 +116,8 @@ class TreeBuilder:
             if isinstance(obj, Select) or (isinstance(obj, ast.Call) and getattr(obj.func, 'id', None) == 'Select'):
                 select_name = obj.name if isinstance(obj, Select) else obj.args[0].s
                 self.select_nodes[select_name] = node
-            if "__" in name:
-                prefix, option = name.split("__", 1)
+            if '__' in name:
+                prefix, option = name.split('__', 1)
                 self.option_nodes.setdefault(prefix, []).append((option, node))
             else:
                 self.root.add_child(node)
@@ -128,27 +127,25 @@ class TreeBuilder:
             if isinstance(value, Select):
                 node = self.node_factory.create_node(name, "Select", value.name)
                 self.select_nodes[value.name] = node
-
-    def _find_nested_select_nodes(self, node):
-        for child in node.children.values():
-            if child.type == "Select":
-                self.select_nodes[child.value] = child
-            self._find_nested_select_nodes(child)
+            elif name not in self.root.children:
+                node = self.node_factory.create_node(name, "value", value)
+                self.root.add_child(node)
 
     def _connect_select_nodes(self):
         for select_name, select_node in self.select_nodes.items():
             options = self.option_nodes.get(select_name, [])
             for option, option_node in options:
                 select_node.add_child(option_node)
-                if option_node.name in self.root.children:
-                    del self.root.children[option_node.name]
             
             # Find the parent node for this select node
+            parent_found = False
             for node in self.root.children.values():
-                if select_name in node.children:
-                    node.children[select_name] = select_node
+                if isinstance(node.value, dict) and select_name in node.value:
+                    node.add_child(select_node)
+                    parent_found = True
                     break
-            else:
+            
+            if not parent_found:
                 self.root.add_child(select_node)
 
     def _add_remaining_top_level_nodes(self):
