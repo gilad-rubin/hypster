@@ -140,10 +140,14 @@ class TreeBuilder:
             # Find the parent node for this select node
             parent_found = False
             for node in self.root.children.values():
-                if isinstance(node.value, dict) and select_name in node.value:
-                    node.add_child(select_node)
-                    parent_found = True
-                    break
+                if isinstance(node, ConfigNode):
+                    for child in node.children.values():
+                        if child.type == "Select" and child.value == select_name:
+                            child.children = select_node.children
+                            parent_found = True
+                            break
+                    if parent_found:
+                        break
             
             if not parent_found:
                 self.root.add_child(select_node)
