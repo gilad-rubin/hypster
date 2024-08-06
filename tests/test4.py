@@ -1,4 +1,6 @@
-from hypster import OpenAiDriver, Options, lazy
+from hypster import Options, lazy
+
+from .classes import OpenAiDriver
 
 OpenAiDriver = lazy(OpenAiDriver)
 

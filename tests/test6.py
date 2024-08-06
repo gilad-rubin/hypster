@@ -1,6 +1,8 @@
-from hypster import CacheManager, DiskCache, Options, SqlCache, lazy
+from hypster import Options, lazy
 
-OpenAiDriver = lazy(CacheManager)
+from .classes import CacheManager, DiskCache, SqlCache
+
+CacheManager = lazy(CacheManager)
 DiskCache = lazy(DiskCache)
 SqlCache = lazy(SqlCache)
 

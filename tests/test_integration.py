@@ -1,11 +1,7 @@
-import test1
-import test2
-import test3
-import test4
-import test5
-import test6
-import inspect
-from hypster import CacheManager, Composer, DiskCache, OpenAiDriver, SqlCache
+from hypster import Composer
+
+from . import test1, test2, test3, test4, test5, test6
+from .classes import CacheManager, DiskCache, OpenAiDriver, SqlCache
 
 
 def test_select_two_classes():
@@ -46,7 +42,7 @@ def test_external_variables():
     config = Composer().with_modules(test3).compose()
     result = config.instantiate(
         final_vars=["llm_driver"],
-        selections={"llm_driver.model": "gpt-4o-mini"},
+        selections={"model": "gpt-4o-mini"}, #TODO: think of what todo if llm_driver.model is selected
         overrides={"llm_driver.max_tokens": 300}
     )
 
@@ -58,7 +54,7 @@ def test_external_variables_different_name():
     config = Composer().with_modules(test4).compose()
     result = config.instantiate(
         final_vars=["llm_driver"],
-        selections={"llm_driver.model": "gpt-4o-mini"},
+        selections={"openai_model": "gpt-4o-mini"},
         overrides={"llm_driver.max_tokens": 300}
     )
 
@@ -67,26 +63,6 @@ def test_external_variables_different_name():
     assert result["llm_driver"].max_tokens == 300
     
 def test_external_variables_different_name_propogation():
-    # Dictionary to store objects and their names
-    object_references = {}
-    
-    # First, gather all variable names and their corresponding objects
-    for name, obj in inspect.getmembers(test4):
-        if not name.startswith("__"):
-            object_references[id(obj)] = name
-
-    # Now, inspect class instances and identify their attributes
-    for name, obj in inspect.getmembers(test4):
-        if not name.startswith("__") and not inspect.isclass(obj) and not inspect.isfunction(obj):
-            if hasattr(obj, "__dict__"):  # This checks if obj is a class instance
-                print(f"Inspecting object: {name} ({type(obj)})")
-                for attr_name, attr_value in vars(obj).items():
-                    reference_name = object_references.get(id(attr_value), None)
-                    if reference_name:
-                        print(f"  Attribute '{attr_name}' points to reference: '{reference_name}'")
-                        print(f"    Value of '{reference_name}': {attr_value}")
-                    else:
-                        print(f"  Attribute '{attr_name}' value: {attr_value}")
     config = Composer().with_modules(test4).compose()
     result = config.instantiate(
         final_vars=["llm_driver"],
@@ -103,18 +79,19 @@ def test_downstream_propogation():
     result = config.instantiate(
         final_vars=["llm_driver", "tabular_driver"],
         selections={"openai_model": "gpt-4o-mini"},
-        overrides={"llm_driver.max_tokens": 300}
+        overrides={"llm_driver.max_tokens": 300, 
+                   "tabular_driver.model" : "gpt-4o"}
     )
 
     assert isinstance(result["llm_driver"], OpenAiDriver)
     assert isinstance(result["tabular_driver"], OpenAiDriver)
     assert result["llm_driver"].model == "gpt-4o-mini"
-    assert result["tabular_driver"].model == "gpt-4o-mini"
+    assert result["tabular_driver"].model == "gpt-4o"
     assert result["llm_driver"].max_tokens == 300
     assert result["tabular_driver"].max_tokens == 1500
 
 def test_hierarchical():
-    config = Composer().with_modules(test6).compose()
+    config = Composer().with_modules(test5).compose()
     result = config.instantiate(final_vars=["cache_manager"],
                                 selections={"cache_manager.cache.path":"/var/tmp"})
 
@@ -123,7 +100,7 @@ def test_hierarchical():
     assert result["cache_manager"].cache.path == "/var/tmp"
 
 def test_hierarchical_different_caches():
-    config = Composer().with_modules(globals()).compose()
+    config = Composer().with_modules(test6).compose()
     result = config.instantiate(
         final_vars=["cache_manager"],
         selections={"cache_manager.cache": "sql_cache"}
