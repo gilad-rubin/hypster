@@ -6,6 +6,7 @@ class Options:
     def __init__(self, options: Union[List, Dict], default: Any = None):
         self.options = options
         self.default = default
+        self.original_type = type(options)
 
         if isinstance(self.options, list):  # TODO: allow only strings and references
             self.options = {str(val): val for val in self.options}
@@ -111,7 +112,18 @@ class Reference(Variable):
             if isinstance(self.referred_var, str)
             else self.referred_var.name
         )
-        return f"{name} (Reference -> {referred_name})"
+        referred_value = (
+            self.referred_var.get_value()
+            if hasattr(self.referred_var, "get_value")
+            else str(self.referred_var)
+        )
+        return f"{name} (Reference -> {referred_name}: {referred_value})"
+
+    def get_children_for_log(self):
+        return []
+
+    def get_value(self):
+        return self.referred_var.get_value()
 
 
 class OptionsVariable(Variable):
@@ -124,10 +136,10 @@ class OptionsVariable(Variable):
         wrapped = {}
         for k, v in self.options.options.items():
             wrapped[k] = wrap_variable(f"{self.name}.{k}", v, object_references)
-
-        if all(
-            isinstance(w, Reference) for w in wrapped.values()
-        ):  # Special case where there's a list of references and we need to change their dict keys
+        
+        options_are_list = self.options.original_type == list
+        all_references = all(isinstance(w, Reference) for w in wrapped.values())
+        if options_are_list and all_references:  # Special case where there's a list of references and we need to change their dict keys
             options_with_reference_names = {}
             for k, v in wrapped.items():
                 reference_name = v.referred_var.name
@@ -135,6 +147,9 @@ class OptionsVariable(Variable):
             return options_with_reference_names
 
         return wrapped
+
+    def get_value(self):
+        return self.options.options
 
     def get_dependencies(self):
         return list(self._wrapped_options.values())
@@ -169,7 +184,8 @@ class OptionsVariable(Variable):
         return f"OptionsVariable('{self.name}', options={{{options_repr}}}, default='{self.options.default}')"
 
     def format_for_log(self, name):
-        return f"{name} (OptionsVariable, default='{self.options.default}')"
+        options_str = ", ".join(f"{k}: {v}" for k, v in self.options.options.items())
+        return f"{name} (OptionsVariable, options={{{options_str}}}, default='{self.options.default}')"
 
     def get_children_for_log(self):
         return list(self._wrapped_options.values())
@@ -214,6 +230,13 @@ class LazyClassVariable(Variable):
     def get_children_for_log(self):
         return list(self._wrapped_kwargs.values())
 
+    def get_value(self):
+        args_repr = ", ".join(arg.get_value() for arg in self._wrapped_args)
+        kwargs_repr = ", ".join(
+            f"{k}={v.get_value()}" for k, v in self._wrapped_kwargs.items()
+        )
+        return f"{self.lazy_class.class_type.__name__}({args_repr}, {kwargs_repr})"
+
 
 def wrap_variable(name: str, obj: Any, object_references: dict) -> Variable:
     reference_name = object_references.get(id(obj), None)
@@ -224,7 +247,5 @@ def wrap_variable(name: str, obj: Any, object_references: dict) -> Variable:
         return OptionsVariable(name, obj, object_references)
     elif isinstance(obj, LazyClass):
         return LazyClassVariable(name, obj, object_references)
-    elif isinstance(obj, (int, float, str, bool)):
-        return Value(name, obj)
     else:
-        raise ValueError(f"Invalid variable type for {name}: {type(obj)}")
+        return Value(name, obj)

@@ -1,6 +1,5 @@
+from classes import CacheManager, DiskCache, SqlCache
 from hypster import Options, lazy
-
-from .classes import CacheManager, DiskCache, SqlCache
 
 CacheManager = lazy(CacheManager)
 DiskCache = lazy(DiskCache)

@@ -26,7 +26,8 @@ class CacheManager:
         return f"CacheManager(cache={self.cache})"
 
 class DiskCache:
-    def __init__(self, path):
+    def __init__(self, path="path", cache_dir="cache"):
+        self.cache_dir = cache_dir
         self.path = path
 
     def __repr__(self):

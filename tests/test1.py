@@ -1,6 +1,5 @@
+from classes import AnthropicDriver, OpenAiDriver
 from hypster import Options, lazy
-
-from .classes import AnthropicDriver, OpenAiDriver
 
 OpenAiDriver = lazy(OpenAiDriver)
 AnthropicDriver = lazy(AnthropicDriver)

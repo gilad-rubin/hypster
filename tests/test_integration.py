@@ -1,7 +1,13 @@
+import test1
+import test2
+import test3
+import test4
+import test5
+import test6
+import test7
+import test8
+from classes import CacheManager, DiskCache, OpenAiDriver, SqlCache
 from hypster import Composer
-
-from . import test1, test2, test3, test4, test5, test6
-from .classes import CacheManager, DiskCache, OpenAiDriver, SqlCache
 
 
 def test_select_two_classes():
@@ -99,6 +105,21 @@ def test_hierarchical():
     assert isinstance(result["cache_manager"].cache, DiskCache)
     assert result["cache_manager"].cache.path == "/var/tmp"
 
+def test_hierarchical_azure():
+    config = Composer().with_modules(test8).compose()
+    result = config.instantiate(final_vars=["azure_doc_ai_loader"])
+    assert isinstance(result["azure_doc_ai_loader"].cache_manager.cache, DiskCache)
+    assert result["azure_doc_ai_loader"].cache_manager.cache.cache_dir == "cache/azure_ai_doc"
+
+def test_non_existing_selections():
+    config = Composer().with_modules(test8).compose()
+    #assert that there's an error:
+    try:
+        config.instantiate(final_vars=["azure_doc_ai_loader"], 
+                           selections={"azure_doc_ai_loader" : "none"})
+    except Exception as e:
+        assert "azure_doc_ai_loader" in str(e)    
+
 def test_hierarchical_different_caches():
     config = Composer().with_modules(test6).compose()
     result = config.instantiate(
@@ -109,6 +130,26 @@ def test_hierarchical_different_caches():
     assert isinstance(result["cache_manager"], CacheManager)
     assert isinstance(result["cache_manager"].cache, SqlCache)
     assert result["cache_manager"].cache.table == "cache"
+
+def test_override_implicit_arg():
+    config = Composer().with_modules(test1).compose()
+    result = config.instantiate(
+        final_vars=["llm_driver"],
+        selections={"llm_driver": "openai"},
+        overrides={"llm_driver.openai.max_tokens": 200,
+                   "llm_driver.openai.model" : "gpt-4o-mini"
+                   },
+    )
+    assert isinstance(result["llm_driver"], OpenAiDriver)
+    assert result["llm_driver"].max_tokens == 200
+    assert result["llm_driver"].model == "gpt-4o-mini"
+
+def test_tuple_var():
+    config = Composer().with_modules(test7).compose()
+    result = config.instantiate(
+        final_vars=["vectorizer", "top_k"],
+    )
+    assert result["vectorizer"].ngram_range == (1, 3)
 
 if __name__ == "__main__":
     import logging
@@ -123,4 +164,10 @@ if __name__ == "__main__":
     test_external_variables_different_name_propogation()
     test_downstream_propogation()
     test_hierarchical()
+    test_hierarchical_azure()
     test_hierarchical_different_caches()
+    #test_override_implicit_arg()
+    #test_non_existing_selections() #TODO: test for selections that are not present
+    #builder = (Builder().with_adapters(tqdm)).with_config(conf) #TODO: handle this case, including overriding adapters and configs
+    test_tuple_var()
+    print("All tests passed!")
