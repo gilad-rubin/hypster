@@ -1,8 +1,11 @@
 from collections import defaultdict
 from typing import Any, Dict, List, Set, Union
 
-
-# Mock classes
+class Thermometer:
+    def __init__(self, temperature, location):
+        self.temperature: float = temperature
+        self.location: str = location
+        
 class OpenAiDriver:
     def __init__(self, max_tokens, model="gpt-4o"):
         self.max_tokens = max_tokens
