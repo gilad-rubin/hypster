@@ -61,6 +61,10 @@ result = config.instantiate(
 db.connect()  # Outputs: Connecting to prod.example.com:5434
 cache.initialize()  # Outputs: Initializing redis cache
 ```
+## Inspiration
+Hypster draws inspiration from [Meta's Hydra](https://github.com/facebookresearch/hydra) and [hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) packages, combining their powerful configuration management with a minimalist approach. 
+
+The API design is also influenced by the elegant simplicity of [Hamilton's API](https://github.com/DAGWorks-Inc/hamilton).
 
 ## Contributing
 
