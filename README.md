@@ -21,26 +21,21 @@ Here's a simple example of how to use Hypster:
 %%writefile configs.py
 from hypster import lazy, Options
 
-class Database:
-    def __init__(self, host: str, port: int):
-        self.host = host
-        self.port = port
+@dataclass
+class DatabaseConfig:
+    host: str
+    port: int
 
-    def connect(self):
-        print(f"Connecting to {self.host}:{self.port}")
+@dataclass
+class CacheConfig:
+    type: str
 
-class Cache:
-    def __init__(self, type: str):
-        self.type = type
-
-    def initialize(self):
-        print(f"Initializing {self.type} cache")
-
-# Make classes lazy and update the global namespace
+# "lazy" defers instantiation
 lazy([Database, Cache], update_globals=True)
 
 # Define configuration options
-db_host = Options({"production": "prod.example.com", "staging": "staging.example.com"}, default="staging")
+db_host = Options({"production": "prod.example.com", 
+                   "staging": "staging.example.com"}, default="staging")
 cache_type = Options(["memory", "redis"], default="memory")
 db_port = Options({"main": 5432, "alt": 5433}, default="main")
 
