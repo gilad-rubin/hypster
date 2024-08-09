@@ -1,13 +1,9 @@
-# Hypster
+<p align="center">
+  <img src="assets/hypster_with_text.png" alt="Hypster Logo" width="600"/>
+</p>
 
-Hypster is a flexible configuration system for Python projects, allowing for dynamic configuration management and visualization using Streamlit.
-
-## Features
-
-- Dynamic configuration tree building
-- Nested configuration support
-- Streamlit-based configuration visualization and editing
-- Easy integration with existing Python projects
+Hypster is a lightweight configuration system for AI & Machine Learning projects. 
+It offers minimal, intuitive syntax, supporting hierarchical and swappable configurations with lazy instantiation - making it both powerful and easy to integrate with existing projects.
 
 ## Installation
 
@@ -17,36 +13,59 @@ You can install Hypster using pip:
 pip install hypster
 ```
 
-Or using Poetry:
-
-```bash
-poetry add hypster
-```
-
 ## Quick Start
 
 Here's a simple example of how to use Hypster:
 
 ```python
-from hypster import Builder, Select, prep
+%%writefile configs.py
+from hypster import lazy, Options
 
-class CacheConfig:
-    def __init__(self, type: str, size: int):
+class Database:
+    def __init__(self, host: str, port: int):
+        self.host = host
+        self.port = port
+
+    def connect(self):
+        print(f"Connecting to {self.host}:{self.port}")
+
+class Cache:
+    def __init__(self, type: str):
         self.type = type
-        self.size = size
 
-cache_config = prep(CacheConfig(type=Select("cache_type"), size=1000))
-cache_type__memory = "memory"
-cache_type__disk = "disk"
+    def initialize(self):
+        print(f"Initializing {self.type} cache")
 
-builder = Builder().with_modules(globals())
-driver = builder.build()
-config = driver.instantiate(["cache_config"])
+# Make classes lazy and update the global namespace
+lazy([Database, Cache], update_globals=True)
 
-print(config)
+# Define configuration options
+db_host = Options({"production": "prod.example.com", "staging": "staging.example.com"}, default="staging")
+cache_type = Options(["memory", "redis"], default="memory")
+db_port = Options({"main": 5432, "alt": 5433}, default="main")
+
+# Create lazy instances
+db = Database(host=db_host, port=db_port)
+cache = Cache(type=cache_type)
 ```
 
-For more examples and detailed usage, check out the [documentation](https://hypster.readthedocs.io).
+Now, in another cell or module, you can instantiate the configuration:
+
+```python
+from hypster import Composer
+import configs
+
+config = Composer().with_modules(configs).compose()
+
+result = config.instantiate(
+    final_vars=["db", "cache"],
+    selections={"db.host": "production", "cache.type": "redis"},
+    overrides={"db.port": 8000}
+)
+
+db.connect()  # Outputs: Connecting to prod.example.com:5434
+cache.initialize()  # Outputs: Initializing redis cache
+```
 
 ## Contributing
 
