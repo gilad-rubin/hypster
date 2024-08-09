@@ -14,33 +14,85 @@ class Options:
             raise ValueError("Options must be a list or a dictionary")
 
 
+import sys
+import inspect
+from typing import Union, List, Type, Dict, Optional, Callable
+from functools import wraps
+
 class LazyClass:
     def __init__(self, class_type: type, *args, **kwargs):
         self.class_type = class_type
         self.args = args
         self.kwargs = kwargs
-        self.arg_names = self._get_arg_names()
+        self.instance = None
 
-    def _get_arg_names(self):
-        params = self._get_init_params()
-        return [name for name in params.keys() if name != "self"]
+    def __getattr__(self, name):
+        if self.instance is None:
+            self.instance = self.class_type(*self.args, **self.kwargs)
+        return getattr(self.instance, name)
 
-    def _get_init_params(self):
-        params = {}
-        for cls in self.class_type.__mro__:
-            if cls == object:
-                break
-            if hasattr(cls, "__init__"):
-                sig = inspect.signature(cls.__init__)
-                params.update(sig.parameters)
-        return params
+def is_class_like(obj):
+    return isinstance(obj, type) or (callable(obj) and hasattr(obj, '__class__'))
 
+def lazy(arg: Union[Type, List[Type], Callable], update_globals: bool = False, namespace: Optional[Dict] = None) -> Union[Callable, Dict[str, Callable], None]:
+    """
+    Make a class or multiple classes lazy.
 
-def lazy(cls):
-    def wrapper(*args, **kwargs):
-        return LazyClass(cls, *args, **kwargs)
+    Args:
+        arg: A class, or a list of classes to be made lazy.
+        update_globals: If True, modifies the classes in the global namespace. Default is False.
+        namespace: The namespace to update. If None, uses the global namespace of the caller.
 
-    return wrapper
+    Returns:
+        - If arg is a single class and update_globals is False: returns a wrapper function.
+        - If arg is a list of classes and update_globals is False: returns a dictionary of wrapper functions.
+        - If update_globals is True: returns None (classes are modified in-place).
+
+    Raises:
+        TypeError: If the argument is neither a class nor a list of classes.
+    """
+    def make_lazy_wrapper(cls):
+        if hasattr(cls, '__lazy_wrapped__'):
+            return cls  # If it's already lazy, just return it
+        
+        @wraps(cls)
+        def wrapper(*args, **kwargs):
+            return LazyClass(cls, *args, **kwargs)
+        
+        # Preserve class attributes
+        for attr in dir(cls):
+            if not hasattr(wrapper, attr):
+                setattr(wrapper, attr, getattr(cls, attr))
+        
+        # Preserve type hints
+        wrapper.__annotations__ = cls.__annotations__
+
+        # Mark as lazy wrapped
+        wrapper.__lazy_wrapped__ = True
+        
+        return wrapper
+
+    if namespace is None:
+        namespace = sys._getframe(1).f_globals
+
+    if isinstance(arg, list):
+        lazy_wrappers = {}
+        for cls in arg:
+            if not is_class_like(cls):
+                raise TypeError(f"All elements in the list must be classes. Found: {type(cls)}")
+            lazy_wrapper = make_lazy_wrapper(cls)
+            lazy_wrappers[cls.__name__] = lazy_wrapper
+            if update_globals:
+                namespace[cls.__name__] = lazy_wrapper
+        return None if update_globals else lazy_wrappers
+    elif is_class_like(arg):
+        lazy_wrapper = make_lazy_wrapper(arg)
+        if update_globals:
+            namespace[arg.__name__] = lazy_wrapper
+            return None
+        return lazy_wrapper
+    else:
+        raise TypeError("lazy() argument must be a class or a list of classes")
 
 
 class Variable:

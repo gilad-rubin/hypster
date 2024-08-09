@@ -1,6 +1,7 @@
 from collections import defaultdict
 from typing import Any, Dict, List, Set, Union
 
+
 class Thermometer:
     def __init__(self, temperature, location):
         self.temperature: float = temperature
