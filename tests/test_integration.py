@@ -6,6 +6,8 @@ import test5
 import test6
 import test7
 import test8
+import test9
+import test10
 from classes import CacheManager, DiskCache, OpenAiDriver, SqlCache
 from hypster import Composer
 
@@ -151,6 +153,25 @@ def test_tuple_var():
     )
     assert result["vectorizer"].ngram_range == (1, 3)
 
+def test_lazy_global_update_single():
+    config = Composer().with_modules(test9).compose()
+    result = config.instantiate(
+        final_vars=["cache"],
+        selections={"cache.path": "/tmp"},
+    )
+    assert isinstance(result["cache"], DiskCache)
+    assert result["cache"].path == "/tmp"
+
+def test_lazy_global_update_multiple():
+    config = Composer().with_modules(test10).compose()
+    result = config.instantiate(
+        final_vars=["cache_manager"],
+        selections={"cache_manager.cache": "sql_cache"},
+    )
+    assert isinstance(result["cache_manager"].cache, SqlCache)
+    assert result["cache_manager"].cache.table == "cache"
+    assert isinstance(result["cache_manager"], CacheManager)
+    
 if __name__ == "__main__":
     import logging
 
@@ -170,4 +191,6 @@ if __name__ == "__main__":
     #test_non_existing_selections() #TODO: test for selections that are not present
     #builder = (Builder().with_adapters(tqdm)).with_config(conf) #TODO: handle this case, including overriding adapters and configs
     test_tuple_var()
+    test_lazy_global_update_single()
+    test_lazy_global_update_multiple()
     print("All tests passed!")
