@@ -1,12 +1,8 @@
 [tool.poetry]
 name = "hypster"
-<<<<<<< HEAD
-version = "0.1.6"
+version = "0.1.8"
 description = "A flexible configuration system for Python projects"
-=======
-version = "0.1.5"
-description = "A lightweight configuration system for AI & Machine Learning projects"
->>>>>>> fa2052a77ae1d2a301d850eb329c317e6fae43d9
+
 authors = ["Gilad Rubin <gilad.rubin@gmail.com>"]
 license = "MIT"
 readme = "README.md"

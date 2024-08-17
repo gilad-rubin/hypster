@@ -1,55 +1,55 @@
 import logging
 
-
 class CustomFormatter(logging.Formatter):
-    def format(self, record):
-        return record.getMessage()
+    BLACK = "\033[0;30m"
+    RED = "\033[0;31m"
+    GREEN = "\033[0;32m"
+    BROWN = "\033[0;33m"
+    BLUE = "\033[0;34m"
+    PURPLE = "\033[0;35m"
+    CYAN = "\033[0;36m"
+    LIGHT_GRAY = "\033[0;37m"
+    DARK_GRAY = "\033[1;30m"
+    LIGHT_RED = "\033[1;31m"
+    LIGHT_GREEN = "\033[1;32m"
+    YELLOW = "\033[1;33m"
+    LIGHT_BLUE = "\033[1;34m"
+    LIGHT_PURPLE = "\033[1;35m"
+    LIGHT_CYAN = "\033[1;36m"
+    LIGHT_WHITE = "\033[1;37m"
+    BOLD = "\033[1m"
+    FAINT = "\033[2m"
+    ITALIC = "\033[3m"
+    UNDERLINE = "\033[4m"
+    BLINK = "\033[5m"
+    NEGATIVE = "\033[7m"
+    CROSSED = "\033[9m"
+    END = "\033[0m"
+    reset = "\x1b[0m"
+    format = "%(message)s"
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler()
-handler.setFormatter(CustomFormatter())
-logger.addHandler(handler)
+    FORMATS = {
+        logging.DEBUG: CYAN + "%(levelname)s" + reset + " - " + format,
+        logging.INFO: GREEN + "%(levelname)s" + reset + " - " + format,
+        logging.WARNING: YELLOW + "%(levelname)s" + reset + " - " + format,
+        logging.ERROR: RED + "%(levelname)s" + reset + " - " + format,
+    }
 
-class ConfigLogger:
-    @staticmethod
-    def log_variable_hierarchy(variable, indent="", is_last=False, parent_name=""):
-        prefix = "└── " if is_last else "├── "
-        name_without_prefix = variable.name[len(parent_name):].lstrip('.')
-        logger.debug(f"{indent}{prefix}{variable.format_for_log(name_without_prefix)}")
+# Logging Configuration Function
+def configure_logging():
+    # Get the root logger
+    logger = logging.getLogger()
 
-        children = variable.get_children_for_log()
-        child_indent = indent + ("    " if is_last else "│   ")
-        for i, child in enumerate(children):
-            is_last_child = i == len(children) - 1
-            ConfigLogger.log_variable_hierarchy(child, child_indent, is_last_child, variable.name)
+    # Remove all existing handlers
+    if logger.hasHandlers():
+        logger.handlers.clear()
 
-    @staticmethod
-    def log_graph(graph, stage):
-        logger.debug(f"--- {stage} ---")
-        roots = [n for n in graph.nodes() if graph.in_degree(n) == 0]
-        for i, root in enumerate(sorted(roots)):
-            is_last = i == len(roots) - 1
-            ConfigLogger.log_variable_hierarchy(graph.nodes[root]['variable'], is_last=is_last)
-        logger.debug("-----------------------------------")
+    # Initialize the handler with the custom formatter
+    handler = logging.StreamHandler()
+    handler.setFormatter(CustomFormatter())
 
-    @staticmethod
-    def log_selected_and_overridden_values(graph, selections, overrides):
-        logger.debug("--- Selected and Overridden Values ---")
-        for node in sorted(graph.nodes):
-            if node in selections:
-                logger.debug(f"{node}: Selected as {selections[node]}")
-            if node in overrides:
-                logger.debug(f"{node}: Overridden to {overrides[node]}")
-        logger.debug("-----------------------------------")
+    # Set the handler for the logger
+    logger.addHandler(handler)
+    logger.setLevel(logging.WARNING)
 
-    @staticmethod
-    def log_instantiated_config(config):
-        logger.debug("--- Instantiated Config ---")
-        for name, value in sorted(config.items()):
-            logger.debug(f"{name}: {value}")
-        logger.debug("-----------------------------------")
-
-def set_debug_level(level):
-    logger.setLevel(level)
-    logger.debug(f"Debug level set to {level}")
+    return logger
