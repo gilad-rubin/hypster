@@ -63,6 +63,16 @@ class HP:
         self.config_dict[name] = result
         return result
 
+# core.py
+
+import ast
+import inspect
+import types
+from typing import Any, Callable, Dict, List, Union
+from .logging_utils import configure_logging
+from .ast_analyzer import inject_names, analyze_hp_select
+
+logger = configure_logging()
 
 class Hypster:
     def __init__(self, func: Callable, source_code: str = None):
@@ -70,22 +80,60 @@ class Hypster:
         self.source_code = source_code or inspect.getsource(func)
 
     def __call__(self, final_vars: List[str] = [], selections: Dict[str, Any] = {}, overrides: Dict[str, Any] = {}):
-        logger.info(
-            "Hypster called with final_vars: %s, selections: %s, overrides: %s", final_vars, selections, overrides
-        )
-        hp = HP(selections, overrides)
-        self.func(hp)  # Execute the function without expecting a return value
-        result = hp.config_dict  # Use the config_dict from HP instance
+        logger.info("Hypster called with final_vars: %s, selections: %s, overrides: %s", 
+                    final_vars, selections, overrides)
+        try:
+            hp = HP(selections, overrides)
 
-        if not final_vars:
-            return result
-        else:
-            return {k: result.get(k, None) for k in final_vars}
+            # Analyze and modify the source code
+            results, selects = analyze_hp_select(self.source_code)
+            modified_source = inject_names(self.source_code, selects)
+            
+            # Extract the function body
+            function_body = self._extract_function_body(modified_source)
 
+            # Create a new namespace and add the 'hp' object to it
+            namespace = {'hp': hp}
+
+            # Execute the modified function body in this namespace
+            exec(function_body, globals(), namespace)
+
+            # Process and filter the results
+            final_result = self._process_results(namespace)
+
+            if not final_vars:
+                return final_result
+            else:
+                result = {k: final_result.get(k, None) for k in final_vars}
+                logger.debug("Final result after filtering by final_vars: %s", result)
+                return result
+
+        except Exception as e:
+            logger.error("An error occurred: %s", str(e))
+            raise
+
+    def _extract_function_body(self, source: str) -> str:
+        lines = source.split('\n')
+        body_start = next(i for i, line in enumerate(lines) if line.strip().endswith(':'))
+        body_lines = lines[body_start + 1:]
+        min_indent = min(len(line) - len(line.lstrip()) for line in body_lines if line.strip())
+        return '\n'.join(line[min_indent:] for line in body_lines)
+
+    def _process_results(self, namespace: Dict[str, Any]) -> Dict[str, Any]:
+        filtered_locals = {
+            k: v for k, v in namespace.items()
+            if k != 'hp' and not k.startswith('__') and not isinstance(v, (types.ModuleType, types.FunctionType, type))
+        }
+
+        final_result = {k: v for k, v in filtered_locals.items() if not k.startswith('_')}
+
+        logger.debug("Captured locals: %s", filtered_locals)
+        logger.debug("Final result after filtering: %s", final_result)
+
+        return final_result
 
 def config(func: Callable) -> Hypster:
     return Hypster(func)
-
 
 def save(hypster_instance: Hypster, path: str = None):
     if not isinstance(hypster_instance, Hypster):
@@ -111,7 +159,6 @@ def save(hypster_instance: Hypster, path: str = None):
 
     logger.info("Configuration saved to %s", path)
 
-
 def load(path: str) -> Hypster:
     with open(path, "r") as f:
         source = f.read()
@@ -128,10 +175,8 @@ def load(path: str) -> Hypster:
 
     raise ValueError("No suitable function found in the source code")
 
-
 class InvalidSelectionError(Exception):
     pass
-
 
 # Example usage (can be commented out in the actual module)
 """
