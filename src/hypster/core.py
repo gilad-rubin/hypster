@@ -1,4 +1,3 @@
-# core.py
 import ast
 import inspect
 import types
@@ -9,18 +8,33 @@ from .logging_utils import configure_logging
 
 logger = configure_logging()
 
+from typing import Any, Callable, Dict, List, Optional, Union
+import logging
+
+logger = logging.getLogger(__name__)
+
 class HP:
     def __init__(self, final_vars: List[str], selections: Dict[str, Any], overrides: Dict[str, Any]):
         self.final_vars = final_vars
         self.selections = selections
         self.overrides = overrides
         self.config_dict = {}
+        self.current_namespace = []
         logger.info("Initialized HP with final_vars: %s, selections: %s, and overrides: %s", 
                     self.final_vars, self.selections, self.overrides)
+
+    def _get_full_name(self, name: str) -> str:
+        return '.'.join(self.current_namespace + [name])
+
+    def _store_value(self, name: str, value: Any):
+        full_name = self._get_full_name(name)
+        self.config_dict[full_name] = value
 
     def select(self, options: Union[Dict[str, Any], List[Any]], name: str = None, default: Any = None):
         if name is None:
             raise ValueError("Name must be provided explicitly or automatically inferred.")
+
+        full_name = self._get_full_name(name)
 
         if isinstance(options, dict):
             if not all(isinstance(k, str) for k in options.keys()):
@@ -39,70 +53,84 @@ class HP:
         logger.debug("Select called with options: %s, name: %s, default: %s", options, name, default)
 
         result = None
-        if name in self.overrides:
-            override_value = self.overrides[name]
-            logger.debug("Found override for %s: %s", name, override_value)
+        if full_name in self.overrides:
+            override_value = self.overrides[full_name]
+            logger.debug("Found override for %s: %s", full_name, override_value)
             if override_value in options:
                 result = options[override_value]
             else:
                 result = override_value
-            logger.info("Applied override for %s: %s", name, result)
-        elif name in self.selections:
-            selected_value = self.selections[name]
-            logger.debug("Found selection for %s: %s", name, selected_value)
+            logger.info("Applied override for %s: %s", full_name, result)
+        elif full_name in self.selections:
+            selected_value = self.selections[full_name]
+            logger.debug("Found selection for %s: %s", full_name, selected_value)
             if selected_value in options:
                 result = options[selected_value]
-                logger.info("Applied selection for %s: %s", name, result)
+                logger.info("Applied selection for %s: %s", full_name, result)
             else:
-                raise InvalidSelectionError(
-                    f"Invalid selection '{selected_value}' for '{name}'. Not in options: {list(options.keys())}"
+                raise ValueError(
+                    f"Invalid selection '{selected_value}' for '{full_name}'. Not in options: {list(options.keys())}"
                 )
         elif default is not None:
             result = options[default]
         else:
-            raise ValueError(f"No selection or override found for {name} and no default provided.")
+            raise ValueError(f"No selection or override found for {full_name} and no default provided.")
 
-        self.config_dict[name] = result
+        self._store_value(name, result)
         return result
 
     def text_input(self, default: Optional[str] = None, name: Optional[str] = None) -> str:
         if name is None:
             raise ValueError("Name must be provided explicitly or automatically inferred.")
 
-        logger.debug("Text input called with default: %s, name: %s", default, name)
+        full_name = self._get_full_name(name)
+        logger.debug("Text input called with default: %s, name: %s", default, full_name)
         
-        if name in self.overrides:
-            result = self.overrides[name]
+        if full_name in self.overrides:
+            result = self.overrides[full_name]
         elif default is None:
-            raise ValueError(f"No default value or override provided for text input {name}.")
+            raise ValueError(f"No default value or override provided for text input {full_name}.")
         else:
             result = default
         
-        logger.info("Text input for %s: %s", name, result)
+        logger.info("Text input for %s: %s", full_name, result)
 
-        self.config_dict[name] = result
+        self._store_value(name, result)
         return result
 
     def number_input(self, default: Optional[Union[int, float]] = None, name: Optional[str] = None) -> Union[int, float]:
         if name is None:
             raise ValueError("Name must be provided explicitly or automatically inferred.")
 
-        logger.debug("Number input called with default: %s, name: %s", default, name)
+        full_name = self._get_full_name(name)
+        logger.debug("Number input called with default: %s, name: %s", default, full_name)
         
-        if name in self.overrides:
-            result = self.overrides[name]
+        if full_name in self.overrides:
+            result = self.overrides[full_name]
         elif default is None:
-            raise ValueError(f"No default value or override provided for number input {name}.")
+            raise ValueError(f"No default value or override provided for number input {full_name}.")
         else:
             result = default
         
-        logger.info("Number input for %s: %s", name, result)
+        # Ensure the result is of the same type as the default
+        if default is not None:
+            if isinstance(default, int):
+                result = int(result)
+            elif isinstance(default, float):
+                result = float(result)
+        
+        logger.info("Number input for %s: %s", full_name, result)
 
-        self.config_dict[name] = result
+        self._store_value(name, result)
         return result
     
-    def propagate(self, config_func: Callable, name: str) -> Dict[str, Any]:
+    def propagate(self, config_func: Callable, name: str = None) -> Dict[str, Any]:
         logger.info(f"Propagating configuration for {name}")
+        
+        if name is None:
+            name = config_func.__name__
+
+        self.current_namespace.append(name)
         
         # Create dictionaries for the nested configuration
         nested_selections = {k[len(name)+1:]: v for k, v in self.selections.items() if k.startswith(f"{name}.")}
@@ -112,21 +140,31 @@ class HP:
         nested_final_vars = [var[len(name)+1:] for var in self.final_vars if var.startswith(f"{name}.")]
         
         logger.debug(f"Propagated configuration for {name} with Selections:\n{nested_selections}\n& Overrides:\n{nested_overrides}\nAuto-propagated final vars: {nested_final_vars}")
-        result = config_func(final_vars=nested_final_vars, selections=nested_selections, overrides=nested_overrides)
         
-        # Update the config_dict with the propagated results
-        self.config_dict[name] = result
+        # Run the nested configuration
+        _, nested_snapshot = config_func(final_vars=nested_final_vars, selections=nested_selections, overrides=nested_overrides, return_config_snapshot=True)
         
-        return result
+        # Merge the nested snapshot into the parent configuration
+        for key, value in nested_snapshot.items():
+            full_key = f"{name}.{key}"
+            self.config_dict[full_key] = value
+        
+        self.current_namespace.pop()
+        
+        return nested_snapshot
+
+    def get_config_snapshot(self) -> Dict[str, Any]:
+        return self.config_dict
 
 class Hypster:
     def __init__(self, func: Callable, source_code: str = None):
         self.func = func
         self.source_code = source_code or inspect.getsource(func)
 
-    def __call__(self, final_vars: List[str] = [], selections: Dict[str, Any] = {}, overrides: Dict[str, Any] = {}):
-        logger.info("Hypster called with final_vars: %s, selections: %s, overrides: %s", 
-                    final_vars, selections, overrides)
+    def __call__(self, final_vars: List[str] = [], selections: Dict[str, Any] = {}, 
+                 overrides: Dict[str, Any] = {}, return_config_snapshot: bool = False):
+        logger.info("Hypster called with final_vars: %s, selections: %s, overrides: %s, return_config_snapshot: %s", 
+                    final_vars, selections, overrides, return_config_snapshot)
         try:
             hp = HP(final_vars, selections, overrides)
 
@@ -134,51 +172,57 @@ class Hypster:
             results, hp_calls = analyze_hp_calls(self.source_code)
             modified_source = inject_names(self.source_code, hp_calls)
             
-            # Extract the function body
-            function_body = self._extract_function_body(modified_source)
+            # Execute the function
+            result = self._execute_function(hp, modified_source)
 
-            # Create a new namespace and add the 'hp' object to it
-            namespace = {'hp': hp}
-
-            # Execute the modified function body in this namespace
-            exec(function_body, globals(), namespace)
-
-            # Process and filter the results
-            final_result = self._process_results(namespace)
-
-            if not final_vars:
-                return final_result
+            if return_config_snapshot:
+                config_snapshot = hp.get_config_snapshot()
+                return result, config_snapshot
             else:
-                result = {k: final_result.get(k, None) for k in final_vars}
-                logger.debug("Final result after filtering by final_vars: %s", result)
                 return result
 
         except Exception as e:
             logger.error("An error occurred: %s", str(e))
             raise
+
+    def _execute_function(self, hp: HP, modified_source: str) -> Dict[str, Any]:
+        # Extract the function body
+        function_body = self._extract_function_body(modified_source)
+
+        # Create a new namespace and add the 'hp' object to it
+        namespace = {'hp': hp}
+
+        # Execute the modified function body in this namespace
+        exec(function_body, globals(), namespace)
+
+        # Process and filter the results
+        return self._process_results(namespace, hp.final_vars)
+
+    def _process_results(self, namespace: Dict[str, Any], final_vars: List[str]) -> Dict[str, Any]:
+        filtered_locals = {
+            k: v for k, v in namespace.items()
+            if k != 'hp' and not k.startswith('__') and not isinstance(v, (types.ModuleType, types.FunctionType, type))
+        }
+
+        if not final_vars:
+            final_result = {k: v for k, v in filtered_locals.items() if not k.startswith('_')}
+        else:
+            final_result = {k: filtered_locals.get(k, None) for k in final_vars}
+
+        logger.debug("Captured locals: %s", filtered_locals)
+        logger.debug("Final result after filtering: %s", final_result)
+
+        return final_result
         
     def save(self, path: str):
         save(self, path)
-        
+
     def _extract_function_body(self, source: str) -> str:
         lines = source.split('\n')
         body_start = next(i for i, line in enumerate(lines) if line.strip().endswith(':'))
         body_lines = lines[body_start + 1:]
         min_indent = min(len(line) - len(line.lstrip()) for line in body_lines if line.strip())
         return '\n'.join(line[min_indent:] for line in body_lines)
-
-    def _process_results(self, namespace: Dict[str, Any]) -> Dict[str, Any]:
-        filtered_locals = {
-            k: v for k, v in namespace.items()
-            if k != 'hp' and not k.startswith('__') and not isinstance(v, (types.ModuleType, types.FunctionType, type))
-        }
-
-        final_result = {k: v for k, v in filtered_locals.items() if not k.startswith('_')}
-
-        logger.debug("Captured locals: %s", filtered_locals)
-        logger.debug("Final result after filtering: %s", final_result)
-
-        return final_result
 
 def config(func: Callable) -> Hypster:
     return Hypster(func)
@@ -212,7 +256,7 @@ def load(path: str) -> Hypster:
         source = f.read()
 
     # Execute the source code to define the function
-    namespace = {}
+    namespace = {'HP': HP}
     exec(source, namespace)
 
     # Find the function in the namespace
