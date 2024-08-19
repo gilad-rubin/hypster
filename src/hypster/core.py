@@ -13,12 +13,18 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from typing import Any, Callable, Dict, List, Optional, Union
+import logging
+
+logger = logging.getLogger(__name__)
+
 class HP:
     def __init__(self, final_vars: List[str], selections: Dict[str, Any], overrides: Dict[str, Any]):
         self.final_vars = final_vars
         self.selections = selections
         self.overrides = overrides
-        self.config_dict = {}
+        self.config_dict = {}  # Stores only HP call results
+        self.function_results = {}  # Stores full function results
         self.current_namespace = []
         logger.info("Initialized HP with final_vars: %s, selections: %s, and overrides: %s", 
                     self.final_vars, self.selections, self.overrides)
@@ -142,19 +148,26 @@ class HP:
         logger.debug(f"Propagated configuration for {name} with Selections:\n{nested_selections}\n& Overrides:\n{nested_overrides}\nAuto-propagated final vars: {nested_final_vars}")
         
         # Run the nested configuration
-        _, nested_snapshot = config_func(final_vars=nested_final_vars, selections=nested_selections, overrides=nested_overrides, return_config_snapshot=True)
+        result, nested_snapshot = config_func(final_vars=nested_final_vars, selections=nested_selections, overrides=nested_overrides, return_config_snapshot=True)
         
-        # Merge the nested snapshot into the parent configuration
+        # Store the full result
+        self.function_results[name] = result
+        
+        # Merge only the HP call results into the parent configuration
         for key, value in nested_snapshot.items():
             full_key = f"{name}.{key}"
             self.config_dict[full_key] = value
         
         self.current_namespace.pop()
         
-        return nested_snapshot
+        # Return the full result of the propagated function
+        return result
 
     def get_config_snapshot(self) -> Dict[str, Any]:
         return self.config_dict
+
+    def get_function_results(self) -> Dict[str, Any]:
+        return self.function_results
 
 class Hypster:
     def __init__(self, func: Callable, source_code: str = None):
