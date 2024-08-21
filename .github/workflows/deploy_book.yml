@@ -10,9 +10,6 @@ permissions:
   pages: write
   id-token: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE20: true
-
 concurrency:
   group: "pages"
   cancel-in-progress: false
