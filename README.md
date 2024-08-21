@@ -18,53 +18,34 @@ pip install hypster
 Here's a simple example of how to use Hypster:
 
 ```python
-%%writefile configs.py
-from hypster import lazy, Options
+import hypster
+from hypster import HP
 
-@dataclass
-class DatabaseConfig:
-    host: str
-    port: int
-
-@dataclass
-class CacheConfig:
-    type: str
-
-# "lazy" defers instantiation
-lazy([Database, Cache], update_globals=True)
-
-# Define configuration options
-db_host = Options({"production": "prod.example.com", 
-                   "staging": "staging.example.com"}, default="staging")
-cache_type = Options(["memory", "redis"], default="memory")
-db_port = Options({"main": 5432, "alt": 5433}, default="main")
-
-# Create lazy instances
-db = Database(host=db_host, port=db_port)
-cache = Cache(type=cache_type)
+@hypster.config
+def my_config(hp: HP):
+    chunking_strategy = hp.select(['paragraph', 'semantic', 'fixed'], default='paragraph')
+    
+    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307', 
+                           'sonnet': 'claude-3-5-sonnet-20240620',
+                           'gpt-4o-mini': 'gpt-4o-mini'}, default='gpt-4o-mini')
+    
+    llm_config = {'temperature': hp.number_input(0), 
+                  'max_tokens': hp.number_input(64)}
+    
+    system_prompt = hp.text_input('You are a helpful assistant. Answer with one word only')
 ```
 
-Now, in another cell or module, you can instantiate the configuration:
-
+Now we can instantiate the configs with our selections and overrides:
 ```python
-from hypster import Composer
-import configs
-
-config = Composer().with_modules(configs).compose()
-
-result = config.instantiate(
-    final_vars=["db", "cache"],
-    selections={"db.host": "production", "cache.type": "redis"},
-    overrides={"db.port": 8000}
-)
-
-db.connect()  # Outputs: Connecting to prod.example.com:5434
-cache.initialize()  # Outputs: Initializing redis cache
+results = my_config(final_vars=["chunking_strategy", "llm_config", "llm_model"], 
+                    selections={"llm_model" : "haiku"}, 
+                    overrides={"llm_config.temperature" : 0.5})
 ```
-## Inspiration
-Hypster draws inspiration from [Meta's Hydra](https://github.com/facebookresearch/hydra) and [hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) packages, combining their powerful configuration management with a minimalist approach. 
 
-The API design is also influenced by the elegant simplicity of [Hamilton's API](https://github.com/DAGWorks-Inc/hamilton).
+## Inspiration
+Hypster draws inspiration from [Meta's Hydra](https://github.com/facebookresearch/hydra) and the [hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) framework.
+
+The API design is influenced by [Optuna's](https://github.com/optuna/optuna) "define-by-run" API.
 
 ## Contributing
 
