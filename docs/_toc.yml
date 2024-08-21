@@ -1,0 +1,5 @@
+format: jb-book
+root: intro
+chapters:
+- file: doc
+  title: Introduction to Hypster
