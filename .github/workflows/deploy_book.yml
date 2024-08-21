@@ -2,13 +2,16 @@ name: Deploy Jupyter Book to GitHub Pages
 
 on:
   push:
-    branches: ["marimo-docs"]
+    branches: ["marimo-docs", "master"]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE20: true
 
 concurrency:
   group: "pages"

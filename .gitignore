@@ -2,3 +2,4 @@
 *.whl
 .*tar
 *.DS_Store
+*/_build/*
