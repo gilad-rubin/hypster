@@ -6,7 +6,7 @@ description = "A flexible configuration system for Python projects"
 authors = ["Gilad Rubin <gilad.rubin@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/hypster-dev/hypster"
+repository = "https://github.com/gilad-rubin/hypster"
 keywords = ["configuration", "ai", "machine-learning"]
 
 [tool.poetry.dependencies]

@@ -3,7 +3,7 @@
 </p>
 
 Hypster is a lightweight configuration system for AI & Machine Learning projects. 
-It offers minimal, intuitive syntax, supporting hierarchical and swappable configurations with lazy instantiation - making it both powerful and easy to integrate with existing projects.
+It offers minimal, intuitive pythonic syntax, supporting hierarchical and swappable configurations.
 
 ## Installation
 
