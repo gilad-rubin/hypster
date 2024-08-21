@@ -240,6 +240,7 @@ class Hypster:
 def config(func: Callable) -> Hypster:
     return Hypster(func)
 
+
 def save(hypster_instance: Hypster, path: Optional[str] = None):
     if not isinstance(hypster_instance, Hypster):
         raise ValueError("The provided object is not a Hypster instance")
