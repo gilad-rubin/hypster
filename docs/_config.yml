@@ -1,5 +1,6 @@
 title: Hypster Documentation
-author: Your Name
-logo: hypster_logo.png  # Add your logo file to the docs directory
+author: Gilad Rubin
+logo: hypster_logo.png
 execute:
   execute_notebooks: force
+  

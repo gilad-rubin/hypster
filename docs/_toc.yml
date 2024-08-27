@@ -1,5 +1,11 @@
 format: jb-book
-root: intro
+root: doc
 chapters:
-- file: doc
-  title: Introduction to Hypster
+- file: core_concepts/hp_object
+  title: HP Object Methods
+- file: core_concepts/python_api
+  title: The Pythonic API
+- file: core_concepts/variable_naming
+  title: Automatic Parameter Naming
+- file: core_concepts/portability
+  title: Portability

@@ -2,7 +2,7 @@
   <img src="assets/hypster_with_text.png" alt="Hypster Logo" width="600"/>
 </p>
 
-Hypster is a lightweight configuration system for AI & Machine Learning projects. 
+**`Hypster`** is a lightweight configuration system for AI & Machine Learning projects.
 It offers minimal, intuitive pythonic syntax, supporting hierarchical and swappable configurations.
 
 ## Installation
@@ -43,7 +43,7 @@ results = my_config(final_vars=["chunking_strategy", "llm_config", "llm_model"],
 ```
 
 ## Inspiration
-Hypster draws inspiration from [Meta's Hydra](https://github.com/facebookresearch/hydra) and the [hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) framework.
+Hypster draws inspiration from Meta's [hydra](https://github.com/facebookresearch/hydra) and [hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) framework.
 
 The API design is influenced by [Optuna's](https://github.com/optuna/optuna) "define-by-run" API.
 
