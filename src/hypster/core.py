@@ -240,7 +240,6 @@ class Hypster:
 def config(func: Callable) -> Hypster:
     return Hypster(func)
 
-
 def save(hypster_instance: Hypster, path: Optional[str] = None):
     if not isinstance(hypster_instance, Hypster):
         raise ValueError("The provided object is not a Hypster instance")
@@ -257,9 +256,24 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
             node.decorator_list = []
             break
 
+    # Check if the function signature contains 'HP'
+    contains_hp = False
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            for arg in node.args.args:
+                if arg.annotation and isinstance(arg.annotation, ast.Name) and arg.annotation.id == 'HP':
+                    contains_hp = True
+                    break
+            node.decorator_list = []
+            break
+    
     # Convert the modified AST back to source code
     modified_source = ast.unparse(tree)
 
+    # Add "from hypster import HP" if needed
+    if contains_hp:
+        modified_source = "from hypster import HP\n\n" + modified_source
+    
     with open(path, "w") as f:
         f.write(modified_source)
 

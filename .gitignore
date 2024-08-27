@@ -1,5 +1,6 @@
 *.pyc
 *.whl
-.*tar
+.*tar*
 *.DS_Store
 */_build/*
+dist*
