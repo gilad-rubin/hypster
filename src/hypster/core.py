@@ -43,9 +43,9 @@ class HP:
         full_name = self._get_full_name(name)
 
         if isinstance(options, dict):
-            if not all(isinstance(k, str) for k in options.keys()):
-                bad_keys = [key for key in options.keys() if not isinstance(key, str)]
-                raise ValueError(f"Dictionary keys must be strings. got {bad_keys} instead.")
+            if not all(isinstance(k, (str, int, bool, float)) for k in options.keys()):
+                bad_keys = [key for key in options.keys() if not isinstance(key, (str, int, bool, float))]
+                raise ValueError(f"Dictionary keys must be str, int, bool, float. got {bad_keys} instead.")
         elif isinstance(options, list):
             if not all(isinstance(v, (str, int, bool, float)) for v in options):
                 raise ValueError("List values must be one of: str, int, bool, float.")
