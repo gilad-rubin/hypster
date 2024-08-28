@@ -59,7 +59,7 @@ The API design is influenced by [Optuna's](https://github.com/optuna/optuna) "de
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request. For more information on how to contribute, please see our [Contributing Guide](CONTRIBUTING.md).
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
