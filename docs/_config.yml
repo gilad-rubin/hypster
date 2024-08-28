@@ -1,6 +1,7 @@
 title: Hypster Documentation
 author: Gilad Rubin
 logo: hypster_logo.png
+html:
+     favicon: favicon.ico
 execute:
-  execute_notebooks: force
-  
+  execute_notebooks: cache
