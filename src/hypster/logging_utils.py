@@ -1,5 +1,6 @@
 import logging
 
+
 class CustomFormatter(logging.Formatter):
     BLACK = "\033[0;30m"
     RED = "\033[0;31m"
@@ -34,6 +35,7 @@ class CustomFormatter(logging.Formatter):
         logging.WARNING: YELLOW + "%(levelname)s" + reset + " - " + format,
         logging.ERROR: RED + "%(levelname)s" + reset + " - " + format,
     }
+
 
 # Logging Configuration Function
 def configure_logging():

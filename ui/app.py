@@ -3,11 +3,10 @@ import sys
 from typing import Any, Dict, List
 
 import streamlit as st
+
 from hypster import Builder, ConfigNode, HypsterDriver, visualize_config_tree
 
-project_root = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..")
-)  # TODO: fix this?
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # TODO: fix this?
 sys.path.insert(0, project_root)
 
 
@@ -18,9 +17,7 @@ def get_suffix(name: str) -> str:
 def render_config_node(node: ConfigNode, path: str = "", state: Dict[str, str] = {}):
     if node.type == "root":
         for child in node.children.values():
-            render_config_node(
-                child, f"{path}.{child.name}" if path else child.name, state
-            )
+            render_config_node(child, f"{path}.{child.name}" if path else child.name, state)
     elif node.type == "Select":
         options = [get_suffix(name) for name in node.children.keys()]
         full_options = list(node.children.keys())
@@ -32,9 +29,7 @@ def render_config_node(node: ConfigNode, path: str = "", state: Dict[str, str] =
                 index=index,
                 key=f"{path}.{node.name}",
             )
-            selected_full_name = next(
-                name for name in node.children.keys() if name.endswith(f"__{selected}")
-            )
+            selected_full_name = next(name for name in node.children.keys() if name.endswith(f"__{selected}"))
             state[node.name] = selected_full_name
             render_config_node(
                 node.children[selected_full_name],
@@ -46,9 +41,7 @@ def render_config_node(node: ConfigNode, path: str = "", state: Dict[str, str] =
     elif node.children:
         st.subheader(get_suffix(node.name))
         for child in node.children.values():
-            render_config_node(
-                child, f"{path}.{child.name}" if path else child.name, state
-            )
+            render_config_node(child, f"{path}.{child.name}" if path else child.name, state)
     else:
         value = node.value if node.value is not None else ""
         shared_text = " [SHARED]" if node.is_shared else ""
@@ -58,24 +51,18 @@ def render_config_node(node: ConfigNode, path: str = "", state: Dict[str, str] =
             key=f"{path}.{node.name}",
         )
         if str(new_value) != str(value):
-            node.value = (
-                type(node.value)(new_value) if node.value is not None else new_value
-            )
+            node.value = type(node.value)(new_value) if node.value is not None else new_value
 
 
 def collect_config(node: ConfigNode, state: Dict[str, str]) -> Dict[str, Any]:
     if node.type == "Select":
         selected_option = state.get(node.name, list(node.children.keys())[0])
         selected_option_short = selected_option.split("__")[-1]
-        return {
-            selected_option_short: collect_config(node.children[selected_option], state)
-        }
+        return {selected_option_short: collect_config(node.children[selected_option], state)}
     elif not node.children:
         return node.value
     else:
-        return {
-            child.name: collect_config(child, state) for child in node.children.values()
-        }
+        return {child.name: collect_config(child, state) for child in node.children.values()}
 
 
 def main(driver: HypsterDriver, final_vars: List[str]):

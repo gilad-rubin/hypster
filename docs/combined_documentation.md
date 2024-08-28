@@ -6,7 +6,7 @@
 
 # The Hypster Object
 
-- When you decorate a function with `@config`, Hypster creates an object that wraps your configuration function. 
+- When you decorate a function with `@config`, Hypster creates an object that wraps your configuration function.
 - This object, an instance of the `Hypster` class, provides additional functionality and allows for flexible usage of your configuration.
 
 ## Creation
@@ -86,7 +86,7 @@ When using a dictionary, keys must be of type `str`, `int`, `bool`, or `float`. 
 
 ```python
 optimizer = hp.select({
-    'adam': torch.optim.Adam, 
+    'adam': torch.optim.Adam,
     'sgd': torch.optim.SGD,
     1: 'custom_optimizer',
     True: lambda lr: torch.optim.AdamW(lr=lr)
@@ -141,33 +141,33 @@ from hypster import HP, config
 @config
 def hp_methods_example(hp: HP):
     import torch
-    
+
     activation = hp.select(['relu', 'tanh', 'sigmoid'], default='relu')
-    
+
     optimizer = hp.select({
         'adam': torch.optim.Adam,
         'sgd': torch.optim.SGD,
         1: 'custom_optimizer',
         True: lambda lr: torch.optim.AdamW(lr=lr)
     }, default='adam')
-    
+
     model_name = hp.text_input(default='my_awesome_model')
     learning_rate = hp.number_input(default=0.001)
-    
+
     # Using the selected values
     act_func = {
         'relu': torch.nn.ReLU(),
         'tanh': torch.nn.Tanh(),
         'sigmoid': torch.nn.Sigmoid()
     }[activation]
-    
+
     if isinstance(optimizer, str):
         opt = optimizer  # It's a custom optimizer name
     elif callable(optimizer):
         opt = optimizer(learning_rate)  # It's a lambda function
     else:
         opt = optimizer(torch.nn.Linear(10, 10).parameters(), lr=learning_rate)
-    
+
     print(f"Configured {model_name} with {activation} activation and {opt.__class__.__name__} optimizer")
 
 # Usage
@@ -194,15 +194,15 @@ def my_config(hp: HP):
     var3 = hp.text_input("hello")
     var4 = hp.number_input(10)
 
-my_config(final_vars=["var2", "var3"]) 
+my_config(final_vars=["var2", "var3"])
 # {'var2': 7, 'var3': 'hello'}
 ```
 
 ## Selections
 
-- Selections only work with `hp.select` and need to be one of the *keys* for the options. 
+- Selections only work with `hp.select` and need to be one of the *keys* for the options.
 - For dictionaries, the keys are used, and for lists, the values themselves are used as keys.
-- If there's a selection, it takes precedence over the default value. 
+- If there's a selection, it takes precedence over the default value.
 - If a selection is not part of the options keys, it will raise an error.
 
 ### Example:
@@ -223,8 +223,8 @@ my_config(selections={"var1" : "a", "var2" : "d"})
 
 ## Overrides
 
-- Overrides work on both `hp.select`, `text_input` & `number_input` methods. 
-- For `hp.select`, if the override is a key in the options, it will output the value associated with that key. 
+- Overrides work on both `hp.select`, `text_input` & `number_input` methods.
+- For `hp.select`, if the override is a key in the options, it will output the value associated with that key.
 - If it's not in the option keys or if it's selected for a parameter that uses `text_input` or `number_input`, it will output that value directly.
 
 The precedence order is: overrides > selections > defaults```{warning}
@@ -256,7 +256,7 @@ Note how the override takes precedence in the second example.
 
 ## Defaults
 
-- In `hp.select`, you need to specify the defaults explicitly. 
+- In `hp.select`, you need to specify the defaults explicitly.
 - For `text_input` and `number_input` methods, the value itself serves as the default.
 
 ### Common Use Case: Empty Call
@@ -293,7 +293,7 @@ from hypster import HP, config
 @config
 def conditional_config(hp: HP):
     model_type = hp.select(['CNN', 'RNN', 'Transformer'], default='CNN')
-    
+
     if model_type == 'CNN':
         num_layers = hp.select([3, 5, 7], default=5)
     elif model_type == 'RNN':
@@ -310,7 +310,7 @@ from hypster import HP, config
 def loop_config(hp: HP):
     num_layers = hp.select([3, 5, 7], default=5)
     layer_sizes = []
-    
+
     for i in range(num_layers):
         layer_sizes.append(hp.select([32, 64, 128], default=64, name=f'layer_{i}_size'))
 ```
@@ -322,14 +322,14 @@ from hypster import HP, config
 @config
 def dynamic_options_config(hp: HP):
     dataset_size = hp.select(['small', 'medium', 'large'], default='medium')
-    
+
     if dataset_size == 'small':
         model_options = ['simple_cnn', 'small_rnn']
     elif dataset_size == 'medium':
         model_options = ['resnet', 'lstm']
     else:
         model_options = ['transformer', 'large_cnn']
-    
+
     model = hp.select(model_options)
 ```
 ## Summary
@@ -400,14 +400,14 @@ def class_kwargs_naming(hp: HP):
         def __init__(self, model_type, learning_rate):
             self.model_type = model_type
             self.learning_rate = learning_rate
-    
+
     def func(param):
         return
 
     model = ModelConfig(model_type=hp.select(['cnn', 'rnn']), # Automatically named 'model.model_type'
                         learning_rate=hp.number_input(0.001)  # Automatically named 'model.learning_rate'
                         )
-    
+
     var = func(param=hp.select(['option1', 'option2']))  # Automatically named 'var.param'
 ```
 ```python
@@ -424,7 +424,7 @@ from hypster import HP, config
 @config
 def portable_config(hp: HP):
     import torch
-    
+
     device = hp.select(['cpu', 'cuda'], default='cuda' if torch.cuda.is_available() else 'cpu')
     # Rest of your configuration...
 ```
@@ -432,7 +432,7 @@ This approach ensures that the configuration function can be easily shared or sa
 from hypster import HP, config
 
 @config
-def non_portable_config(hp: HP):    
+def non_portable_config(hp: HP):
     device = hp.select(['cpu', 'cuda'], default='cuda' if os.environ.get('USE_CUDA', '0') == '1' else 'cpu')
 ```
 ```python
@@ -454,7 +454,7 @@ from hypster import HP, config
 @config
 def portable_config(hp: HP):
     import torch
-    
+
     device = hp.select(['cpu', 'cuda'], default='cuda' if torch.cuda.is_available() else 'cpu')
     # Rest of your configuration...
 ```
@@ -468,13 +468,13 @@ def class_kwargs_naming(hp: HP):
         def __init__(self, model_type, learning_rate):
             self.model_type = model_type
             self.learning_rate = learning_rate
-    
+
     def func(param):
         return param
 
     model = ModelConfig(model_type=hp.select(['cnn', 'rnn']),     # Automatically named 'model.model_type'
                         learning_rate=hp.number_input(0.001))     # Automatically named 'model.learning_rate'
-    
+
     var = func(param=hp.select(['option1', 'option2']))           # Automatically named 'var.param'
 ```
 ## Advanced Usage
@@ -495,13 +495,13 @@ from hypster import HP
 
 @hypster.config
 def my_config(hp: HP):
-    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307', 
+    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307',
                            'sonnet': 'claude-3-5-sonnet-20240620',
                            'gpt-4o-mini': 'gpt-4o-mini'}, default='gpt-4o-mini')
-    
-    llm_config = {'temperature': hp.number_input(0), 
+
+    llm_config = {'temperature': hp.number_input(0),
                   'max_tokens': hp.number_input(64)}
-    
+
     system_prompt = hp.text_input('You are a helpful assistant. Answer with one word only')
 ```
 ```python
@@ -519,7 +519,7 @@ def my_config_parent(hp: HP):
     a = hp.select(["a", "b", "c"], default="a")
 
 my_config_parent(selections={"my_conf.llm_model": "haiku"},
-                 overrides={"a" : "d", 
+                 overrides={"a" : "d",
                             "my_conf.system_prompt": "You are a helpful assistant. Answer with *two words* only"})
 ```
 # Saving and Loading Configurations
@@ -542,14 +542,14 @@ from hypster import HP
 @hypster.config
 def my_config(hp: HP):
     chunking_strategy = hp.select(['paragraph', 'semantic', 'fixed'], default='paragraph')
-    
-    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307', 
+
+    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307',
                            'sonnet': 'claude-3-5-sonnet-20240620',
                            'gpt-4o-mini': 'gpt-4o-mini'}, default='gpt-4o-mini')
-    
-    llm_config = {'temperature': hp.number_input(0), 
+
+    llm_config = {'temperature': hp.number_input(0),
                   'max_tokens': hp.number_input(64)}
-    
+
     system_prompt = hp.text_input('You are a helpful assistant. Answer with one word only')
 ```
 ```python
@@ -594,7 +594,7 @@ class LLMModel:
         self.chunking = chunking
         self.model = model
         self.config = config
-    
+
     def __eq__(self, other):
         return (self.chunking == other.chunking and
                 self.model == other.model and
@@ -607,14 +607,14 @@ from hypster import HP, config
 def my_config(hp: HP):
     from llm_model import LLMModel
     chunking_strategy = hp.select(['paragraph', 'semantic', 'fixed'], default='paragraph')
-    
-    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307', 
+
+    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307',
                            'sonnet': 'claude-3-5-sonnet-20240620',
                            'gpt-4o-mini': 'gpt-4o-mini'}, default='gpt-4o-mini')
-    
-    llm_config = {'temperature': hp.number_input(0), 
+
+    llm_config = {'temperature': hp.number_input(0),
                   'max_tokens': 64}
-    
+
     model = LLMModel(chunking_strategy, llm_model, llm_config)
 
 results, snapshot = my_config(selections={"llm_model": "haiku"}, return_config_snapshot=True)
@@ -645,11 +645,11 @@ from hypster import HP, config, save, load
 
 @config
 def my_config(hp: HP):
-    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307', 
+    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307',
                            'sonnet': 'claude-3-5-sonnet-20240620',
                            'gpt-4o-mini': 'gpt-4o-mini'}, default='gpt-4o-mini')
-    
-    llm_config = {'temperature': hp.number_input(0), 
+
+    llm_config = {'temperature': hp.number_input(0),
                   'max_tokens': hp.number_input(64)}
 ```
 ```python
@@ -669,7 +669,7 @@ final_vars=["my_conf", "a"]
 
 results, snapshot = my_config_parent(final_vars=final_vars,
                                      selections={"my_conf.llm_model": "haiku"},
-                                     overrides={"a" : "d"}, 
+                                     overrides={"a" : "d"},
                                      return_config_snapshot=True)
 ```
 ```python

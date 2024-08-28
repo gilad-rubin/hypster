@@ -33,22 +33,22 @@ from hypster import HP
 @hypster.config
 def my_config(hp: HP):
     chunking_strategy = hp.select(['paragraph', 'semantic', 'fixed'], default='paragraph')
-    
-    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307', 
+
+    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307',
                            'sonnet': 'claude-3-5-sonnet-20240620',
                            'gpt-4o-mini': 'gpt-4o-mini'}, default='gpt-4o-mini')
-    
-    llm_config = {'temperature': hp.number_input(0), 
+
+    llm_config = {'temperature': hp.number_input(0),
                   'max_tokens': hp.number_input(64)}
-    
+
     system_prompt = hp.text_input('You are a helpful assistant. Answer with one word only')
 ```
 
 Now we can instantiate the configs with our selections and overrides:
 
 ```python
-results = my_config(final_vars=["chunking_strategy", "llm_config", "llm_model"], 
-                    selections={"llm_model" : "haiku"}, 
+results = my_config(final_vars=["chunking_strategy", "llm_config", "llm_model"],
+                    selections={"llm_model" : "haiku"},
                     overrides={"llm_config.temperature" : 0.5})
 ```
 
