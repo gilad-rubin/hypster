@@ -9,8 +9,14 @@ from .logging_utils import configure_logging
 
 logger = configure_logging()
 
+
 class HP:
-    def __init__(self, final_vars: List[str], selections: Dict[str, Any], overrides: Dict[str, Any]):
+    def __init__(
+        self,
+        final_vars: List[str],
+        selections: Dict[str, Any],
+        overrides: Dict[str, Any],
+    ):
         self.final_vars = final_vars
         self.selections = selections
         self.overrides = overrides
@@ -31,11 +37,18 @@ class HP:
         full_name = self._get_full_name(name)
         self.config_dict[full_name] = value
 
-    def select(self, options: Union[Dict[str, Any], List[Any]], name: str = None, default: Any = None):
+    def select(
+        self,
+        options: Union[Dict[str, Any], List[Any]],
+        name: str = None,
+        default: Any = None,
+    ):
         if name is None:
             raise ValueError("Name must be provided explicitly or automatically inferred.")
 
         full_name = self._get_full_name(name)
+        if options is None or len(options) == 0:
+            raise ValueError("Options must be a non-empty list or dictionary.")
 
         if isinstance(options, dict):
             if not all(isinstance(k, (str, int, bool, float)) for k in options.keys()):
@@ -51,7 +64,12 @@ class HP:
         if default is not None and default not in options:
             raise ValueError("Default value must be one of the options.")
 
-        logger.debug("Select called with options: %s, name: %s, default: %s", options, name, default)
+        logger.debug(
+            "Select called with options: %s, name: %s, default: %s",
+            options,
+            name,
+            default,
+        )
 
         result = None
         if full_name in self.overrides:
@@ -100,13 +118,19 @@ class HP:
         return result
 
     def number_input(
-        self, default: Optional[Union[int, float]] = None, name: Optional[str] = None
+        self,
+        default: Optional[Union[int, float]] = None,
+        name: Optional[str] = None,
     ) -> Union[int, float]:
         if name is None:
             raise ValueError("Name must be provided explicitly or automatically inferred.")
 
         full_name = self._get_full_name(name)
-        logger.debug("Number input called with default: %s, name: %s", default, full_name)
+        logger.debug(
+            "Number input called with default: %s, name: %s",
+            default,
+            full_name,
+        )
 
         if full_name in self.overrides:
             result = self.overrides[full_name]
@@ -143,7 +167,8 @@ class HP:
         nested_final_vars = [var[len(name) + 1 :] for var in self.final_vars if var.startswith(f"{name}.")]
 
         logger.debug(
-            f"Propagated configuration for {name} with Selections:\n{nested_selections}\n& Overrides:\n{nested_overrides}\nAuto-propagated final vars: {nested_final_vars}"
+            f"Propagated configuration for {name} with Selections:\n{nested_selections}\
+                \n& Overrides:\n{nested_overrides}\nAuto-propagated final vars: {nested_final_vars}"
         )
 
         # Run the nested configuration
@@ -197,7 +222,7 @@ class Hypster:
             hp = HP(final_vars, selections, overrides)
 
             # Dedent the source code if necessary
-            self._dedent_source()
+            self.source_code = dedent_source(self.source_code)
 
             # Analyze and modify the source code
             results, hp_calls = analyze_hp_calls(self.source_code)
@@ -215,29 +240,6 @@ class Hypster:
         except Exception as e:
             logger.error("An error occurred: %s", str(e))
             raise
-
-    def _dedent_source(self):
-        """
-        Dedent the source code if it's unexpectedly indented.
-        Updates self.source_code if dedenting is performed.
-        """
-        lines = self.source_code.splitlines()
-        if not lines:
-            return
-
-        # Check if the first non-empty line is indented
-        first_non_empty = next((line for line in lines if line.strip()), "")
-        if not first_non_empty or not first_non_empty[0].isspace():
-            # No dedenting needed
-            return
-
-        # Check if this is a function or class definition (which should start at column 0)
-        if first_non_empty.lstrip().startswith(("def ", "class ", "@")):
-            # Unexpected indentation, dedent needed
-            dedented = textwrap.dedent(self.source_code)
-            if dedented != self.source_code:
-                self.source_code = dedented
-                logger.debug("Source code was indented and has been dedented")
 
     def _execute_function(self, hp: HP, modified_source: str) -> Dict[str, Any]:
         # Extract the function body
@@ -262,7 +264,13 @@ class Hypster:
         if not final_vars:
             final_result = {k: v for k, v in filtered_locals.items() if not k.startswith("_")}
         else:
-            final_result = {k: filtered_locals.get(k, None) for k in final_vars}
+            non_existent_vars = set(final_vars) - set(filtered_locals.keys())
+            if non_existent_vars:
+                raise ValueError(
+                    f"The following variables specified in final_vars\
+                          do not exist in the configuration: {', '.join(non_existent_vars)}"
+                )
+            final_result = {k: filtered_locals[k] for k in final_vars}
 
         logger.debug("Captured locals: %s", filtered_locals)
         logger.debug("Final result after filtering: %s", final_result)
@@ -280,6 +288,31 @@ class Hypster:
         return "\n".join(line[min_indent:] for line in body_lines)
 
 
+def dedent_source(source: str) -> str:
+    """
+    Dedent the source code if it's unexpectedly indented.
+    """
+    lines = source.splitlines()
+    if not lines:
+        return source
+
+    # Check if the first non-empty line is indented
+    first_non_empty = next((line for line in lines if line.strip()), "")
+    if not first_non_empty or not first_non_empty[0].isspace():
+        # No dedenting needed
+        return source
+
+    # Check if this is a function or class definition (which should start at column 0)
+    if first_non_empty.lstrip().startswith(("def ", "class ", "@")):
+        # Unexpected indentation, dedent needed
+        dedented = textwrap.dedent(source)
+        if dedented != source:
+            logger.debug("Source code was indented and has been dedented")
+            return dedented
+
+    return source
+
+
 def config(func: Callable) -> Hypster:
     return Hypster(func)
 
@@ -291,8 +324,11 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
     if path is None:
         path = f"{hypster_instance.func.__name__}.py"
 
-    # Parse the source code into an AST
-    tree = ast.parse(hypster_instance.source_code)
+    # Dedent the source code if necessary
+    source_code = dedent_source(hypster_instance.source_code)
+
+    # Parse the dedented source code into an AST
+    tree = ast.parse(source_code)
 
     # Find the function definition and remove decorators
     for node in ast.walk(tree):
@@ -308,7 +344,6 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
                 if arg.annotation and isinstance(arg.annotation, ast.Name) and arg.annotation.id == "HP":
                     contains_hp = True
                     break
-            node.decorator_list = []
             break
 
     # Convert the modified AST back to source code
