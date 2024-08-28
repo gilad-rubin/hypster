@@ -2,6 +2,15 @@
   <img src="assets/hypster_with_text.png" alt="Hypster Logo" width="600"/>
 </p>
 
+</p>
+<p align="center">
+  <span style="font-size: 18px;">
+    <a href="https://gilad-rubin.github.io/hypster/">[Documentation]</a> |
+    <a href="#installation">[Installation]</a> |
+    <a href="#quick-start">[Quick Start]</a>
+  </span>
+</p>
+
 **`Hypster`** is a lightweight configuration system for AI & Machine Learning projects.
 It offers minimal, intuitive pythonic syntax, supporting hierarchical and swappable configurations.
 
@@ -36,6 +45,7 @@ def my_config(hp: HP):
 ```
 
 Now we can instantiate the configs with our selections and overrides:
+
 ```python
 results = my_config(final_vars=["chunking_strategy", "llm_config", "llm_model"], 
                     selections={"llm_model" : "haiku"}, 
@@ -43,13 +53,13 @@ results = my_config(final_vars=["chunking_strategy", "llm_config", "llm_model"],
 ```
 
 ## Inspiration
-Hypster draws inspiration from Meta's [hydra](https://github.com/facebookresearch/hydra) and [hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) framework.
 
+Hypster draws inspiration from Meta's [hydra](https://github.com/facebookresearch/hydra) and [hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) framework.
 The API design is influenced by [Optuna's](https://github.com/optuna/optuna) "define-by-run" API.
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please feel free to submit a Pull Request. For more information on how to contribute, please see our [Contributing Guide](CONTRIBUTING.md).
 
 ## License
 
