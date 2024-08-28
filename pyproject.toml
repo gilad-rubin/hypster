@@ -21,10 +21,18 @@ mypy = "^0.950"
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.ruff]
-line-length = 120
-target-version = "py310"
-
 [tool.mypy]
 ignore_missing_imports = true
 strict_optional = true
+
+[tool.ruff]
+select = ["E", "F", "I"]
+line-length = 120
+target-version = "py310"
+ignore = ["F841"]
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.ruff.isort]
+known-first-party = ["hypster"]
