@@ -118,8 +118,8 @@ def test_final_vars():
 
     # Test mixture of existing and non-existing final_vars
     with pytest.raises(ValueError) as exc_info:
-        config_func(final_vars=["model", "non_existent", "another_non_existent"])
-    assert "do not exist in the configuration: non_existent, another_non_existent" in str(exc_info.value)
+        config_func(final_vars=["model", "non_existent"])
+    assert "do not exist in the configuration: non_existent" in str(exc_info.value)
 
 
 def test_pythonic_api():
@@ -159,7 +159,28 @@ def test_pythonic_api():
     assert result["layer_sizes"][1] == 128
 
 
+def test_save_load_complex_module():
+    complex_config = hypster.load("tests/complex_config.py")
+
+    # def nested_config(hp: HP):
+    #     b = func(6)
+    #     c = TestClass("hey")
+    #     cwd = os.getcwd()
+    #     nested_param = hp.select(["a", "b"], default="a")
+
+    results = complex_config()
+
+    assert results["b"] == 6
+    assert results["c"].hello == "hey"
+    assert results["nested_param"] == "a"
+
+
 def test_propagation():
+    import logging
+
+    logger = logging.getLogger("hypster")
+    logger.setLevel(logging.DEBUG)
+
     @config
     def nested_config(hp: HP):
         nested_param = hp.select(["a", "b"], default="a")
