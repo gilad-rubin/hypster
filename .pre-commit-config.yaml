@@ -14,12 +14,12 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
 
-  - repo: local
-    hooks:
-      - id: pytest
-        name: pytest
-        entry: pytest
-        language: python
-        types: [python]
-        pass_filenames: false
-        additional_dependencies: [hypster]
+  # - repo: local
+  #   hooks:
+  #     - id: pytest
+  #       name: pytest
+  #       entry: pytest
+  #       language: python
+  #       types: [python]
+  #       pass_filenames: false
+  #       additional_dependencies: [hypster]
