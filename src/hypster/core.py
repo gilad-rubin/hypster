@@ -12,14 +12,18 @@ logger = configure_logging()
 
 
 class Hypster:
-    def __init__(self, source_code: str, namespace: Dict[str, Any]):
+    def __init__(self, source_code: str, namespace: Dict[str, Any], inject_names=True):
         self.source_code = source_code
         self.namespace = namespace
+        self.inject_names = inject_names
         self._prepare_source_code()
 
     def _prepare_source_code(self):
-        results, hp_calls = analyze_hp_calls(self.source_code)
-        self.modified_source = inject_names(self.source_code, hp_calls)
+        if self.inject_names:
+            results, hp_calls = analyze_hp_calls(self.source_code)
+            self.modified_source = inject_names(self.source_code, hp_calls)
+        else:
+            self.modified_source = self.source_code
 
     def __call__(
         self,
@@ -79,11 +83,11 @@ class Hypster:
         save(self, path)
 
 
-def config(func: Callable) -> Hypster:
+def config(func: Callable, inject_names=True) -> Hypster:
     source_code = inspect.getsource(func)
     config_body = find_hp_function_body(source_code)
     namespace = {"HP": HP}
-    return Hypster(config_body, namespace)
+    return Hypster(config_body, namespace, inject_names)
 
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):
@@ -104,7 +108,7 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
     logger.info("Configuration saved to %s", path)
 
 
-def load(path: str) -> Hypster:
+def load(path: str, inject_names=True) -> Hypster:
     with open(path, "r") as f:
         module_source = f.read()
 
@@ -119,7 +123,7 @@ def load(path: str) -> Hypster:
     if config_body is None:
         raise ValueError("No configuration function found in the module")
 
-    return Hypster(config_body, namespace)
+    return Hypster(config_body, namespace, inject_names)
 
 
 # TODO: consider moving these functions to ast_analyzer
