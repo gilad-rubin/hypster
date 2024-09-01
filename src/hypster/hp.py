@@ -48,7 +48,7 @@ class HP:
         elif default is not None:
             result = options[default]
         else:
-            raise ValueError(f"No selection or override found for {full_name} and no default provided.")
+            raise ValueError(f"`{full_name}` has no selections, overrides or defaults provided.")
 
         self._store_value(full_name, result)
         return result
@@ -107,7 +107,7 @@ class HP:
 
     def _check_name_exists(self, name: Optional[str]):
         if name is None:
-            raise ValueError("Name must be provided explicitly or automatically inferred.")
+            raise ValueError("`name` argument is missing and must be provided explicitly.")
 
     def _check_options_exists(self, options: Union[Dict[str, Any], List[Any]]):
         if options is None or len(options) == 0:

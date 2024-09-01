@@ -1,3 +1,5 @@
+import pytest
+
 from hypster import HP, config
 
 
@@ -127,3 +129,39 @@ def test_function_naming():
     result = config_func(overrides={"result.param2": 20})
     assert result["result"][0] == "a"
     assert result["result"][1] == 20
+
+
+def test_disable_automatic_naming_with_explicit_names():
+    @config(inject_names=False)
+    def class_kwargs_naming(hp: HP):
+        class ModelConfig:
+            def __init__(self, model_type, learning_rate):
+                self.model_type = model_type
+                self.learning_rate = learning_rate
+
+        model = ModelConfig(
+            model_type=hp.select(["cnn", "rnn"], name="model_type", default="cnn"),
+            learning_rate=hp.number_input(0.001, name="learning_rate"),
+        )
+
+    # Test with explicit names
+    result = class_kwargs_naming()
+    assert result["model"].model_type == "cnn"
+    assert result["model"].learning_rate == 0.001
+
+    # Test with selections
+    result = class_kwargs_naming(selections={"model_type": "rnn", "param": "option2"})
+    assert result["model"].model_type == "rnn"
+
+    # Test with overrides
+    result = class_kwargs_naming(overrides={"learning_rate": 0.01})
+    assert result["model"].learning_rate == 0.01
+
+
+def test_disable_automatic_naming_missing_name_error():
+    @config(inject_names=False)
+    def no_injection_config(hp: HP):
+        a = hp.select(["a", "b"])  # This should raise an error
+
+    with pytest.raises(ValueError, match="`name` argument is missing"):
+        no_injection_config()

@@ -1,8 +1,9 @@
 import ast
+import functools
 import inspect
 import textwrap
 import types
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from .ast_analyzer import analyze_hp_calls, inject_names
 from .hp import HP
@@ -83,11 +84,23 @@ class Hypster:
         save(self, path)
 
 
-def config(func: Callable, inject_names=True) -> Hypster:
-    source_code = inspect.getsource(func)
-    config_body = find_hp_function_body(source_code)
-    namespace = {"HP": HP}
-    return Hypster(config_body, namespace, inject_names)
+def config(arg: Union[Callable, None] = None, *, inject_names: bool = True):
+    def decorator(func: Callable) -> Hypster:
+        @functools.wraps(func)
+        def wrapper():
+            source_code = inspect.getsource(func)
+            config_body = find_hp_function_body(source_code)
+            namespace = {"HP": HP}
+            return Hypster(config_body, namespace, inject_names=inject_names)
+
+        return wrapper()
+
+    if callable(arg):
+        # @config used without arguments
+        return decorator(arg)
+    else:
+        # @config(inject_names=True/False)
+        return decorator
 
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):
