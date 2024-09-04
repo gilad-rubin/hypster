@@ -27,10 +27,9 @@ pip install hypster
 Here's a simple example of how to use Hypster:
 
 ```python
-import hypster
-from hypster import HP
+from hypster import HP, config
 
-@hypster.config
+@config
 def my_config(hp: HP):
     chunking_strategy = hp.select(['paragraph', 'semantic', 'fixed'], default='paragraph')
 
