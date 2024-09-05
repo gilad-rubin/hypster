@@ -23,8 +23,10 @@ class HP:
             self.overrides,
         )
 
-    def select(self, options: Union[Dict[str, Any], List[Any]], name: str = None, default: Any = None):
-        self._check_name_exists(name)
+    def select(self, options: Union[Dict[str, Any], List[Any]], name: Optional[str] = None, default: Any = None):
+        if name is None:
+            raise ValueError("`name` argument is missing and must be provided explicitly.")
+        
         self._check_options_exists(options)
 
         full_name = self._get_full_name(name)
@@ -54,14 +56,16 @@ class HP:
         return result
 
     def text_input(self, default: Optional[str] = None, name: Optional[str] = None) -> str:
-        self._check_name_exists(name)
+        if name is None:
+            raise ValueError("`name` argument is missing and must be provided explicitly.")
+        
         full_name = self._get_full_name(name)
         logger.debug("Text input called with default: %s, name: %s", default, full_name)
 
         if full_name in self.overrides:
             result = self.overrides[full_name]
         elif default is None:
-            raise ValueError(f"No default value or override provided for text input {full_name}.")
+            raise ValueError(f"`{full_name}` has no default value or overrides provided.")
         else:
             result = default
 
@@ -72,14 +76,16 @@ class HP:
     def number_input(
         self, default: Optional[Union[int, float]] = None, name: Optional[str] = None
     ) -> Union[int, float]:
-        self._check_name_exists(name)
+        if name is None:
+            raise ValueError("`name` argument is missing and must be provided explicitly.")
+        
         full_name = self._get_full_name(name)
         logger.debug("Number input called with default: %s, name: %s", default, full_name)
 
         if full_name in self.overrides:
             result = self.overrides[full_name]
         elif default is None:
-            raise ValueError(f"No default value or override provided for number input {full_name}.")
+            raise ValueError(f"`{full_name}` has no default value or overrides provided.")
         else:
             result = default
 
@@ -87,8 +93,10 @@ class HP:
         self._store_value(full_name, result)
         return result
 
-    def propagate(self, config_func: Callable, name: str = None) -> Dict[str, Any]:
-        name = name or config_func.__name__
+    def propagate(self, config_func: Callable, name: Optional[str] = None) -> Dict[str, Any]:
+        if name is None:
+            raise ValueError("`name` argument is missing and must be provided explicitly.")
+        
         logger.info(f"Propagating configuration for {name}")
         self.current_namespace.append(name)
 
@@ -105,12 +113,8 @@ class HP:
     def _store_value(self, full_name: str, value: Any):
         self.config_dict[full_name] = value
 
-    def _check_name_exists(self, name: Optional[str]):
-        if name is None:
-            raise ValueError("`name` argument is missing and must be provided explicitly.")
-
     def _check_options_exists(self, options: Union[Dict[str, Any], List[Any]]):
-        if options is None or len(options) == 0:
+        if not isinstance(options, (list, dict)) or len(options) == 0:
             raise ValueError("Options must be a non-empty list or dictionary.")
 
     def _validate_dict_keys(self, options: Dict[str, Any]):
