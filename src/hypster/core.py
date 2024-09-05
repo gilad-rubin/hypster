@@ -3,9 +3,9 @@ import functools
 import inspect
 import textwrap
 import types
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from .ast_analyzer import analyze_hp_calls, inject_names
+from .ast_analyzer import HPCall, analyze_hp_calls, collect_hp_calls, find_referenced_vars, inject_names_to_source_code
 from .hp import HP
 from .logging_utils import configure_logging
 
@@ -13,18 +13,28 @@ logger = configure_logging()
 
 
 class Hypster:
-    def __init__(self, source_code: str, namespace: Dict[str, Any], inject_names=True):
+    def __init__(self, source_code: str, namespace: Dict[str, Any], inject_names: bool = True):
         self.source_code = source_code
         self.namespace = namespace
-        self.inject_names = inject_names
-        self._prepare_source_code()
+        self.hp_calls = collect_hp_calls(self.source_code)
+        self.referenced_vars = find_referenced_vars(self.source_code)
 
-    def _prepare_source_code(self):
-        if self.inject_names:
-            results, hp_calls = analyze_hp_calls(self.source_code)
-            self.modified_source = inject_names(self.source_code, hp_calls)
-        else:
-            self.modified_source = self.source_code
+        self.modified_source = (
+            inject_names_to_source_code(self.source_code, self.hp_calls) if inject_names else self.source_code
+        )
+
+        self.independent_select_calls = self.independent_select_calls()
+
+    def independent_select_calls(self) -> List[str]:
+        independent_vars = {
+            call.implicit_name.split(".")[0]
+            for call in self.hp_calls
+            if call.implicit_name
+            and call.method_name == "select"
+            and call.implicit_name.split(".")[0] not in self.referenced_vars
+        }
+
+        return list(independent_vars)
 
     def __call__(
         self,

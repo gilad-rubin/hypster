@@ -1,5 +1,5 @@
 import ast
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from .logging_utils import configure_logging
 
@@ -56,20 +56,37 @@ class VariableGraphBuilder(ast.NodeVisitor):
         return self.get_target_name(node)
 
 
+# class HPCall:
+#     def __init__(
+#         self,
+#         lineno: int,
+#         call_index: int,
+#         method_name: str,
+#         explicit_name: str = None,
+#         implicit_name: str = None,
+#     ):
+#         self.lineno = lineno
+#         self.call_index = call_index
+#         self.method_name = method_name
+#         self.explicit_name = explicit_name
+#         self.implicit_name = implicit_name
+
+
 class HPCall:
     def __init__(
         self,
         lineno: int,
-        call_index: int,
+        col_offset: int,
         method_name: str,
-        explicit_name: str = None,
-        implicit_name: str = None,
+        implicit_name: Optional[str] = None,
+        explicit_name: Optional[str] = None,
     ):
         self.lineno = lineno
-        self.call_index = call_index
+        self.col_offset = col_offset
         self.method_name = method_name
-        self.explicit_name = explicit_name
         self.implicit_name = implicit_name
+        self.explicit_name = explicit_name
+        self.call_index = 0  # Will be set later
 
 
 class HPCallAnalyzer(ast.NodeVisitor):
@@ -286,13 +303,145 @@ def analyze_hp_calls(code: str) -> Tuple[Dict[int, Dict[str, Any]], List[HPCall]
     return analyzer.results, analyzer.hp_calls
 
 
-def inject_names(source_code: str, hp_calls: List[HPCall]) -> str:
-    tree = ast.parse(source_code)
+class HPCallVisitor(ast.NodeVisitor):
+    def __init__(self):
+        self.hp_calls = []
+        self.call_index = {}
+        self.current_assignment = None
+        self.current_path = []
+
+    def visit_Call(self, node):
+        if (
+            isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "hp"
+        ):
+            lineno = node.lineno
+            method_name = node.func.attr
+
+            if lineno not in self.call_index:
+                self.call_index[lineno] = {}
+            if method_name not in self.call_index[lineno]:
+                self.call_index[lineno][method_name] = 0
+            else:
+                self.call_index[lineno][method_name] += 1
+
+            implicit_name = self.get_implicit_name(node)
+            explicit_name = self.get_explicit_name(node)
+
+            hp_call = HPCall(
+                lineno=lineno,
+                col_offset=node.col_offset,
+                method_name=method_name,
+                implicit_name=implicit_name,
+                explicit_name=explicit_name,
+            )
+            hp_call.call_index = self.call_index[lineno][method_name]
+            self.hp_calls.append(hp_call)
+
+        self.generic_visit(node)
+    
+    def visit_Assign(self, node):
+        self.current_assignment = node  # Track the current assignment
+        self.generic_visit(node)
+        self.current_assignment = None  # Reset after processing
+
+    def get_implicit_name(self, node):
+        if self.current_assignment:
+            target = self.get_target_name(self.current_assignment.targets[0])
+            if isinstance(self.current_assignment.value, ast.Call) and self.is_hp_call(self.current_assignment.value):
+                return target
+            return self.find_node_in_assignment(self.current_assignment.value, node, [target])
+        return self.find_node_in_current_path(node)
+
+    def get_explicit_name(self, node):
+        for kw in node.keywords:
+            if kw.arg == "name":
+                if isinstance(kw.value, ast.Constant):
+                    return kw.value.value
+        if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant):
+            return node.args[1].value
+        return None
+
+    def get_target_name(self, node):
+        if isinstance(node, ast.Name):
+            return node.id
+        elif isinstance(node, ast.Attribute):
+            return f"{self.get_target_name(node.value)}.{node.attr}"
+        return "Unknown"
+
+    def is_hp_call(self, node):
+        return (
+            isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "hp"
+        )
+
+    def find_node_in_assignment(self, value_node, target_node, path):
+        if isinstance(value_node, ast.Dict):
+            for key, value in zip(value_node.keys, value_node.values):
+                if value == target_node:
+                    return ".".join(path + [self.get_node_value(key)])
+                result = self.find_node_in_assignment(value, target_node, path + [self.get_node_value(key)])
+                if result:
+                    return result
+        elif isinstance(value_node, ast.Call):
+            for idx, arg in enumerate(value_node.args):
+                if arg == target_node:
+                    return ".".join(path + [f"arg{idx}"])
+                result = self.find_node_in_assignment(arg, target_node, path + [f"arg{idx}"])
+                if result:
+                    return result
+            for keyword in value_node.keywords:
+                if keyword.value == target_node:
+                    return ".".join(path + [keyword.arg])
+                result = self.find_node_in_assignment(keyword.value, target_node, path + [keyword.arg])
+                if result:
+                    return result
+        return None
+
+    def find_node_in_current_path(self, node):
+        return ".".join(self.current_path) if self.current_path else None
+
+    def get_node_value(self, node):
+        if isinstance(node, ast.Constant):
+            return str(node.value)
+        elif isinstance(node, ast.Name):
+            return node.id
+        return ast.unparse(node)
+
+
+class VariableReferenceCollector(ast.NodeVisitor):
+    def __init__(self):
+        self.referenced_vars = set()
+
+    def visit_Name(self, node):
+        if isinstance(node.ctx, ast.Load):
+            self.referenced_vars.add(node.id)
+        self.generic_visit(node)
+
+
+def collect_hp_calls(code: str) -> List[HPCall]:
+    tree = ast.parse(code)
+    visitor = HPCallVisitor()
+    visitor.visit(tree)
+    return visitor.hp_calls
+
+
+def find_referenced_vars(code: str) -> Set[str]:
+    tree = ast.parse(code)
+    collector = VariableReferenceCollector()
+    collector.visit(tree)
+    return collector.referenced_vars
+
+
+def inject_names_to_source_code(code: str, hp_calls: List[HPCall]) -> str:
+    tree = ast.parse(code)
 
     class NameInjector(ast.NodeTransformer):
         def __init__(self, hp_calls):
             self.hp_calls = hp_calls
-            self.call_index = {}
+            self.call_index = 0
 
         def visit_Call(self, node):
             if (
@@ -300,36 +449,11 @@ def inject_names(source_code: str, hp_calls: List[HPCall]) -> str:
                 and isinstance(node.func.value, ast.Name)
                 and node.func.value.id == "hp"
             ):
-                lineno = node.lineno
-                method_name = node.func.attr
-
-                if lineno not in self.call_index:
-                    self.call_index[lineno] = {}
-                if method_name not in self.call_index[lineno]:
-                    self.call_index[lineno][method_name] = 0
-                else:
-                    self.call_index[lineno][method_name] += 1
-
-                hp_call = next(
-                    (
-                        c
-                        for c in self.hp_calls
-                        if c.lineno == lineno
-                        and c.method_name == method_name
-                        and c.call_index == self.call_index[lineno][method_name]
-                    ),
-                    None,
-                )
-
-                if hp_call and not hp_call.explicit_name and hp_call.implicit_name:
-                    # Inject the implicit name as a keyword argument
+                if self.call_index < len(self.hp_calls) and self.hp_calls[self.call_index].implicit_name:
                     node.keywords.append(
-                        ast.keyword(
-                            arg="name",
-                            value=ast.Constant(value=hp_call.implicit_name),
-                        )
+                        ast.keyword(arg="name", value=ast.Constant(value=self.hp_calls[self.call_index].implicit_name))
                     )
-
+                self.call_index += 1
             return self.generic_visit(node)
 
     injector = NameInjector(hp_calls)
