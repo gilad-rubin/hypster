@@ -10,8 +10,8 @@ class HP:
         self.final_vars = final_vars
         self.selections = selections
         self.overrides = overrides
-        self.config_dict = {}  # Stores only HP call results
-        self.function_results = {}  # Stores full function results
+        self.config_dict = {}
+        self.function_results = {}
         self.current_namespace = []
         self._log_initialization()
 
@@ -26,7 +26,7 @@ class HP:
     def select(self, options: Union[Dict[str, Any], List[Any]], name: Optional[str] = None, default: Any = None):
         if name is None:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
-        
+
         self._check_options_exists(options)
 
         full_name = self._get_full_name(name)
@@ -58,7 +58,7 @@ class HP:
     def text_input(self, default: Optional[str] = None, name: Optional[str] = None) -> str:
         if name is None:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
-        
+
         full_name = self._get_full_name(name)
         logger.debug("Text input called with default: %s, name: %s", default, full_name)
 
@@ -78,7 +78,7 @@ class HP:
     ) -> Union[int, float]:
         if name is None:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
-        
+
         full_name = self._get_full_name(name)
         logger.debug("Number input called with default: %s, name: %s", default, full_name)
 
@@ -96,7 +96,7 @@ class HP:
     def propagate(self, config_func: Callable, name: Optional[str] = None) -> Dict[str, Any]:
         if name is None:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
-        
+
         logger.info(f"Propagating configuration for {name}")
         self.current_namespace.append(name)
 
