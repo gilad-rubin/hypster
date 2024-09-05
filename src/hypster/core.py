@@ -13,7 +13,8 @@ logger = configure_logging()
 
 
 class Hypster:
-    def __init__(self, source_code: str, namespace: Dict[str, Any], inject_names: bool = True):
+    def __init__(self, name, source_code: str, namespace: Dict[str, Any], inject_names: bool = True):
+        self.name = name
         self.source_code = source_code
         self.namespace = namespace
         self.hp_calls = collect_hp_calls(self.source_code)
@@ -23,9 +24,9 @@ class Hypster:
             inject_names_to_source_code(self.source_code, self.hp_calls) if inject_names else self.source_code
         )
 
-        self.independent_select_calls = self.independent_select_calls()
+        self.independent_select_calls = self.find_independent_select_calls()
 
-    def independent_select_calls(self) -> List[str]:
+    def find_independent_select_calls(self) -> List[str]:
         independent_vars = {
             call.implicit_name.split(".")[0]
             for call in self.hp_calls
@@ -99,9 +100,14 @@ def config(arg: Union[Callable, None] = None, *, inject_names: bool = True):
         @functools.wraps(func)
         def wrapper():
             source_code = inspect.getsource(func)
-            config_body = find_hp_function_body(source_code)
+            result = find_hp_function_body_and_name(source_code)
+            
+            if result is None:
+                raise ValueError("No configuration function found in the module")
+            
+            config_name, config_body = result
             namespace = {"HP": HP}
-            return Hypster(config_body, namespace, inject_names=inject_names)
+            return Hypster(config_name, config_body, namespace, inject_names=inject_names)
 
         return wrapper()
 
@@ -118,11 +124,15 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
         raise ValueError("The provided object is not a Hypster instance")
 
     if path is None:
-        path = f"{hypster_instance.func.__name__}.py"
+        path = f"{hypster_instance.name}.py"
 
-    hp_func_source = find_hp_function_body(hypster_instance.source_code)
+    result = find_hp_function_body_and_name(hypster_instance.source_code)
+    
+    if result is None:
+        raise ValueError("No configuration function found in the module")
 
-    # Adding "from hypster import HP" to enable importing the module
+    func_name, hp_func_source = result
+    
     modified_source = "from hypster import HP\n\n" + hp_func_source
 
     with open(path, "w") as f:
@@ -142,11 +152,22 @@ def load(path: str, inject_names=True) -> Hypster:
     exec(module_source, namespace)
 
     # Find the configuration function
-    config_body = find_hp_function_body(module_source)
-    if config_body is None:
+    result = find_hp_function_body_and_name(module_source)
+   
+    if result is None:
         raise ValueError("No configuration function found in the module")
 
-    return Hypster(config_body, namespace, inject_names)
+    # Unpack the function name and body from the result
+    func_name, config_body = result
+
+    # Retrieve the function object from the namespace
+    func = namespace.get(func_name)
+
+    if func is None:
+        raise ValueError(f"Could not find the function {func_name} in the loaded module")
+
+    return Hypster(func_name, config_body, namespace, inject_names)
+
 
 
 # TODO: consider moving these functions to ast_analyzer
@@ -184,12 +205,24 @@ def get_hp_function_node(tree: ast.Module) -> Optional[ast.FunctionDef]:
     return hp_functions[0]
 
 
-def find_hp_function_body(source_code: str) -> Optional[str]:
+def find_hp_function_body_and_name(source_code: str) -> Optional[Tuple[str, str]]:
     dedented_source = textwrap.dedent(source_code)
     tree = ast.parse(dedented_source)
+
     function_node = get_hp_function_node(tree)
+
+    if function_node is None:
+        return None
+
+    # Ensure that both function_name and function_body are strings
+    function_name = function_node.name if isinstance(function_node.name, str) else None
     function_body = ast.get_source_segment(dedented_source, function_node)
-    return function_body
+
+    # If function_body or function_name is None, return None
+    if function_name is None or function_body is None:
+        return None
+
+    return function_name, function_body
 
 
 def remove_function_signature(source: str) -> str:
