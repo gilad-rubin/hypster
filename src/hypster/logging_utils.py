@@ -38,7 +38,7 @@ class CustomFormatter(logging.Formatter):
 
 
 # Logging Configuration Function
-def configure_logging():
+def configure_logging(level: int = logging.INFO) -> logging.Logger:
     # Get the root logger
     logger = logging.getLogger()
 
@@ -52,6 +52,7 @@ def configure_logging():
 
     # Set the handler for the logger
     logger.addHandler(handler)
+    #logger.setLevel(level)
     logger.setLevel(logging.WARNING)
 
     return logger

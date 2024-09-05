@@ -340,7 +340,7 @@ class HPCallVisitor(ast.NodeVisitor):
             self.hp_calls.append(hp_call)
 
         self.generic_visit(node)
-    
+
     def visit_Assign(self, node):
         self.current_assignment = node  # Track the current assignment
         self.generic_visit(node)
@@ -449,7 +449,11 @@ def inject_names_to_source_code(code: str, hp_calls: List[HPCall]) -> str:
                 and isinstance(node.func.value, ast.Name)
                 and node.func.value.id == "hp"
             ):
-                if self.call_index < len(self.hp_calls) and self.hp_calls[self.call_index].implicit_name:
+                if (
+                    self.call_index < len(self.hp_calls)
+                    and self.hp_calls[self.call_index].implicit_name
+                    and self.hp_calls[self.call_index].explicit_name is None
+                ):
                     node.keywords.append(
                         ast.keyword(arg="name", value=ast.Constant(value=self.hp_calls[self.call_index].implicit_name))
                     )

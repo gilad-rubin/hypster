@@ -1,15 +1,20 @@
 import ast
 import functools
 import inspect
+import itertools
+
+# from .logging_utils import configure_logging
+import logging
 import textwrap
 import types
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .ast_analyzer import HPCall, analyze_hp_calls, collect_hp_calls, find_referenced_vars, inject_names_to_source_code
-from .hp import HP
-from .logging_utils import configure_logging
+from .hp import HP, PropagatedConfig
 
-logger = configure_logging()
+# Correct logging configuration
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
 class Hypster:
@@ -25,6 +30,30 @@ class Hypster:
         )
 
         self.independent_select_calls = self.find_independent_select_calls()
+
+    def get_combinations(self):
+        hp = HP([], {}, {}, explore_mode=True)
+        return self._get_combinations_recursive(hp)
+
+    def _get_combinations_recursive(self, hp):
+        combinations = []
+        
+        while True:
+            try:
+                self._execute_function(hp, self.modified_source)
+                combination = hp.get_current_combination()
+                print(f"Generated combination: {combination}")
+                combinations.append(combination)
+
+                if not hp.increment_last_select():
+                    print("No more combinations to generate, breaking the loop")
+                    break
+            except Exception as e:
+                print(f"Error in _get_combinations_recursive: {str(e)}")
+                break
+
+        print(f"Total combinations generated: {len(combinations)}")
+        return combinations
 
     def find_independent_select_calls(self) -> List[str]:
         independent_vars = {
@@ -91,7 +120,9 @@ class Hypster:
 
         return final_result
 
-    def save(self, path: str):
+    def save(self, path: Optional[str] = None):
+        if path is None:
+            path = f"{self.name}.py"
         save(self, path)
 
 
@@ -101,10 +132,10 @@ def config(arg: Union[Callable, None] = None, *, inject_names: bool = True):
         def wrapper():
             source_code = inspect.getsource(func)
             result = find_hp_function_body_and_name(source_code)
-            
+
             if result is None:
                 raise ValueError("No configuration function found in the module")
-            
+
             config_name, config_body = result
             namespace = {"HP": HP}
             return Hypster(config_name, config_body, namespace, inject_names=inject_names)
@@ -127,12 +158,12 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
         path = f"{hypster_instance.name}.py"
 
     result = find_hp_function_body_and_name(hypster_instance.source_code)
-    
+
     if result is None:
         raise ValueError("No configuration function found in the module")
 
     func_name, hp_func_source = result
-    
+
     modified_source = "from hypster import HP\n\n" + hp_func_source
 
     with open(path, "w") as f:
@@ -153,7 +184,7 @@ def load(path: str, inject_names=True) -> Hypster:
 
     # Find the configuration function
     result = find_hp_function_body_and_name(module_source)
-   
+
     if result is None:
         raise ValueError("No configuration function found in the module")
 
@@ -167,7 +198,6 @@ def load(path: str, inject_names=True) -> Hypster:
         raise ValueError(f"Could not find the function {func_name} in the loaded module")
 
     return Hypster(func_name, config_body, namespace, inject_names)
-
 
 
 # TODO: consider moving these functions to ast_analyzer
