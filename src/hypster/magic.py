@@ -1,3 +1,5 @@
+# File: magic.py
+
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List
@@ -55,6 +57,8 @@ class InteractiveHypster:
         overrides: Dict[str, Any] = None,
         final_vars: List[str] = None,
         results_var: str = None,
+        instantiate_on_first: bool = False,
+        instantiate_on_change: bool = False,
     ):
         self.hp_config = hp_config
         self.shell = shell
@@ -64,11 +68,15 @@ class InteractiveHypster:
         self.overrides = overrides or {}
         self.final_vars = final_vars or []
         self.results_var = results_var
+        self.instantiate_on_first = instantiate_on_first
+        self.instantiate_on_change = instantiate_on_change
         self.selected_params = OrderedDict()
         self.widgets = OrderedDict()
         self.output = widgets.Output()
         self.widgets_container = widgets.VBox([])
         self.create_widgets()
+        if self.instantiate_on_first:
+            self.instantiate(None)
 
     def get_defaults(self):
         defaults = OrderedDict()
@@ -84,16 +92,16 @@ class InteractiveHypster:
             self.create_widget_for_param(param, options)
         self.update_widgets_display()
 
-    def create_widget_for_param(self, param, options):
+    def create_widget_for_param(self, param, options, value=None):
+        disabled = False
+
         if param in self.overrides:
             value = self.overrides[param]
             disabled = True
         elif param in self.selections:
             value = self.selections[param]
-            disabled = False
-        else:
+        elif value is None:
             value = self.defaults.get(param, options[0] if options else None)
-            disabled = False
 
         if value not in options:
             options.append(value)
@@ -115,6 +123,9 @@ class InteractiveHypster:
             param = change["owner"].description.split()[-1]
             self.selected_params[param] = change["new"]
 
+            # Store current selections
+            current_selections = {k: v for k, v in self.selected_params.items()}
+
             # Remove all subsequent parameters
             keys_to_remove = [key for key in list(self.widgets.keys()) if key > param]
             for key in keys_to_remove:
@@ -126,10 +137,17 @@ class InteractiveHypster:
             available_options = get_available_options(self.combinations, self.selected_params)
             for next_param, options in available_options.items():
                 if next_param not in self.widgets:
-                    self.create_widget_for_param(next_param, options)
+                    if next_param in current_selections and current_selections[next_param] in options:
+                        # Preserve the user's previous selection if it's still valid
+                        self.create_widget_for_param(next_param, options, current_selections[next_param])
+                    else:
+                        self.create_widget_for_param(next_param, options)
 
             self.update_widgets_display()
             self.display_valid_combinations()
+
+            if self.instantiate_on_change:
+                self.instantiate(None)
 
     def update_widgets_display(self):
         self.widgets_container.children = list(self.widgets.values())
@@ -139,6 +157,7 @@ class InteractiveHypster:
             comb for comb in self.combinations if all(comb.get(k) == v for k, v in self.selected_params.items())
         ]
         df = pd.DataFrame(valid_combinations)
+        display(df)
 
     def instantiate(self, button):
         with self.output:
@@ -148,12 +167,29 @@ class InteractiveHypster:
             )
             if self.results_var:
                 self.shell.user_ns[self.results_var] = results
+                # print(f"Results stored in variable: {self.results_var}")
             else:
                 self.shell.user_ns.update(results)
+                # print("Results stored in global namespace")
+
+            # print("\nConfiguration instantiated with the following selections:")
+            # for name, value in self.selected_params.items():
+            # print(f"{name}: {value}")
+
+            # print("\nResults:")
+            # for name, value in results.items():
+            # print(f"{name}: {value}")
 
     def display(self):
         instantiate_button = widgets.Button(description="Instantiate")
         instantiate_button.on_click(self.instantiate)
+
+        if self.instantiate_on_change:
+            button_layout = widgets.Layout(display="none")
+        else:
+            button_layout = widgets.Layout()
+
+        instantiate_button.layout = button_layout
 
         display(widgets.VBox([self.widgets_container, instantiate_button, self.output]))
 
@@ -171,7 +207,13 @@ class HypsterMagics(Magics):
     @argument("-f", "--final_vars", help="Comma-separated list of final variables")
     @argument("-w", "--write_to_file", help="Write cell content to a file")
     @argument("-r", "--results", help="Variable name to store the results dictionary")
-    @argument("-i", "--instantiate", action="store_true", help="Instantiate selections immediately")
+    @argument(
+        "-i",
+        "--instantiate",
+        choices=["first", "change", "button", "first,change"],
+        help="Instantiation behavior: 'first' (on first run), 'change' (on parameter change), "
+        "'button' (manual only), or 'first,change' (on first run and parameter change)",
+    )
     @cell_magic
     def hypster(self, line, cell):
         css = """
@@ -195,17 +237,26 @@ class HypsterMagics(Magics):
         final_vars = args.final_vars.split(",") if args.final_vars else None
         results_var = args.results
 
-        interactive_hypster = InteractiveHypster(hp_config, self.shell, selections, overrides, final_vars, results_var)
+        instantiate_options = args.instantiate.split(",") if args.instantiate else ["button"]
+        instantiate_on_first = "first" in instantiate_options
+        instantiate_on_change = "change" in instantiate_options
+
+        interactive_hypster = InteractiveHypster(
+            hp_config,
+            self.shell,
+            selections,
+            overrides,
+            final_vars,
+            results_var,
+            instantiate_on_first=instantiate_on_first,
+            instantiate_on_change=instantiate_on_change,
+        )
         interactive_hypster.display()
 
         self.shell.user_ns[args.config_name] = hp_config
 
         if args.write_to_file:
             Path(args.write_to_file).write_text(cell)
-
-        if args.instantiate and self._first_run:
-            interactive_hypster.instantiate(None)
-            self._first_run = False
 
         return None
 
