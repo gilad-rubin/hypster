@@ -55,7 +55,7 @@ class HP:
         if full_name not in self.exploration_state:
             self.exploration_state[full_name] = 0
 
-        return list(options.values())[self.exploration_state[full_name]]
+        return list(options.keys())[self.exploration_state[full_name]]
 
     def increment_last_select(self):
         # First, try to increment the last local select
@@ -70,7 +70,9 @@ class HP:
 
     def get_current_combinations(self):
         select_combination = {
-            name: list(self.options_for_name[name].values())[index] for name, index in self.exploration_state.items()
+            name: list(self.options_for_name[name].keys())[index]
+            for name, index in self.exploration_state.items()
+            if name in self.options_for_name
         }
         dcts = {}
         if len(select_combination) > 0:

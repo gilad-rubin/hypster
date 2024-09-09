@@ -46,6 +46,8 @@ class Hypster:
 
                 if not hp.increment_last_select():
                     break
+
+                hp.options_for_name = {}
             except Exception as e:
                 break
 
