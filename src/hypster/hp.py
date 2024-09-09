@@ -1,4 +1,5 @@
-#from .logging_utils import configure_logging
+# from .logging_utils import configure_logging
+import itertools
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
@@ -6,23 +7,21 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-class PropagatedConfig:
-    def __init__(self, config_func, name):
-        self.config_func = config_func
-        self.name = name
-        self.combinations = self.config_func.get_combinations()  # Pre-generate all combinations
-        self.current_index = 0
 
-    def increment_last_select(self):
-        if self.current_index < len(self.combinations) - 1:
-            self.current_index += 1
-            return True
-        return False
+def cross_join_nested_dict(nested_dict):
+    # Extract the lists of dictionaries
+    dict_lists = list(nested_dict.values())
 
-    def get_current_combination(self):
-        if self.current_index < len(self.combinations):
-            return self.combinations[self.current_index]
-        return {}
+    # Generate all combinations
+    result = []
+    for combination in itertools.product(*dict_lists):
+        combined = {}
+        for d in combination:
+            combined.update(d)
+        result.append(combined)
+
+    return result
+
 
 class HP:
     def __init__(
@@ -34,11 +33,11 @@ class HP:
         self.config_dict = {}
         self.function_results = {}
         self.current_namespace = []
-        
+
         self.explore_mode = explore_mode
         self.exploration_state = {}
         self.options_for_name = {}
-        self.propagated_configs = {}
+        self.propagated_combinations = {}
 
         self._log_initialization()
 
@@ -50,10 +49,7 @@ class HP:
             self.overrides,
         )
 
-    def _explore_select(self, options: Union[Dict[str, Any], List[Any]], full_name: str):
-        if isinstance(options, list):
-            options = {str(v): v for v in options}
-
+    def _explore_select(self, options: dict, full_name: str):
         self.options_for_name[full_name] = options
 
         if full_name not in self.exploration_state:
@@ -62,42 +58,27 @@ class HP:
         return list(options.values())[self.exploration_state[full_name]]
 
     def increment_last_select(self):
-        print("Starting increment_last_select")
-        print(f"Current exploration_state: {self.exploration_state}")
-        print(f"Current options_for_name: {self.options_for_name}")
-        
         # First, try to increment the last local select
         for name in reversed(list(self.exploration_state.keys())):
-            print(f"Checking {name}")
             if self.exploration_state[name] < len(self.options_for_name[name]) - 1:
                 self.exploration_state[name] += 1
-                print(f"Incremented {name} to {self.exploration_state[name]}")
                 return True
             else:
                 self.exploration_state[name] = 0
-                print(f"Reset {name} to 0")
-        
-        # If no local select could be incremented, try to increment nested configs
-        for name in reversed(list(self.propagated_configs.keys())):
-            prop_config = self.propagated_configs[name]
-            print(f"Checking propagated config: {name}")
-            if prop_config.increment_last_select():
-                print(f"Incremented nested config {name}")
-                return True
-        
-        print("No more combinations to generate")
+
         return False
 
-    def get_current_combination(self):
-        combination = {name: list(self.options_for_name[name].values())[index] 
-                       for name, index in self.exploration_state.items()}
-        
-        for name, prop_config in self.propagated_configs.items():
-            nested_combination = prop_config.get_current_combination()
-            for nested_name, nested_value in nested_combination.items():
-                combination[f"{name}.{nested_name}"] = nested_value
-        
-        return combination
+    def get_current_combinations(self):
+        select_combination = {
+            name: list(self.options_for_name[name].values())[index] for name, index in self.exploration_state.items()
+        }
+        dcts = {}
+        if len(select_combination) > 0:
+            dcts["hp_select"] = [select_combination]
+        if len(self.propagated_combinations) > 0:
+            dcts.update(self.propagated_combinations.copy())
+
+        return cross_join_nested_dict(dcts)
 
     def select(self, options: Union[Dict[str, Any], List[Any]], name: Optional[str] = None, default: Any = None):
         if name is None:
@@ -106,9 +87,6 @@ class HP:
         self._check_options_exists(options)
 
         full_name = self._get_full_name(name)
-
-        if self.explore_mode:
-            return self._explore_select(options, full_name)
 
         if isinstance(options, dict):
             self._validate_dict_keys(options)
@@ -120,7 +98,8 @@ class HP:
 
         self._validate_default(default, options)
 
-        print("Select called with options: %s, name: %s, default: %s", options, name, default)
+        if self.explore_mode:
+            return self._explore_select(options, full_name)
 
         if full_name in self.overrides:
             result = self._get_result_from_override(full_name, options)
@@ -139,7 +118,6 @@ class HP:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
 
         full_name = self._get_full_name(name)
-        print("Text input called with default: %s, name: %s", default, full_name)
 
         if full_name in self.overrides:
             result = self.overrides[full_name]
@@ -172,21 +150,31 @@ class HP:
         self._store_value(full_name, result)
         return result
 
-    def propagate(self, config_func: Callable, name: Optional[str] = None) -> Union[Dict[str, Any], PropagatedConfig]:
+    def _explore_propagate(self, name: str, config_func: Callable):
+        combinations = config_func.get_combinations()
+        renamed_combinations = []
+        for combination in combinations:
+            renamed_combination = {}
+            for key, value in combination.items():
+                renamed_combination[f"{name}.{key}"] = value
+            renamed_combinations.append(renamed_combination)
+        self.propagated_combinations[name] = renamed_combinations
+        self.current_namespace.pop()
+        return
+
+    def propagate(
+        self, config_func: Callable, name: Optional[str] = None
+    ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         if name is None:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
 
         logger.info(f"Propagating configuration for {name}")
         self.current_namespace.append(name)
 
-        nested_config = self._prepare_nested_config(name)
-
         if self.explore_mode:
-            propagated_config = PropagatedConfig(config_func, name)
-            self.propagated_configs[name] = propagated_config
-            return propagated_config
+            return self._explore_propagate(name, config_func)
 
-        # Existing logic for non-explore mode
+        nested_config = self._prepare_nested_config(name)
         result, nested_snapshot = self._run_nested_config(config_func, nested_config)
         self._store_nested_results(name, result, nested_snapshot)
         self.current_namespace.pop()

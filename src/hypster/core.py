@@ -1,7 +1,6 @@
 import ast
 import functools
 import inspect
-import itertools
 
 # from .logging_utils import configure_logging
 import logging
@@ -9,8 +8,8 @@ import textwrap
 import types
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-from .ast_analyzer import HPCall, analyze_hp_calls, collect_hp_calls, find_referenced_vars, inject_names_to_source_code
-from .hp import HP, PropagatedConfig
+from .ast_analyzer import collect_hp_calls, find_referenced_vars, inject_names_to_source_code
+from .hp import HP
 
 # Correct logging configuration
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -37,22 +36,19 @@ class Hypster:
 
     def _get_combinations_recursive(self, hp):
         combinations = []
-        
+
         while True:
             try:
                 self._execute_function(hp, self.modified_source)
-                combination = hp.get_current_combination()
-                print(f"Generated combination: {combination}")
-                combinations.append(combination)
+                cur_combinations = hp.get_current_combinations()
+
+                combinations.extend(cur_combinations)
 
                 if not hp.increment_last_select():
-                    print("No more combinations to generate, breaking the loop")
                     break
             except Exception as e:
-                print(f"Error in _get_combinations_recursive: {str(e)}")
                 break
 
-        print(f"Total combinations generated: {len(combinations)}")
         return combinations
 
     def find_independent_select_calls(self) -> List[str]:
@@ -148,6 +144,13 @@ def config(arg: Union[Callable, None] = None, *, inject_names: bool = True):
     else:
         # @config(inject_names=True/False)
         return decorator
+
+
+def query_combinations(combinations: List[Dict], query: Dict) -> List[Dict]:
+    def matches_query(d):
+        return all(k in d and d[k] in v for k, v in query.items())
+
+    return [d for d in combinations if matches_query(d)]
 
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):
