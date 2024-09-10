@@ -55,11 +55,11 @@ class HP:
         if full_name not in self.exploration_state:
             self.exploration_state[full_name] = 0
 
-        return list(options.keys())[self.exploration_state[full_name]]
+        return list(options.values())[self.exploration_state[full_name]]
 
     def increment_last_select(self):
         # First, try to increment the last local select
-        for name in reversed(list(self.exploration_state.keys())):
+        for name in reversed(list(self.options_for_name.keys())):
             if self.exploration_state[name] < len(self.options_for_name[name]) - 1:
                 self.exploration_state[name] += 1
                 return True

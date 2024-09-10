@@ -38,19 +38,15 @@ class Hypster:
         combinations = []
 
         while True:
-            try:
-                self._execute_function(hp, self.modified_source)
-                cur_combinations = hp.get_current_combinations()
+            self._execute_function(hp, self.modified_source)
+            cur_combinations = hp.get_current_combinations()
 
-                combinations.extend(cur_combinations)
+            combinations.extend(cur_combinations)
 
-                if not hp.increment_last_select():
-                    break
-
-                hp.options_for_name = {}
-            except Exception as e:
+            if not hp.increment_last_select():
                 break
 
+            hp.options_for_name = {}
         return combinations
 
     def find_independent_select_calls(self) -> List[str]:
@@ -146,13 +142,6 @@ def config(arg: Union[Callable, None] = None, *, inject_names: bool = True):
     else:
         # @config(inject_names=True/False)
         return decorator
-
-
-def query_combinations(combinations: List[Dict], query: Dict) -> List[Dict]:
-    def matches_query(d):
-        return all(k in d and d[k] in v for k, v in query.items())
-
-    return [d for d in combinations if matches_query(d)]
 
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):
@@ -266,3 +255,24 @@ def remove_function_signature(source: str) -> str:
         if line.strip().endswith(":"):
             return "\n".join(lines[i + 1 :])
     raise ValueError("Could not find function signature")
+
+
+def query_combinations(combinations, query):
+    """
+    Filter combinations based on the provided query.
+
+    Args:
+    combinations (list): List of dictionaries, each representing a combination of hyperparameters.
+    query (dict): Dictionary of key-value pairs to filter the combinations.
+
+    Returns:
+    list: Filtered list of combinations that match the query criteria.
+    """
+
+    def match_combination(combination, query):
+        for key, value in query.items():
+            if key not in combination or combination[key] != value:
+                return False
+        return True
+
+    return [comb for comb in combinations if match_combination(comb, query)]
