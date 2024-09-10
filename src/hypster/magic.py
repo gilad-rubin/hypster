@@ -167,18 +167,8 @@ class InteractiveHypster:
             )
             if self.results_var:
                 self.shell.user_ns[self.results_var] = results
-                # print(f"Results stored in variable: {self.results_var}")
             else:
                 self.shell.user_ns.update(results)
-                # print("Results stored in global namespace")
-
-            # print("\nConfiguration instantiated with the following selections:")
-            # for name, value in self.selected_params.items():
-            # print(f"{name}: {value}")
-
-            # print("\nResults:")
-            # for name, value in results.items():
-            # print(f"{name}: {value}")
 
     def display(self):
         instantiate_button = widgets.Button(description="Instantiate")
