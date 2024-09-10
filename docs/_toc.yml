@@ -25,3 +25,10 @@ parts:
         title: Saving and Loading Configurations
       - file: advanced_usage/snapshot
         title: Configuration Snapshots
+
+  - caption: Hyperparameter Optimization
+    chapters:
+      - file: hpo/combinations
+        title: HP Combinations
+      - file: hpo/hpo
+        title: Grid & Random Search

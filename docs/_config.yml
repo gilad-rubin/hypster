@@ -3,5 +3,9 @@ author: Gilad Rubin
 logo: hypster_logo.png
 html:
      favicon: favicon.ico
+     default_mode: light
 execute:
-  execute_notebooks: cache
+     execute_notebooks: cache
+sphinx:
+  html_context:
+     default_mode: light
