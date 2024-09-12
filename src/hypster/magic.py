@@ -110,6 +110,8 @@ class InteractiveHypster:
             options=options,
             value=value,
             description=f"Select {param}",
+            style={'description_width': 'initial'},
+            #layout=widgets.Layout(width='auto'),
             disabled=disabled,
         )
         widget.observe(self.on_change, names="value")
