@@ -1,8 +1,16 @@
 # from .logging_utils import configure_logging
 import itertools
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Union
 
+# Define a type variable for the allowed key types
+KeyType = TypeVar("KeyType", str, int, float, bool)
+
+# Define a type alias for the options dictionary
+OptionsDict = Dict[KeyType, Any]
+
+# Define a type alias for the options list
+OptionsList = List[Union[str, int, float, bool]]
 # Correct logging configuration
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -82,7 +90,7 @@ class HP:
 
         return cross_join_nested_dict(dcts)
 
-    def select(self, options: Union[Dict[str, Any], List[Any]], name: Optional[str] = None, default: Any = None):
+    def select(self, options: Union[OptionsDict, OptionsList], name: Optional[str] = None, default: Any = None) -> Any:
         if name is None:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
 
@@ -188,26 +196,26 @@ class HP:
     def _store_value(self, full_name: str, value: Any):
         self.config_dict[full_name] = value
 
-    def _check_options_exists(self, options: Union[Dict[str, Any], List[Any]]):
+    def _check_options_exists(self, options: Union[OptionsDict, OptionsList]):
         if not isinstance(options, (list, dict)) or len(options) == 0:
             raise ValueError("Options must be a non-empty list or dictionary.")
 
-    def _validate_dict_keys(self, options: Dict[str, Any]):
+    def _validate_dict_keys(self, options: OptionsDict):
         if not all(isinstance(k, (str, int, bool, float)) for k in options.keys()):
             bad_keys = [key for key in options.keys() if not isinstance(key, (str, int, bool, float))]
             raise ValueError(f"Dictionary keys must be str, int, bool, float. Got {bad_keys} instead.")
 
-    def _validate_list_values(self, options: List[Any]):
+    def _validate_list_values(self, options: OptionsList):
         if not all(isinstance(v, (str, int, bool, float)) for v in options):
             raise ValueError(
                 "List values must be one of: str, int, bool, float. For complex types - use a dictionary instead"
             )
 
-    def _validate_default(self, default: Any, options: Dict[str, Any]):
+    def _validate_default(self, default: Any, options: OptionsDict):
         if default is not None and default not in options:
             raise ValueError("Default value must be one of the options.")
 
-    def _get_result_from_override(self, full_name: str, options: Dict[str, Any]):
+    def _get_result_from_override(self, full_name: str, options: OptionsDict):
         override_value = self.overrides[full_name]
         logger.debug("Found override for %s: %s", full_name, override_value)
         if override_value in options:
@@ -217,7 +225,7 @@ class HP:
         logger.info("Applied override for %s: %s", full_name, result)
         return result
 
-    def _get_result_from_selection(self, full_name: str, options: Dict[str, Any]):
+    def _get_result_from_selection(self, full_name: str, options: OptionsDict):
         selected_value = self.selections[full_name]
         logger.debug("Found selection for %s: %s", full_name, selected_value)
         if selected_value in options:
