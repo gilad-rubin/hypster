@@ -1,73 +1,68 @@
-import ast
-import functools
-import inspect
-
-# from .logging_utils import configure_logging
 import logging
 import textwrap
 import types
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-from .ast_analyzer import collect_hp_calls, find_referenced_vars, inject_names_to_source_code
+from .ast_analyzer import (
+    collect_hp_calls,
+    find_independent_select_calls,
+    find_referenced_vars,
+    inject_names_to_source_code,
+)
 from .hp import HP
+from .utils import find_hp_function_body_and_name, remove_function_signature
 
 # Correct logging configuration
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+HypsterReturn = Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]
+
 
 class Hypster:
     def __init__(self, name, source_code: str, namespace: Dict[str, Any], inject_names: bool = True):
+        """
+        Initialize a Hypster instance.
+
+        Args:
+            name (str): The name of the Hypster instance.
+            source_code (str): The source code to be executed.
+            namespace (Dict[str, Any]): The namespace for execution.
+            inject_names (bool, optional): Whether to inject names into the source code. Defaults to True.
+        """
         self.name = name
         self.source_code = source_code
         self.namespace = namespace
         self.hp_calls = collect_hp_calls(self.source_code)
-        self.referenced_vars = find_referenced_vars(self.source_code)
 
         self.modified_source = (
             inject_names_to_source_code(self.source_code, self.hp_calls) if inject_names else self.source_code
         )
 
-        self.independent_select_calls = self.find_independent_select_calls()
-
-    def get_combinations(self):
-        hp = HP([], {}, {}, explore_mode=True)
-        return self._get_combinations_recursive(hp)
-
-    def _get_combinations_recursive(self, hp):
-        combinations = []
-
-        while True:
-            self._execute_function(hp, self.modified_source)
-            cur_combinations = hp.get_current_combinations()
-
-            combinations.extend(cur_combinations)
-
-            if not hp.increment_last_select():
-                break
-
-            hp.options_for_name = {}
-        return combinations
-
-    def find_independent_select_calls(self) -> List[str]:
-        independent_vars = {
-            call.implicit_name.split(".")[0]
-            for call in self.hp_calls
-            if call.implicit_name
-            and call.method_name == "select"
-            and call.implicit_name.split(".")[0] not in self.referenced_vars
-        }
-
-        return list(independent_vars)
+        self.referenced_vars = find_referenced_vars(self.source_code)
+        self.independent_select_calls = find_independent_select_calls(self.referenced_vars, self.hp_calls)
 
     def __call__(
         self,
-        final_vars: List[str] = [],
-        selections: Dict[str, Any] = {},
-        overrides: Dict[str, Any] = {},
+        final_vars: Optional[List[str]] = None,
+        selections: Optional[Dict[str, Any]] = None,
+        overrides: Optional[Dict[str, Any]] = None,
         return_config_snapshot: bool = False,
-    ):
-        hp = HP(final_vars, selections, overrides)
+    ) -> HypsterReturn:
+        """
+        Execute the Hypster instance with given parameters.
+
+        Args:
+            final_vars (Optional[List[str]], optional): List of variables to include in the final result.
+            selections (Optional[Dict[str, Any]], optional): Predefined selections for hyperparameters.
+            overrides (Optional[Dict[str, Any]], optional): Overrides for hyperparameters.
+            return_config_snapshot (bool, optional): Whether to return the config snapshot. Defaults to False.
+
+        Returns:
+            Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
+                The execution result, optionally with the config snapshot.
+        """
+        hp = HP(final_vars or [], selections or {}, overrides or {})
         result = self._execute_function(hp, self.modified_source)
 
         if return_config_snapshot:
@@ -77,6 +72,17 @@ class Hypster:
             return result
 
     def _execute_function(self, hp: HP, modified_source: str) -> Dict[str, Any]:
+        """
+        Execute the modified source code with the given HP instance.
+
+        Args:
+            hp (HP): The HP instance for selections & overrides management.
+            modified_source (str): The modified source code to execute.
+
+        Returns:
+            Dict[str, Any]: The instantiated config.
+        """
+
         body_wo_signature = remove_function_signature(modified_source)
         function_body = textwrap.dedent(body_wo_signature)
 
@@ -91,6 +97,20 @@ class Hypster:
         return self._process_results(exec_namespace, hp.final_vars)
 
     def _process_results(self, namespace: Dict[str, Any], final_vars: List[str]) -> Dict[str, Any]:
+        """
+        Process and filter the execution results.
+
+        Args:
+            namespace (Dict[str, Any]): The namespace after execution.
+            final_vars (List[str]): List of variables to include in the final result.
+
+        Returns:
+            Dict[str, Any]: The processed and filtered results.
+
+        Raises:
+            ValueError: If any variable in final_vars does not exist in the configuration.
+        """
+
         filtered_locals = {
             k: v
             for k, v in namespace.items()
@@ -114,37 +134,74 @@ class Hypster:
 
         return final_result
 
+    def get_combinations(self):
+        """
+        Generate all possible combinations of hyperparameters.
+
+        This method explores all possible combinations of hyperparameter selections
+        defined in the Hypster instance's source code.
+
+        Warnings:
+        - This mapping is performed in a brute-force manner: running the configuration multiple times.
+        - For configurations with many options or deep nesting, this method may take a long time to complete.
+        - Ensure that running the configuration multiple times does not lead to unintended consequences
+            (e.g., API rate limiting, excessive resource usage).
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries, where each dictionary
+            represents a unique combination of hyperparameter selections.
+        """
+
+        hp = HP([], {}, {}, explore_mode=True)
+        combinations = []
+
+        while True:
+            self._execute_function(hp, self.modified_source)
+            cur_combinations = hp.get_current_combinations()
+
+            combinations.extend(cur_combinations)
+
+            if not hp.increment_last_select():
+                break
+
+            hp.options_for_name = {}
+        return combinations
+
     def save(self, path: Optional[str] = None):
+        """
+        Save the current object to a file.
+
+        Parameters:
+        path (Optional[str]): The file path where the object should be saved.
+                              If None, the object will be saved with its name as the filename.
+
+        Returns:
+        None
+        """
         if path is None:
             path = f"{self.name}.py"
         save(self, path)
 
 
-def config(arg: Union[Callable, None] = None, *, inject_names: bool = True):
-    def decorator(func: Callable) -> Hypster:
-        @functools.wraps(func)
-        def wrapper():
-            source_code = inspect.getsource(func)
-            result = find_hp_function_body_and_name(source_code)
-
-            if result is None:
-                raise ValueError("No configuration function found in the module")
-
-            config_name, config_body = result
-            namespace = {"HP": HP}
-            return Hypster(config_name, config_body, namespace, inject_names=inject_names)
-
-        return wrapper()
-
-    if callable(arg):
-        # @config used without arguments
-        return decorator(arg)
-    else:
-        # @config(inject_names=True/False)
-        return decorator
-
-
 def save(hypster_instance: Hypster, path: Optional[str] = None):
+    """
+    Save the configuration of a Hypster instance to a file.
+    This function extracts the configuration function from the provided
+    Hypster instance's source code and writes it to a specified file. If no
+    path is provided, the configuration is saved to a file named after the
+    Hypster instance's name with a .py extension.
+    Args:
+        hypster_instance (Hypster): The Hypster instance whose configuration
+            is to be saved.
+        path (Optional[str]): The file path where the configuration should be
+            saved. If None, the configuration is saved to a file named after
+            the Hypster instance's name.
+    Raises:
+        ValueError: If the provided object is not a Hypster instance or if no
+            configuration function is found in the module.
+    Returns:
+        None
+    """
     if not isinstance(hypster_instance, Hypster):
         raise ValueError("The provided object is not a Hypster instance")
 
@@ -167,6 +224,19 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
 
 
 def load(path: str, inject_names=True) -> Hypster:
+    """
+    Loads a Python module from the specified file path, executes it, and retrieves a configuration function.
+    Args:
+        path (str): The file path to the Python module to be loaded.
+        inject_names (bool, optional): If True, injects names into the namespace. Defaults to True.
+    
+    Returns:
+        Hypster: An instance of the Hypster class containing the configuration function and its context.
+    
+    Raises:
+        ValueError: If no configuration function is found in the module or 
+                    if the function cannot be retrieved from the namespace.
+    """
     with open(path, "r") as f:
         module_source = f.read()
 
@@ -192,87 +262,3 @@ def load(path: str, inject_names=True) -> Hypster:
         raise ValueError(f"Could not find the function {func_name} in the loaded module")
 
     return Hypster(func_name, config_body, namespace, inject_names)
-
-
-# TODO: consider moving these functions to ast_analyzer
-def get_hp_function_node(tree: ast.Module) -> Optional[ast.FunctionDef]:
-    """
-    Finds the first function with 'hp' in its signature in the given abstract syntax tree.
-
-    :param tree: The abstract syntax tree to search in
-    :return: The function definition node with 'hp' in its signature
-    :raises ValueError: If no function with 'hp' is found, or if multiple functions \
-    with 'hp' are found or if there's a function with 'hp' and another argument
-    """
-    hp_functions = []
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            has_hp = False
-            has_other_args = False
-            for arg in node.args.args:
-                if arg.arg == "hp":
-                    has_hp = True
-                elif arg.arg != "self":  # Ignore 'self' for methods
-                    has_other_args = True
-
-            if has_hp:
-                if has_other_args:
-                    raise ValueError(f"Function '{node.name}' has 'hp' and other arguments in its signature.")
-                hp_functions.append(node)
-
-    if len(hp_functions) > 1:
-        raise ValueError("Multiple functions with 'hp' in their signatures found.")
-    elif len(hp_functions) == 0:
-        raise ValueError("No function with 'hp' in its signature found.")
-
-    return hp_functions[0]
-
-
-def find_hp_function_body_and_name(source_code: str) -> Optional[Tuple[str, str]]:
-    dedented_source = textwrap.dedent(source_code)
-    tree = ast.parse(dedented_source)
-
-    function_node = get_hp_function_node(tree)
-
-    if function_node is None:
-        return None
-
-    # Ensure that both function_name and function_body are strings
-    function_name = function_node.name if isinstance(function_node.name, str) else None
-    function_body = ast.get_source_segment(dedented_source, function_node)
-
-    # If function_body or function_name is None, return None
-    if function_name is None or function_body is None:
-        return None
-
-    return function_name, function_body
-
-
-def remove_function_signature(source: str) -> str:
-    lines = source.split("\n")
-    for i, line in enumerate(lines):
-        if line.strip().endswith(":"):
-            return "\n".join(lines[i + 1 :])
-    raise ValueError("Could not find function signature")
-
-
-def query_combinations(combinations, query):
-    """
-    Filter combinations based on the provided query.
-
-    Args:
-    combinations (list): List of dictionaries, each representing a combination of hyperparameters.
-    query (dict): Dictionary of key-value pairs to filter the combinations.
-
-    Returns:
-    list: Filtered list of combinations that match the query criteria.
-    """
-
-    def match_combination(combination, query):
-        for key, value in query.items():
-            if key not in combination or combination[key] != value:
-                return False
-        return True
-
-    return [comb for comb in combinations if match_combination(comb, query)]

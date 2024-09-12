@@ -463,3 +463,14 @@ def inject_names_to_source_code(code: str, hp_calls: List[HPCall]) -> str:
     injector = NameInjector(hp_calls)
     modified_tree = injector.visit(tree)
     return ast.unparse(modified_tree)
+
+def find_independent_select_calls(referenced_vars, hp_calls) -> List[str]:
+    independent_vars = {
+        call.implicit_name.split(".")[0]
+        for call in hp_calls
+        if call.implicit_name
+        and call.method_name == "select"
+        and call.implicit_name.split(".")[0] not in referenced_vars
+    }
+
+    return list(independent_vars)

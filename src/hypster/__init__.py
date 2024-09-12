@@ -1,5 +1,7 @@
-from .core import Hypster, config, load, query_combinations, save
+from .config import config
+from .core import Hypster, load, save
 from .hp import HP
 from .logging_utils import configure_logging
+from .utils import query_combinations
 
 __all__ = ["config", "save", "load", "HP"]
