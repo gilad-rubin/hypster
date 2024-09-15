@@ -165,6 +165,7 @@ class Hypster:
                 break
 
             hp.options_for_name = {}
+            hp.propagated_combinations = {}
         return combinations
 
     def save(self, path: Optional[str] = None):
@@ -229,12 +230,12 @@ def load(path: str, inject_names=True) -> Hypster:
     Args:
         path (str): The file path to the Python module to be loaded.
         inject_names (bool, optional): If True, injects names into the namespace. Defaults to True.
-    
+
     Returns:
         Hypster: An instance of the Hypster class containing the configuration function and its context.
-    
+
     Raises:
-        ValueError: If no configuration function is found in the module or 
+        ValueError: If no configuration function is found in the module or
                     if the function cannot be retrieved from the namespace.
     """
     with open(path, "r") as f:
