@@ -165,3 +165,13 @@ def test_disable_automatic_naming_missing_name_error():
 
     with pytest.raises(ValueError, match="`name` argument is missing"):
         no_injection_config()
+
+
+def test_non_constant_name():
+    @config
+    def my_config(hp: HP):
+        var = "a"
+        a = hp.select(["a", "b"], name=f"hey_{var}")
+
+    results = my_config(selections={"hey_a": "a"})
+    assert results["a"] == "a"

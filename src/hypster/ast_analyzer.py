@@ -56,22 +56,6 @@ class VariableGraphBuilder(ast.NodeVisitor):
         return self.get_target_name(node)
 
 
-# class HPCall:
-#     def __init__(
-#         self,
-#         lineno: int,
-#         call_index: int,
-#         method_name: str,
-#         explicit_name: str = None,
-#         implicit_name: str = None,
-#     ):
-#         self.lineno = lineno
-#         self.call_index = call_index
-#         self.method_name = method_name
-#         self.explicit_name = explicit_name
-#         self.implicit_name = implicit_name
-
-
 class HPCall:
     def __init__(
         self,
@@ -79,13 +63,13 @@ class HPCall:
         col_offset: int,
         method_name: str,
         implicit_name: Optional[str] = None,
-        explicit_name: Optional[str] = None,
+        has_explicit_name: Optional[bool] = None,
     ):
         self.lineno = lineno
         self.col_offset = col_offset
         self.method_name = method_name
         self.implicit_name = implicit_name
-        self.explicit_name = explicit_name
+        self.has_explicit_name = has_explicit_name
         self.call_index = 0  # Will be set later
 
 
@@ -123,10 +107,9 @@ class HPCallAnalyzer(ast.NodeVisitor):
             call_index = len([c for c in self.hp_calls if c.lineno == line_number])
 
             method_name = node.func.attr
-            explicit_name = self.get_hp_call_name(node)
             inferred_name = self.infer_name(node)
 
-            if not explicit_name and inferred_name and self.is_valid_inference(inferred_name):
+            if not node.has_explicit_name and inferred_name and self.is_valid_inference(inferred_name):
                 implicit_name = inferred_name
             else:
                 implicit_name = None
@@ -135,7 +118,7 @@ class HPCallAnalyzer(ast.NodeVisitor):
                 line_number,
                 call_index,
                 method_name,
-                explicit_name,
+                node.has_explicit_name,
                 implicit_name,
             )
             self.hp_calls.append(hp_call)
@@ -180,19 +163,19 @@ class HPCallAnalyzer(ast.NodeVisitor):
             and node.func.value.id == "hp"
         )
 
-    def get_hp_call_name(self, node):
-        logger.debug(f"HPCallAnalyzer: Attempting to get hp call name for node on line {node.lineno}")
-        if len(node.args) >= 2:
-            name = self.get_node_value(node.args[1])
-            logger.debug(f"HPCallAnalyzer: Found name in second argument: {name}")
-            return name
-        for keyword in node.keywords:
-            if keyword.arg == "name":
-                name = self.get_node_value(keyword.value)
-                logger.debug(f"HPCallAnalyzer: Found name in keyword argument: {name}")
-                return name
-        logger.debug("HPCallAnalyzer: No explicit name found for hp call")
-        return None
+    # def get_hp_call_name(self, node):
+    #     logger.debug(f"HPCallAnalyzer: Attempting to get hp call name for node on line {node.lineno}")
+    #     if len(node.args) >= 2:
+    #         name = self.get_node_value(node.args[1])
+    #         logger.debug(f"HPCallAnalyzer: Found name in second argument: {name}")
+    #         return name
+    #     for keyword in node.keywords:
+    #         if keyword.arg == "name":
+    #             name = self.get_node_value(keyword.value)
+    #             logger.debug(f"HPCallAnalyzer: Found name in keyword argument: {name}")
+    #             return name
+    #     logger.debug("HPCallAnalyzer: No explicit name found for hp call")
+    #     return None
 
     def get_node_value(self, node):
         if isinstance(node, ast.Constant):
@@ -327,14 +310,14 @@ class HPCallVisitor(ast.NodeVisitor):
                 self.call_index[lineno][method_name] += 1
 
             implicit_name = self.get_implicit_name(node)
-            explicit_name = self.get_explicit_name(node)
+            has_explicit_name = self.has_explicit_name(node)
 
             hp_call = HPCall(
                 lineno=lineno,
                 col_offset=node.col_offset,
                 method_name=method_name,
                 implicit_name=implicit_name,
-                explicit_name=explicit_name,
+                has_explicit_name=has_explicit_name,
             )
             hp_call.call_index = self.call_index[lineno][method_name]
             self.hp_calls.append(hp_call)
@@ -354,14 +337,11 @@ class HPCallVisitor(ast.NodeVisitor):
             return self.find_node_in_assignment(self.current_assignment.value, node, [target])
         return self.find_node_in_current_path(node)
 
-    def get_explicit_name(self, node):
+    def has_explicit_name(self, node):
         for kw in node.keywords:
             if kw.arg == "name":
-                if isinstance(kw.value, ast.Constant):
-                    return kw.value.value
-        if len(node.args) >= 2 and isinstance(node.args[1], ast.Constant):
-            return node.args[1].value
-        return None
+                return True
+        return False
 
     def get_target_name(self, node):
         if isinstance(node, ast.Name):
@@ -452,7 +432,7 @@ def inject_names_to_source_code(code: str, hp_calls: List[HPCall]) -> str:
                 if (
                     self.call_index < len(self.hp_calls)
                     and self.hp_calls[self.call_index].implicit_name
-                    and self.hp_calls[self.call_index].explicit_name is None
+                    and self.hp_calls[self.call_index].has_explicit_name is False
                 ):
                     node.keywords.append(
                         ast.keyword(arg="name", value=ast.Constant(value=self.hp_calls[self.call_index].implicit_name))

@@ -90,7 +90,7 @@ class HP:
 
         return cross_join_nested_dict(dcts)
 
-    def select(self, options: Union[OptionsDict, OptionsList], name: Optional[str] = None, default: Any = None) -> Any:
+    def select(self, options: Union[Dict[str, Any], List[Any]], *, name: Optional[str] = None, default: Any = None):
         if name is None:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
 
@@ -123,7 +123,7 @@ class HP:
         self._store_value(full_name, result)
         return result
 
-    def text_input(self, default: Optional[str] = None, name: Optional[str] = None) -> str:
+    def text_input(self, default: Optional[str] = None, *, name: Optional[str] = None) -> str:
         if name is None:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
 
@@ -141,7 +141,7 @@ class HP:
         return result
 
     def number_input(
-        self, default: Optional[Union[int, float]] = None, name: Optional[str] = None
+        self, default: Optional[Union[int, float]] = None, *, name: Optional[str] = None
     ) -> Union[int, float]:
         if name is None:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
@@ -173,7 +173,7 @@ class HP:
         return
 
     def propagate(
-        self, config_func: Callable, name: Optional[str] = None
+        self, config_func: Callable, *, name: Optional[str] = None
     ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         if name is None:
             raise ValueError("`name` argument is missing and must be provided explicitly.")
