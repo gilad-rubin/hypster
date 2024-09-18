@@ -1,4 +1,5 @@
 import logging
+import os
 import textwrap
 import types
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -217,7 +218,7 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
     func_name, hp_func_source = result
 
     modified_source = "from hypster import HP\n\n" + hp_func_source
-
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write(modified_source)
 
