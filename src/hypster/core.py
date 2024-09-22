@@ -42,13 +42,13 @@ class Hypster:
 
         self.referenced_vars = find_referenced_vars(self.source_code)
         self.independent_select_calls = find_independent_select_calls(self.referenced_vars, self.hp_calls)
+        self.config_history = []
 
     def __call__(
         self,
         final_vars: Optional[List[str]] = None,
         selections: Optional[Dict[str, Any]] = None,
         overrides: Optional[Dict[str, Any]] = None,
-        return_config_snapshot: bool = False,
     ) -> HypsterReturn:
         """
         Execute the Hypster instance with given parameters.
@@ -57,20 +57,14 @@ class Hypster:
             final_vars (Optional[List[str]], optional): List of variables to include in the final result.
             selections (Optional[Dict[str, Any]], optional): Predefined selections for hyperparameters.
             overrides (Optional[Dict[str, Any]], optional): Overrides for hyperparameters.
-            return_config_snapshot (bool, optional): Whether to return the config snapshot. Defaults to False.
 
         Returns:
-            Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]:
-                The execution result, optionally with the config snapshot.
+            Dict[str, Any]: The execution result.
         """
         hp = HP(final_vars or [], selections or {}, overrides or {})
         result = self._execute_function(hp, self.modified_source)
-
-        if return_config_snapshot:
-            config_snapshot = hp.get_config_snapshot()
-            return result, config_snapshot
-        else:
-            return result
+        # self.config_history.append(hp.get_current_combination())
+        return result
 
     def _execute_function(self, hp: HP, modified_source: str) -> Dict[str, Any]:
         """
@@ -135,40 +129,6 @@ class Hypster:
 
         return final_result
 
-    def get_combinations(self):
-        """
-        Generate all possible combinations of hyperparameters.
-
-        This method explores all possible combinations of hyperparameter selections
-        defined in the Hypster instance's source code.
-
-        Warnings:
-        - This mapping is performed in a brute-force manner: running the configuration multiple times.
-        - For configurations with many options or deep nesting, this method may take a long time to complete.
-        - Ensure that running the configuration multiple times does not lead to unintended consequences
-            (e.g., API rate limiting, excessive resource usage).
-
-        Returns:
-            List[Dict[str, Any]]: A list of dictionaries, where each dictionary
-            represents a unique combination of hyperparameter selections.
-        """
-
-        hp = HP([], {}, {}, explore_mode=True)
-        combinations = []
-
-        while True:
-            self._execute_function(hp, self.modified_source)
-            cur_combinations = hp.get_current_combinations()
-
-            combinations.extend(cur_combinations)
-
-            if not hp.increment_last_select():
-                break
-
-            hp.options_for_name = {}
-            hp.propagated_combinations = {}
-        return combinations
-
     def save(self, path: Optional[str] = None):
         """
         Save the current object to a file.
@@ -183,6 +143,19 @@ class Hypster:
         if path is None:
             path = f"{self.name}.py"
         save(self, path)
+
+    def get_combinations(self):
+        hp = HP([], {}, {}, explore_mode=True)
+        combinations = []
+
+        while True:
+            self._execute_function(hp, self.modified_source)
+            combinations.append(hp.current_combination.copy())
+
+            if not hp.get_next_combination(combinations):
+                break
+
+        return combinations
 
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):
