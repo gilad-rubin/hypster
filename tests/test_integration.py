@@ -210,3 +210,108 @@ def test_propagation():
     result = main_config(overrides={"main_param": "y", "nested.nested_param": "b"})
     assert result["main_param"] == "y"
     assert result["nested"]["nested_param"] == "b"
+
+
+def test_multi_select_defaults_overrides_selections():
+    @config
+    def config_func(hp: HP):
+        options = hp.multi_select(["option1", "option2", "option3"], default=["option1", "option2"])
+
+    # Test defaults
+    result = config_func()
+    assert result["options"] == ["option1", "option2"]
+
+    # Test selections
+    result = config_func(selections={"options": ["option2", "option3"]})
+    assert result["options"] == ["option2", "option3"]
+
+    # Test overrides
+    result = config_func(overrides={"options": ["option1", "option3"]})
+    assert result["options"] == ["option1", "option3"]
+
+    # Test precedence: overrides > selections > defaults
+    result = config_func(selections={"options": ["option2"]}, overrides={"options": ["option3"]})
+    assert result["options"] == ["option3"]
+
+    # Test invalid selection
+    with pytest.raises(ValueError):
+        config_func(selections={"options": ["invalid_option"]})
+
+
+def test_multi_text_defaults_overrides_selections():
+    @config
+    def config_func(hp: HP):
+        texts = hp.multi_text(default=["default1", "default2"], name="texts")
+
+    # Test defaults
+    result = config_func()
+    assert result["texts"] == ["default1", "default2"]
+
+    # Test overrides
+    result = config_func(overrides={"texts": ["override1", "override2"]})
+    assert result["texts"] == ["override1", "override2"]
+
+    # Test partial overrides
+    result = config_func(overrides={"texts": ["override1"]})
+    assert result["texts"] == ["override1"]
+
+    # Test empty overrides
+    result = config_func(overrides={"texts": []})
+    assert result["texts"] == []
+
+
+def test_multi_number_defaults_overrides_selections():
+    @config
+    def config_func(hp: HP):
+        numbers = hp.multi_number(default=[1, 2, 3], name="numbers")
+
+    # Test defaults
+    result = config_func()
+    assert result["numbers"] == [1, 2, 3]
+
+    # Test overrides
+    result = config_func(overrides={"numbers": [4, 5, 6]})
+    assert result["numbers"] == [4, 5, 6]
+
+    # Test partial overrides
+    result = config_func(overrides={"numbers": [7]})
+    assert result["numbers"] == [7]
+
+    # Test empty overrides
+    result = config_func(overrides={"numbers": []})
+    assert result["numbers"] == []
+
+
+def test_multi_select_error_cases():
+    @config
+    def config_func(hp: HP):
+        hp.multi_select([], default=[])
+
+    # Test empty options
+    with pytest.raises(ValueError):
+        config_func()
+
+    # Test invalid default
+    with pytest.raises(ValueError):
+
+        @config
+        def bad_default(hp: HP):
+            hp.multi_select(["a", "b"], default=["c"])
+
+        bad_default()
+
+
+def test_multi_text_error_cases():
+    @config
+    def config_func(hp: HP):
+        hp.multi_text(default=["default"])
+
+    # multi_text does not have complex validation, but we can test type enforcement if implemented.
+
+
+def test_multi_number_error_cases():
+    @config
+    def config_func(hp: HP):
+        hp.multi_number(default=[1, 2])
+
+    # multi_number does not have complex validation, but we can test type enforcement if implemented.
