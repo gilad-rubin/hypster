@@ -43,6 +43,8 @@ class Hypster:
         self.referenced_vars = find_referenced_vars(self.source_code)
         self.independent_select_calls = find_independent_select_calls(self.referenced_vars, self.hp_calls)
         self.config_history = []
+        self.combinations = []
+        self.defaults = {}
 
     def __call__(
         self,
@@ -145,17 +147,25 @@ class Hypster:
         save(self, path)
 
     def get_combinations(self):
+        if self.combinations:
+            return self.combinations
+
         hp = HP([], {}, {}, explore_mode=True)
         combinations = []
 
         while True:
             self._execute_function(hp, self.modified_source)
             combinations.append(hp.current_combination.copy())
-
             if not hp.get_next_combination(combinations):
                 break
-
+        self.combinations = combinations
+        self.defaults = hp.defaults  # TODO: improve this
         return combinations
+
+    def get_defaults(self):
+        if not self.combinations:
+            self.get_combinations()
+        return self.defaults
 
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):

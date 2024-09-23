@@ -25,8 +25,9 @@ class HP:
         self.overrides = overrides
         self.name_prefix = None
         self.explore_mode = explore_mode
-        self.current_space = OrderedDict()
+        self.current_space = OrderedDict()  # TODO: consider turning these 3 items to a dataclass
         self.current_combination = OrderedDict()
+        self.defaults = {}
         logger.info(f"Initialized HP with explore_mode: {explore_mode}")
 
     def select(self, options: Union[Dict[str, Any], List[Any]], *, name: Optional[str] = None, default: Any = None):

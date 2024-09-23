@@ -16,6 +16,12 @@ class HPCall(ABC):
         self.hp = hp_instance
         self.name = self._get_full_name(name)
         self.default = default
+        # TODO: improve this
+        if default is not None:
+            if self.name not in self.hp.defaults:
+                self.hp.defaults[self.name] = [default]
+            elif default not in self.hp.defaults[self.name]:
+                self.hp.defaults[self.name].append(default)
         self.options = None
 
     def _get_full_name(self, name: str) -> str:
@@ -62,7 +68,7 @@ class HPCall(ABC):
             for key in default:
                 if key not in options:
                     raise ValueError("Default values must be one of the options.")
-        elif default is not None and default not in options:
+        elif default is not None and default not in options:  # TODO: add var/param names to error
             raise ValueError("Default value must be one of the options.")
 
     def handle_overrides_selections(self) -> Any:
@@ -145,10 +151,12 @@ class SelectCall(HPCall):
 
     def explore(self) -> Any:
         if self.name in self.hp.current_combination:
-            return self.hp.current_combination[self.name]
-        chosen_key = list(self.options.keys())[0]
-        self.hp.current_combination[self.name] = chosen_key
-        return chosen_key
+            selected_key = self.hp.current_combination[self.name]
+        else:
+            selected_key = list(self.options.keys())[0]
+            self.hp.current_combination[self.name] = selected_key
+
+        return selected_key
 
 
 class MultiSelectCall(HPCall):
@@ -162,7 +170,10 @@ class MultiSelectCall(HPCall):
 
         if self.hp.explore_mode:
             if self.name in self.hp.current_combination:
-                return self.hp.current_combination[self.name]
+                chosen_keys = self.hp.current_combination[self.name]
+                if set(chosen_keys) == set(self.default):
+                    self.hp.current_default_statuses[self.name] = True
+                return chosen_keys
 
             combinations = self._generate_all_combinations()
             self.hp.current_space[self.name] = combinations
@@ -176,6 +187,8 @@ class MultiSelectCall(HPCall):
     def explore(self, combinations) -> List[Any]:
         selected_combination = combinations[0]
         self.hp.current_combination[self.name] = selected_combination
+        if set(selected_combination) == set(self.default):
+            self.hp.current_default_statuses[self.name] = True
         return selected_combination
 
     def _generate_all_combinations(self) -> List[List[str]]:
@@ -243,10 +256,15 @@ class PropagateCall(HPCall):
 
     def execute(self, config_func: Callable) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         if self.hp.explore_mode:
+            # TODO: make sure that this condition is valid and this doesn't need to be recalculated every time
             if self.name in self.hp.current_combination:
-                return self.hp.current_combination[self.name]
+                selected_dct = self.hp.current_combination[self.name]
+                # TODO: add default statuses
+                return selected_dct
 
             combinations = config_func.get_combinations()
+            defaults = config_func.get_defaults()
+            self.hp.defaults[self.name] = defaults
             self.hp.current_space[self.name] = combinations
             return self.explore(combinations)
 
