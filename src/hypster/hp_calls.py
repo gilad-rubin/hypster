@@ -171,8 +171,6 @@ class MultiSelectCall(HPCall):
         if self.hp.explore_mode:
             if self.name in self.hp.current_combination:
                 chosen_keys = self.hp.current_combination[self.name]
-                if set(chosen_keys) == set(self.default):
-                    self.hp.current_default_statuses[self.name] = True
                 return chosen_keys
 
             combinations = self._generate_all_combinations()
@@ -187,8 +185,6 @@ class MultiSelectCall(HPCall):
     def explore(self, combinations) -> List[Any]:
         selected_combination = combinations[0]
         self.hp.current_combination[self.name] = selected_combination
-        if set(selected_combination) == set(self.default):
-            self.hp.current_default_statuses[self.name] = True
         return selected_combination
 
     def _generate_all_combinations(self) -> List[List[str]]:
