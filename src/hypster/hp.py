@@ -98,9 +98,11 @@ class HP:
     def _get_next_option(
         self, param: str, options: List[Any], current_value: Any, explored_combinations: List[Dict[str, Any]]
     ) -> Optional[Any]:
-        param_index = list(self.current_space.keys()).index(param)
+        param_index = list(self.current_combination.keys()).index(param)
         previous_selections = {
-            k: v for k, v in self.current_combination.items() if list(self.current_space.keys()).index(k) < param_index
+            k: v
+            for k, v in self.current_combination.items()
+            if list(self.current_combination.keys()).index(k) < param_index
         }
         used_options = set(
             _hashable_value(comb[param])
