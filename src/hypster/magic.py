@@ -1,6 +1,5 @@
 # File: magic.py
 
-from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -12,9 +11,20 @@ from IPython.display import HTML, clear_output, display
 
 from .core import Hypster, find_hp_function_body_and_name
 from .hp import HP
+from .selection_handler import SelectionHandler
 
 
 def custom_load(module_source: str, inject_names=True) -> Hypster:
+    """
+    Custom loader to parse the configuration module source code.
+
+    Args:
+        module_source (str): The source code of the configuration module.
+        inject_names (bool): Whether to inject variable names into the namespace.
+
+    Returns:
+        Hypster: An instance of the Hypster configuration.
+    """
     module_source = module_source.replace("@config", "").replace("@hypster.config", "")
     namespace = {"HP": HP}
     exec(module_source, namespace)
@@ -32,23 +42,11 @@ def custom_load(module_source: str, inject_names=True) -> Hypster:
     return Hypster(func_name, config_body, namespace, inject_names)
 
 
-def get_available_options(combinations, selected_params):
-    available_options = OrderedDict()
-    all_params = list(OrderedDict.fromkeys(key for comb in combinations for key in comb.keys()))
-
-    for param in all_params:
-        options = set()
-        for comb in combinations:
-            if all(comb.get(k) == v for k, v in selected_params.items() if k < param):
-                if param in comb:
-                    options.add(comb[param])
-        if options:
-            available_options[param] = sorted(list(options))
-
-    return available_options
-
-
 class InteractiveHypster:
+    """
+    Interactive UI for Hypster configurations using ipywidgets.
+    """
+
     def __init__(
         self,
         hp_config: Hypster,
@@ -62,110 +60,243 @@ class InteractiveHypster:
     ):
         self.hp_config = hp_config
         self.shell = shell
-        self.combinations = hp_config.get_combinations()
-        self.defaults = self.get_defaults()
-        self.selections = selections or {}
+        self.selection_handler = SelectionHandler(hp_config)
+        self.selection_handler.initialize()
         self.overrides = overrides or {}
         self.final_vars = final_vars or []
         self.results_var = results_var
         self.instantiate_on_first = instantiate_on_first
         self.instantiate_on_change = instantiate_on_change
-        self.selected_params = OrderedDict()
-        self.widgets = OrderedDict()
+        self.widgets = {}
         self.output = widgets.Output()
         self.widgets_container = widgets.VBox([])
         self.create_widgets()
+        self.update_widgets_display()
         if self.instantiate_on_first:
             self.instantiate(None)
 
-    def get_defaults(self):
-        defaults = OrderedDict()
-        for comb in self.combinations:
-            for param, value in comb.items():
-                if param not in defaults:
-                    defaults[param] = value
-        return defaults
-
     def create_widgets(self):
-        available_options = get_available_options(self.combinations, self.selected_params)
-        for param, options in available_options.items():
-            self.create_widget_for_param(param, options)
-        self.update_widgets_display()
+        """
+        Create widgets based on the current state of selections.
+        """
+        state = self.selection_handler.get_current_state()
+        # Iterate in the order of selected_params to maintain widget order
+        for param in state["selected_params"]:
+            if param in state["current_options"]:
+                options = state["current_options"][param]
+                value = state["selected_params"][param]
+                self.create_widget_for_param(param, options, value)
 
-    def create_widget_for_param(self, param, options, value=None):
-        disabled = False
+    def create_widget_for_param(self, param, options, value):
+        """
+        Create a widget for a given parameter based on its type.
 
+        Args:
+            param (str): The parameter name.
+            options (Any): The options available for the parameter.
+            value (Any): The current value of the parameter.
+        """
         if param in self.overrides:
             value = self.overrides[param]
             disabled = True
-        elif param in self.selections:
-            value = self.selections[param]
-        elif value is None:
-            value = self.defaults.get(param, options[0] if options else None)
+        else:
+            disabled = False
 
-        if value not in options:
-            options.append(value)
+        if isinstance(options, dict):
+            widget = self.create_dict_widget(param, options, value)
+        elif isinstance(value, list):
+            widget = self.create_list_widget(param, options, value)
+        else:
+            widget = self.create_singular_widget(param, options, value)
 
-        widget = widgets.Dropdown(
-            options=options,
+        widget.disabled = disabled
+        self.widgets[param] = widget
+
+    def create_dict_widget(self, param, options, value):
+        """
+        Create an accordion widget for dictionary-type parameters.
+
+        Args:
+            param (str): The parameter name.
+            options (dict): Nested options for the parameter.
+            value (dict): The current nested values for the parameter.
+
+        Returns:
+            widgets.Accordion: The accordion widget containing sub-widgets.
+        """
+        sub_widgets = []
+        for sub_param, sub_options in options.items():
+            sub_value = value.get(sub_param, None)
+            sub_widget = self.create_widget_for_param(f"{param}.{sub_param}", sub_options, sub_value)
+            sub_widgets.append(sub_widget)
+
+        accordion = widgets.Accordion(children=sub_widgets)
+        accordion.set_title(0, param)
+        return accordion
+
+    def create_list_widget(self, param, options, value):
+        """
+        Create a multi-select widget for list-type parameters.
+
+        Args:
+            param (str): The parameter name.
+            options (set): The available options.
+            value (list): The current selected values.
+
+        Returns:
+            widgets.SelectMultiple: The multi-select widget.
+        """
+        widget = widgets.SelectMultiple(
+            options=sorted(list(options)),
             value=value,
             description=f"Select {param}",
-            style={'description_width': 'initial'},
-            #layout=widgets.Layout(width='auto'),
-            disabled=disabled,
+            style={"description_width": "initial"},
         )
-        widget.observe(self.on_change, names="value")
+        # Observe changes to the 'value' property
+        widget.observe(lambda change: self.on_change_list(param, change["new"]), names="value")
+        return widget
 
-        self.widgets[param] = widget
-        self.selected_params[param] = value
+    def on_change_list(self, param, new_value):
+        """
+        Handle changes in multi-select widgets.
 
-    def on_change(self, change):
-        with self.output:
-            clear_output()
-            param = change["owner"].description.split()[-1]
-            self.selected_params[param] = change["new"]
+        Args:
+            param (str): The parameter name.
+            new_value (tuple): The new selected values.
+        """
+        new_value = list(new_value)  # Convert from tuple to list
+        # Update the parameter and refresh widgets
+        self.selection_handler.update_param(param, new_value)
+        self.update_widgets()
+        self.display_valid_combinations()
 
-            # Store current selections
-            current_selections = {k: v for k, v in self.selected_params.items()}
+        if self.instantiate_on_change:
+            self.instantiate(None)
 
-            # Remove all subsequent parameters
-            keys_to_remove = [key for key in list(self.widgets.keys()) if key > param]
-            for key in keys_to_remove:
-                del self.widgets[key]
-                if key in self.selected_params:
-                    del self.selected_params[key]
+    def create_singular_widget(self, param, options, value):
+        """
+        Create a dropdown widget for singular-type parameters.
 
-            # Recreate subsequent widgets
-            available_options = get_available_options(self.combinations, self.selected_params)
-            for next_param, options in available_options.items():
-                if next_param not in self.widgets:
-                    if next_param in current_selections and current_selections[next_param] in options:
-                        # Preserve the user's previous selection if it's still valid
-                        self.create_widget_for_param(next_param, options, current_selections[next_param])
-                    else:
-                        self.create_widget_for_param(next_param, options)
+        Args:
+            param (str): The parameter name.
+            options (set): The available options.
+            value (Any): The current selected value.
 
-            self.update_widgets_display()
-            self.display_valid_combinations()
+        Returns:
+            widgets.Dropdown: The dropdown widget.
+        """
+        widget = widgets.Dropdown(
+            options=sorted(list(options)),
+            value=value,
+            description=f"Select {param}",
+            style={"description_width": "initial"},
+        )
+        # Observe changes to the 'value' property
+        widget.observe(lambda change: self.on_change(param, change["new"]), names="value")
+        return widget
 
-            if self.instantiate_on_change:
-                self.instantiate(None)
+    def on_change(self, param, new_value):
+        """
+        Handle changes in singular widgets.
+
+        Args:
+            param (str): The parameter name.
+            new_value (Any): The new selected value.
+        """
+        # Update the parameter and refresh widgets
+        self.selection_handler.update_param(param, new_value)
+        self.update_widgets()
+        self.display_valid_combinations()
+
+        if self.instantiate_on_change:
+            self.instantiate(None)
+
+    def update_widgets(self):
+        """
+        Update existing widgets and create/remove widgets based on the current state.
+        """
+        state = self.selection_handler.get_current_state()
+        current_params = set(state["selected_params"].keys())
+        existing_params = set(self.widgets.keys())
+
+        # Remove widgets for params that no longer exist
+        for param in list(existing_params - current_params):
+            del self.widgets[param]
+
+        # Update or create widgets for current params
+        for param in state["selected_params"]:
+            if param in state["current_options"]:
+                options = state["current_options"][param]
+                value = state["selected_params"][param]
+                if param in self.widgets:
+                    self.update_widget(param, options, value)
+                else:
+                    self.create_widget_for_param(param, options, value)
+
+        self.update_widgets_display()
+
+    def update_widget(self, param, options, value):
+        """
+        Update an existing widget with new options and values.
+
+        Args:
+            param (str): The parameter name.
+            options (Any): The updated options.
+            value (Any): The updated value.
+        """
+        widget = self.widgets[param]
+        if isinstance(options, dict):
+            for sub_param, sub_options in options.items():
+                full_param = f"{param}.{sub_param}"
+                sub_value = value.get(sub_param, None)
+                if full_param in self.widgets:
+                    self.update_widget(full_param, sub_options, sub_value)
+                else:
+                    self.create_widget_for_param(full_param, sub_options, sub_value)
+        elif isinstance(widget, widgets.SelectMultiple):
+            widget.options = sorted(list(options))
+            widget.value = [v for v in value if v in options]
+        else:
+            sorted_options = sorted(list(options))
+            widget.options = sorted_options
+            # Ensure the selected value is still valid
+            widget.value = value if value in options else sorted_options[0]
 
     def update_widgets_display(self):
-        self.widgets_container.children = list(self.widgets.values())
+        """
+        Refresh the widgets container to reflect the current set of widgets while maintaining order.
+        """
+        state = self.selection_handler.get_current_state()
+        children = []
+        # Iterate in the order of 'selected_params' to maintain widget order
+        for param in state["selected_params"]:
+            if param in self.widgets:
+                children.append(self.widgets[param])
+        self.widgets_container.children = children
 
     def display_valid_combinations(self):
-        valid_combinations = [
-            comb for comb in self.combinations if all(comb.get(k) == v for k, v in self.selected_params.items())
-        ]
-        df = pd.DataFrame(valid_combinations)
-        display(df)
+        """
+        Display the dataframe of valid parameter combinations based on current selections.
+        """
+        with self.output:
+            clear_output(wait=True)
+            valid_combinations = self.selection_handler.filtered_combinations
+            if valid_combinations:
+                df = pd.DataFrame(valid_combinations)
+                display(df)
 
     def instantiate(self, button):
+        """
+        Instantiate the configuration based on current selections.
+
+        Args:
+            button (widgets.Button): The button widget triggering the instantiation.
+        """
         with self.output:
-            clear_output()
+            clear_output(wait=True)
+            state = self.selection_handler.get_current_state()
             results = self.hp_config(
-                final_vars=self.final_vars, selections=self.selected_params, overrides=self.overrides
+                final_vars=self.final_vars, selections=state["selected_params"], overrides=self.overrides
             )
             if self.results_var:
                 self.shell.user_ns[self.results_var] = results
@@ -173,6 +304,9 @@ class InteractiveHypster:
                 self.shell.user_ns.update(results)
 
     def display(self):
+        """
+        Display the interactive widgets and instantiate button in the notebook.
+        """
         instantiate_button = widgets.Button(description="Instantiate")
         instantiate_button.on_click(self.instantiate)
 
@@ -188,6 +322,10 @@ class InteractiveHypster:
 
 @magics_class
 class HypsterMagics(Magics):
+    """
+    Custom IPython magic for Hypster configurations.
+    """
+
     def __init__(self, shell):
         super().__init__(shell)
         self._first_run = True
@@ -208,6 +346,14 @@ class HypsterMagics(Magics):
     )
     @cell_magic
     def hypster(self, line, cell):
+        """
+        Cell magic to initialize InteractiveHypster with given configuration.
+
+        Usage:
+            %%hypster config_name --results results_var -i first,change
+            # Configuration code here
+        """
+        # Inject custom CSS to style the widgets
         css = """
         <style>
         .cell-output-ipywidget-background {
@@ -221,18 +367,22 @@ class HypsterMagics(Magics):
         """
         display(HTML(css))
 
+        # Parse magic arguments
         args = parse_argstring(self.hypster, line)
         hp_config = custom_load(cell)
 
+        # Retrieve selections and overrides from user namespace
         selections = self.shell.user_ns.get(args.selections, {}) if args.selections else {}
         overrides = self.shell.user_ns.get(args.overrides, {}) if args.overrides else {}
         final_vars = args.final_vars.split(",") if args.final_vars else None
         results_var = args.results
 
+        # Determine instantiation behavior
         instantiate_options = args.instantiate.split(",") if args.instantiate else ["button"]
         instantiate_on_first = "first" in instantiate_options
         instantiate_on_change = "change" in instantiate_options
 
+        # Initialize and display InteractiveHypster
         interactive_hypster = InteractiveHypster(
             hp_config,
             self.shell,
@@ -245,8 +395,10 @@ class HypsterMagics(Magics):
         )
         interactive_hypster.display()
 
+        # Store the configuration in the user namespace
         self.shell.user_ns[args.config_name] = hp_config
 
+        # Optionally write the configuration to a file
         if args.write_to_file:
             Path(args.write_to_file).write_text(cell)
 
@@ -254,4 +406,7 @@ class HypsterMagics(Magics):
 
 
 def load_ipython_extension(ipython):
+    """
+    Register the HypsterMagics with IPython.
+    """
     ipython.register_magics(HypsterMagics)
