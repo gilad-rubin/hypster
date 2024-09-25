@@ -38,9 +38,33 @@ class SelectionHandler:
         self.selected_params[param_name] = self._select_value(
             param_name, self.defaults.get(param_name, None), self.current_options[param_name]
         )
-        self.filtered_combinations = self._filter_combinations(
+        filtered_combinations = self._filter_combinations(
             param_name, self.filtered_combinations, self.selected_params[param_name]
         )
+        self.filtered_combinations = self._remove_dups(filtered_combinations)
+
+    def _remove_dups(self, filtered_combinations):
+        unique_combinations = []
+        seen = set()
+
+        for combination in filtered_combinations:
+            combination_hash = self._hash_combination(combination)
+            if combination_hash not in seen:
+                seen.add(combination_hash)
+                unique_combinations.append(combination)
+
+        return unique_combinations
+
+    def _hash_combination(self, combination):
+        hash_parts = []
+        for key, value in combination.items():
+            if isinstance(value, dict):
+                hash_parts.append(f"{key}:{self._hash_combination(value)}")
+            elif isinstance(value, list):
+                hash_parts.append(f"{key}:{tuple(sorted(value))}")
+            else:
+                hash_parts.append(f"{key}:{value}")
+        return tuple(sorted(hash_parts))
 
     def _process_nested_dict(self, param_name):
         for sub_param in self.combinations[param_name]:

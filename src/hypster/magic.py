@@ -1,5 +1,5 @@
 # File: magic.py
-
+import json
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -57,6 +57,7 @@ class InteractiveHypster:
         results_var: str = None,
         instantiate_on_first: bool = False,
         instantiate_on_change: bool = False,
+        display_mode: str = "text",
     ):
         self.hp_config = hp_config
         self.shell = shell
@@ -70,8 +71,11 @@ class InteractiveHypster:
         self.widgets = {}
         self.output = widgets.Output()
         self.widgets_container = widgets.VBox([])
+        self.selections = selections or {}
+        self.display_mode = display_mode
         self.create_widgets()
         self.update_widgets_display()
+        self.apply_selections()
         if self.instantiate_on_first:
             self.instantiate(None)
 
@@ -168,7 +172,7 @@ class InteractiveHypster:
         # Update the parameter and refresh widgets
         self.selection_handler.update_param(param, new_value)
         self.update_widgets()
-        self.display_valid_combinations()
+        # self.display_valid_combinations()
 
         if self.instantiate_on_change:
             self.instantiate(None)
@@ -206,7 +210,7 @@ class InteractiveHypster:
         # Update the parameter and refresh widgets
         self.selection_handler.update_param(param, new_value)
         self.update_widgets()
-        self.display_valid_combinations()
+        # self.display_valid_combinations()
 
         if self.instantiate_on_change:
             self.instantiate(None)
@@ -276,14 +280,39 @@ class InteractiveHypster:
 
     def display_valid_combinations(self):
         """
-        Display the dataframe of valid parameter combinations based on current selections.
+        Display the valid parameter combinations based on current selections.
         """
         with self.output:
             clear_output(wait=True)
             valid_combinations = self.selection_handler.filtered_combinations
             if valid_combinations:
-                df = pd.DataFrame(valid_combinations)
-                display(df)
+                if self.display_mode == "dataframe":
+                    self.display_as_dataframe(valid_combinations)
+                elif self.display_mode == "json":
+                    self.display_as_json(valid_combinations)
+                else:
+                    self.display_as_text(valid_combinations)
+
+    def display_as_dataframe(self, valid_combinations):
+        """
+        Display valid combinations as a pandas DataFrame.
+        """
+        df = pd.DataFrame(valid_combinations).drop_duplicates()
+        display(df)
+
+    def display_as_json(self, valid_combinations):
+        """
+        Display valid combinations as formatted JSON.
+        """
+        json_output = json.dumps(valid_combinations, indent=2)
+        display(HTML(f"<pre>{json_output}</pre>"))
+
+    def display_as_text(self, valid_combinations):
+        """
+        Display valid combinations as plain text.
+        """
+        text_output = "\n".join([str(combo) for combo in valid_combinations])
+        print(text_output)
 
     def instantiate(self, button):
         """
@@ -318,6 +347,38 @@ class InteractiveHypster:
         instantiate_button.layout = button_layout
 
         display(widgets.VBox([self.widgets_container, instantiate_button, self.output]))
+
+    def apply_selections(self):
+        """
+        Apply user-provided selections iteratively.
+        """
+        state = self.selection_handler.get_current_state()
+        for param in state["selected_params"]:
+            if param in self.selections:
+                self.update_param_with_selection(param, self.selections[param])
+
+    def update_param_with_selection(self, param, value):
+        """
+        Update a parameter with a selected value and refresh the UI.
+        """
+        if param in self.widgets:
+            widget = self.widgets[param]
+            if isinstance(widget, widgets.SelectMultiple):
+                widget.value = [v for v in value if v in widget.options]
+            elif isinstance(widget, widgets.Dropdown):
+                if value in widget.options:
+                    widget.value = value
+            elif isinstance(widget, widgets.Accordion):
+                for i, sub_widget in enumerate(widget.children):
+                    sub_param = f"{param}.{widget.get_title(i)}"
+                    if sub_param in self.selections:
+                        self.update_param_with_selection(sub_param, self.selections[sub_param])
+
+            # Trigger the on_change event to update dependent parameters
+            if isinstance(widget, widgets.SelectMultiple):
+                self.on_change_list(param, widget.value)
+            elif isinstance(widget, widgets.Dropdown):
+                self.on_change(param, widget.value)
 
 
 @magics_class
@@ -386,10 +447,10 @@ class HypsterMagics(Magics):
         interactive_hypster = InteractiveHypster(
             hp_config,
             self.shell,
-            selections,
-            overrides,
-            final_vars,
-            results_var,
+            selections=selections,  # Pass the selections here
+            overrides=overrides,
+            final_vars=final_vars,
+            results_var=results_var,
             instantiate_on_first=instantiate_on_first,
             instantiate_on_change=instantiate_on_change,
         )
