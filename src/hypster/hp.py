@@ -28,6 +28,7 @@ class HP:
         self.current_space = OrderedDict()  # TODO: consider turning these 3 items to a dataclass
         self.current_combination = OrderedDict()
         self.defaults = {}
+        self.snapshot = {}
         logger.info(f"Initialized HP with explore_mode: {explore_mode}")
 
     def select(self, options: Union[Dict[str, Any], List[Any]], *, name: Optional[str] = None, default: Any = None):

@@ -42,9 +42,9 @@ class Hypster:
 
         self.referenced_vars = find_referenced_vars(self.source_code)
         self.independent_select_calls = find_independent_select_calls(self.referenced_vars, self.hp_calls)
-        self.config_history = []
         self.combinations = []
         self.defaults = {}
+        self.snapshot_history = []
 
     def __call__(
         self,
@@ -65,7 +65,7 @@ class Hypster:
         """
         hp = HP(final_vars or [], selections or {}, overrides or {})
         result = self._execute_function(hp, self.modified_source)
-        # self.config_history.append(hp.get_current_combination())
+        self.snapshot_history.append(hp.snapshot)
         return result
 
     def _execute_function(self, hp: HP, modified_source: str) -> Dict[str, Any]:
@@ -166,6 +166,14 @@ class Hypster:
         if not self.combinations:
             self.get_combinations()
         return self.defaults
+
+    def get_snapshot_history(self):
+        return self.snapshot_history
+
+    def get_last_snapshot(self):
+        if not self.snapshot_history:
+            return {}
+        return self.snapshot_history[-1]
 
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):

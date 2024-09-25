@@ -1,3 +1,4 @@
+import collections
 import itertools
 import logging
 from abc import ABC, abstractmethod
@@ -79,9 +80,11 @@ class HPCall(ABC):
         elif self.default is not None:
             if isinstance(self.default, list):
                 result = self.default
+                snapshot = self.default
             else:
-                # TODO: check why this fails tests when I drop that last if part
                 result = self.options[self.default] if self.options else self.default
+                snapshot = self.default
+            self.hp.snapshot[self.name] = snapshot
         else:
             raise ValueError(f"`{self.name}` has no selections, overrides or defaults provided.")
 
@@ -90,9 +93,12 @@ class HPCall(ABC):
     def _get_result_from_override(self):
         override_value = self.hp.overrides[self.name]
         logger.debug("Found override for %s: %s", self.name, override_value)
+        snapshot = None
         if isinstance(override_value, list):
             result = []
+            snapshot = []
             for value in override_value:
+                snapshot.append(value)
                 if self.options and value in self.options:
                     result.append(self.options[value])
                 else:
@@ -101,6 +107,10 @@ class HPCall(ABC):
             result = self.options[override_value]
         else:
             result = override_value
+
+        if snapshot is None:
+            snapshot = override_value
+        self.hp.snapshot[self.name] = snapshot
         logger.info("Applied override for %s: %s", self.name, result)
         return result
 
@@ -109,26 +119,33 @@ class HPCall(ABC):
         # like text, number input (including multi)
         selected_value = self.hp.selections[self.name]
         logger.debug("Found selection for %s: %s", self.name, selected_value)
+        snapshot = None
         if isinstance(selected_value, list):
             result = []
+            snapshot = []
             for key in selected_value:
                 if self.options and key in self.options:
                     result.append(self.options[key])
+                    snapshot.append(key)
                 else:
                     raise ValueError(
                         f"Invalid selection '{key}' for '{self.name}'. Not in options: "
                         f"{list(self.options.keys() if self.options else [])}"
                     )
-            return result
         elif self.options and selected_value in self.options:
             result = self.options[selected_value]
             logger.info("Applied selection for %s: %s", self.name, result)
-            return result
         else:
             raise ValueError(
                 f"Invalid selection '{selected_value}' for '{self.name}'. "
                 f"Not in options: {list(self.options.keys() if self.options else [])}"
             )
+
+        if snapshot is None:  # not a list
+            snapshot = selected_value
+        if self.name not in self.hp.snapshot:
+            self.hp.snapshot[self.name] = snapshot
+        return result
 
     # TODO: handle different cases where options is a list, one item, or empty.
 
@@ -255,7 +272,6 @@ class PropagateCall(HPCall):
             # TODO: make sure that this condition is valid and this doesn't need to be recalculated every time
             if self.name in self.hp.current_combination:
                 selected_dct = self.hp.current_combination[self.name]
-                # TODO: add default statuses
                 return selected_dct
 
             combinations = config_func.get_combinations()
@@ -267,8 +283,10 @@ class PropagateCall(HPCall):
         original_name_prefix = self.hp.name_prefix
         self.hp.name_prefix = self.name if original_name_prefix is None else f"{original_name_prefix}.{self.name}"
         nested_config = self._prepare_nested_config()
-        result = self._run_nested_config(config_func, nested_config)
 
+        result = self._run_nested_config(config_func, nested_config)
+        nested_snapshot = config_func.get_last_snapshot()
+        self.hp.snapshot[self.name] = nested_snapshot
         self.hp.name_prefix = original_name_prefix
         return result
 
@@ -277,21 +295,11 @@ class PropagateCall(HPCall):
         self.hp.current_combination[self.name] = chosen_combination
         return chosen_combination
 
-    def get_current_combination(self) -> Dict[str, Any]:
-        return {f"{self.name}.{k}": v for k, v in self.combinations[self.current_index].items()}
-
-    def _add_prefix_to_keys(self, combinations: List[Dict[str, Any]]):
-        return [{f"{self.name}.{k}": v for k, v in combination.items()} for combination in combinations]
-
     def _prepare_nested_config(self) -> Dict[str, Any]:
         return {
-            "selections": {
-                k[len(self.name) + 1 :]: v for k, v in self.hp.selections.items() if k.startswith(f"{self.name}.")
-            },
-            "overrides": {
-                k[len(self.name) + 1 :]: v for k, v in self.hp.overrides.items() if k.startswith(f"{self.name}.")
-            },
-            "final_vars": [var[len(self.name) + 1 :] for var in self.hp.final_vars if var.startswith(f"{self.name}.")],
+            "selections": self.extract_nested_config(self.hp.selections, self.name),
+            "overrides": self.extract_nested_config(self.hp.overrides, self.name),
+            "final_vars": self.process_final_vars(self.hp.final_vars, self.name),
         }
 
     def _run_nested_config(self, config_func: Callable, nested_config: Dict[str, Any]) -> Dict[str, Any]:
@@ -301,3 +309,52 @@ class PropagateCall(HPCall):
             selections=nested_config["selections"],
             overrides=nested_config["overrides"],
         )
+
+    @staticmethod
+    def extract_nested_config(config: Dict[str, Any], prefix: str) -> Dict[str, Any]:
+        result = collections.defaultdict(dict)
+        prefix_dot = f"{prefix}."
+
+        def process_item(key: str, value: Any, target: Dict[str, Any]):
+            if key.startswith(prefix_dot):
+                nested_key = key[len(prefix_dot) :]
+                target[nested_key] = value
+            elif key == prefix and isinstance(value, dict):
+                target.update(value)
+
+        for key, value in config.items():
+            process_item(key, value, result)
+
+        # Check for discrepancies
+        flat_result = {k: v for k, v in PropagateCall._flatten_dict(result).items()}
+        flat_dot_notation = {k[len(prefix_dot) :]: v for k, v in config.items() if k.startswith(prefix_dot)}
+
+        # Check for keys with different values
+        discrepancies = {
+            k: (flat_result[k], flat_dot_notation[k])
+            for k in set(flat_result) & set(flat_dot_notation)
+            if flat_result[k] != flat_dot_notation[k]
+        }
+
+        if discrepancies:
+            raise ValueError(f"Discrepancies found in nested configuration for '{prefix}': {discrepancies}")
+
+        return dict(result)
+
+    @staticmethod
+    def _flatten_dict(d: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
+        items = []
+        for k, v in d.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                items.extend(PropagateCall._flatten_dict(v, new_key, sep=sep).items())
+            else:
+                items.append((new_key, v))
+        return dict(items)
+
+    @staticmethod
+    def process_final_vars(final_vars: List[str], name: str) -> List[str]:
+        dot_notation_vars = [var[len(name) + 1 :] for var in final_vars if var.startswith(f"{name}.")]
+        dict_style_vars = list(PropagateCall.extract_nested_config(dict.fromkeys(final_vars, None), name).keys())
+        dict_style_vars = [var for var in dict_style_vars if var not in dot_notation_vars]  # remove dups
+        return dot_notation_vars + dict_style_vars
