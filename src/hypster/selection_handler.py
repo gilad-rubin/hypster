@@ -36,12 +36,43 @@ class SelectionHandler:
     def _process_param(self, param_name):
         self.current_options[param_name] = self._collect_options(param_name, self.filtered_combinations)
         self.selected_params[param_name] = self._select_value(
-            param_name, self.defaults.get(param_name, None), self.current_options[param_name]
+            param_name,
+            self.defaults.get(param_name, None),
+            self.current_options[param_name],
         )
         filtered_combinations = self._filter_combinations(
             param_name, self.filtered_combinations, self.selected_params[param_name]
         )
         self.filtered_combinations = self._remove_dups(filtered_combinations)
+        # TODO: see if we can remove this (redundant)
+        self.selected_params = self._update_params_with_filtered_combinations(
+            self.selected_params.copy(), self.filtered_combinations.copy()
+        )
+        self.current_options = self._update_params_with_filtered_combinations(
+            self.current_options.copy(), self.filtered_combinations.copy()
+        )
+
+    def _update_params_with_filtered_combinations(self, selected_params, filtered_combinations):
+        final_selected_params = selected_params.copy()
+        to_remove = []
+        to_update = {}
+        for param_name in final_selected_params.keys():
+            if not isinstance(final_selected_params[param_name], dict):
+                if all(param_name not in combination for combination in filtered_combinations):
+                    to_remove.append(param_name)
+            else:
+                if param_name in selected_params:
+                    selected_params = self._update_params_with_filtered_combinations(
+                        selected_params[param_name].copy(),
+                        [comb[param_name] for comb in filtered_combinations if param_name in comb],
+                    )
+                    if len(selected_params) == 0:
+                        to_remove.append(param_name)
+                    else:
+                        to_update[param_name] = selected_params
+        result = {k: v for k, v in final_selected_params.items() if k not in to_remove}
+        result.update(to_update)
+        return result
 
     def _remove_dups(self, filtered_combinations):
         unique_combinations = []
@@ -75,7 +106,8 @@ class SelectionHandler:
         if isinstance(combinations[0][param_name], dict):
             sub_combinations = []
             for combination in combinations:
-                sub_combinations.append(combination[param_name])
+                if param_name in combination:
+                    sub_combinations.append(combination[param_name])
 
             comb_dct = OrderedDict()
             for combination in sub_combinations:
@@ -97,7 +129,9 @@ class SelectionHandler:
             selected_values = OrderedDict()
             for key in current_param_options.keys():
                 selected_values[key] = self._select_value(
-                    key, param_defaults.get(key, None) if param_defaults else None, current_param_options[key]
+                    key,
+                    param_defaults.get(key, None) if param_defaults else None,
+                    current_param_options[key],
                 )
             return selected_values
         if param_defaults:
@@ -112,16 +146,15 @@ class SelectionHandler:
 
     def _filter_combinations(self, param_name, current_combinations, selected_param_value):
         if isinstance(selected_param_value, dict):
-            sub_combinations = []
-            for combination in current_combinations:
-                append_flag = True
-                for key in selected_param_value.keys():
-                    result = self._filter_combinations(key, [combination[param_name]], selected_param_value[key])
-                    if len(result) == 0:  # if the selected params are not in "combination", filter it out
-                        append_flag = False
-                        break
-                if append_flag:
-                    sub_combinations.append(combination)
+            sub_combinations = current_combinations.copy()
+            for key in selected_param_value.keys():
+                if any(key in combination[param_name] for combination in sub_combinations):
+                    filtered_combinations = []
+                    for combination in sub_combinations:
+                        result = self._filter_combinations(key, [combination[param_name]], selected_param_value[key])
+                        if result:
+                            filtered_combinations.append(combination)
+                    sub_combinations = [comb for comb in sub_combinations if comb in filtered_combinations]
             return sub_combinations
         else:
             filtered_combinations = [
@@ -135,9 +168,26 @@ class SelectionHandler:
         else:
             return value1 == value2
 
+    def convert_param(self, param_name, selected_value):
+        keys = param_name.split(".")
+        nested_value = selected_value
+
+        if len(keys) == 1:
+            return keys[0], nested_value
+
+        for key in reversed(keys[1:]):
+            nested_value = {key: nested_value}
+
+        return keys[0], nested_value
+
     def update_param(self, param_name, selected_value):
-        self.defaults[param_name] = self._update_defaults(
-            param_name, self.defaults.get(param_name, None), selected_value
+        # this handles dot notation for updating "propagate" calls
+        updated_param_name, updated_value = self.convert_param(param_name, selected_value)
+        # print(f"Updating {updated_param_name} with {updated_value}")
+        self.defaults[updated_param_name] = self._update_defaults(
+            updated_param_name,
+            self.defaults.get(updated_param_name, None),
+            updated_value,
         )
         self.current_options = OrderedDict()
         self.selected_params = OrderedDict()

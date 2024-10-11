@@ -1,10 +1,8 @@
 # File: magic.py
-import json
 from pathlib import Path
 from typing import Any, Dict, List
 
 import ipywidgets as widgets
-import pandas as pd
 from IPython.core.magic import Magics, cell_magic, magics_class
 from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
 from IPython.display import HTML, clear_output, display
@@ -94,7 +92,6 @@ class InteractiveHypster:
     def create_widget_for_param(self, param, options, value):
         """
         Create a widget for a given parameter based on its type.
-
         Args:
             param (str): The parameter name.
             options (Any): The options available for the parameter.
@@ -115,6 +112,7 @@ class InteractiveHypster:
 
         widget.disabled = disabled
         self.widgets[param] = widget
+        return widget
 
     def create_dict_widget(self, param, options, value):
         """
@@ -132,11 +130,19 @@ class InteractiveHypster:
         for sub_param, sub_options in options.items():
             sub_value = value.get(sub_param, None)
             sub_widget = self.create_widget_for_param(f"{param}.{sub_param}", sub_options, sub_value)
-            sub_widgets.append(sub_widget)
+            if sub_widget is not None:
+                sub_widgets.append(sub_widget)
+            else:
+                print(f"Warning: sub_widget for {param}.{sub_param} is None")
 
-        accordion = widgets.Accordion(children=sub_widgets)
-        accordion.set_title(0, param)
-        return accordion
+        if not sub_widgets:
+            print(f"Warning: No valid sub-widgets for {param}")
+            return None
+
+        # Create a VBox to contain all sub-widgets
+        vbox = widgets.VBox(sub_widgets)
+
+        return vbox
 
     def create_list_widget(self, param, options, value):
         """
@@ -200,6 +206,7 @@ class InteractiveHypster:
         return widget
 
     def on_change(self, param, new_value):
+        # print(f"on_change: {param} -> {new_value}")
         """
         Handle changes in singular widgets.
 
@@ -215,19 +222,34 @@ class InteractiveHypster:
         if self.instantiate_on_change:
             self.instantiate(None)
 
+    def delete_widgets_recursively(self, param, to_keep):
+        if param in self.widgets:
+            widget = self.widgets[param]
+            if not isinstance(widget, widgets.VBox) and param not in to_keep.keys():
+                del self.widgets[param]
+            else:
+                sub_to_keep = to_keep[param] if param in to_keep else {}
+                for i, sub_widget in enumerate(widget.children):
+                    sub_param = f"{param}.{widget.get_title(i)}"
+                    self.delete_widgets_recursively(sub_param, sub_to_keep)
+
     def update_widgets(self):
+        # print("update_widgets")
         """
         Update existing widgets and create/remove widgets based on the current state.
         """
         state = self.selection_handler.get_current_state()
-        current_params = set(state["selected_params"].keys())
+        current_params = state["selected_params"]
         existing_params = set(self.widgets.keys())
 
         # Remove widgets for params that no longer exist
-        for param in list(existing_params - current_params):
-            del self.widgets[param]
+        # for param in existing_params:
+        #    self.delete_widgets_recursively(param, current_params)
+
+        self.widgets = {}  # TODO: fix refresh
 
         # Update or create widgets for current params
+        # print("selected params: ", state["selected_params"])
         for param in state["selected_params"]:
             if param in state["current_options"]:
                 options = state["current_options"][param]
@@ -240,6 +262,7 @@ class InteractiveHypster:
         self.update_widgets_display()
 
     def update_widget(self, param, options, value):
+        # print(f"update_widget: {param} -> {options} -> {value}")
         """
         Update an existing widget with new options and values.
 
@@ -251,12 +274,15 @@ class InteractiveHypster:
         widget = self.widgets[param]
         if isinstance(options, dict):
             for sub_param, sub_options in options.items():
+                # print(f"sub_param: {sub_param}", f"sub_options: {sub_options}", f"value: {value}")
                 full_param = f"{param}.{sub_param}"
                 sub_value = value.get(sub_param, None)
-                if full_param in self.widgets:
-                    self.update_widget(full_param, sub_options, sub_value)
-                else:
-                    self.create_widget_for_param(full_param, sub_options, sub_value)
+                if sub_param in value:
+                    # print(f"sub_param: {sub_param}")
+                    if full_param in self.widgets:
+                        self.update_widget(full_param, sub_options, sub_value)
+                    else:
+                        self.create_widget_for_param(full_param, sub_options, sub_value)
         elif isinstance(widget, widgets.SelectMultiple):
             widget.options = sorted(list(options))
             widget.value = [v for v in value if v in options]
@@ -285,34 +311,6 @@ class InteractiveHypster:
         with self.output:
             clear_output(wait=True)
             valid_combinations = self.selection_handler.filtered_combinations
-            if valid_combinations:
-                if self.display_mode == "dataframe":
-                    self.display_as_dataframe(valid_combinations)
-                elif self.display_mode == "json":
-                    self.display_as_json(valid_combinations)
-                else:
-                    self.display_as_text(valid_combinations)
-
-    def display_as_dataframe(self, valid_combinations):
-        """
-        Display valid combinations as a pandas DataFrame.
-        """
-        df = pd.DataFrame(valid_combinations).drop_duplicates()
-        display(df)
-
-    def display_as_json(self, valid_combinations):
-        """
-        Display valid combinations as formatted JSON.
-        """
-        json_output = json.dumps(valid_combinations, indent=2)
-        display(HTML(f"<pre>{json_output}</pre>"))
-
-    def display_as_text(self, valid_combinations):
-        """
-        Display valid combinations as plain text.
-        """
-        text_output = "\n".join([str(combo) for combo in valid_combinations])
-        print(text_output)
 
     def instantiate(self, button):
         """
@@ -358,6 +356,7 @@ class InteractiveHypster:
                 self.update_param_with_selection(param, self.selections[param])
 
     def update_param_with_selection(self, param, value):
+        # print(f"update_param_with_selection: {param} -> {value}")
         """
         Update a parameter with a selected value and refresh the UI.
         """
@@ -368,7 +367,7 @@ class InteractiveHypster:
             elif isinstance(widget, widgets.Dropdown):
                 if value in widget.options:
                     widget.value = value
-            elif isinstance(widget, widgets.Accordion):
+            elif isinstance(widget, widgets.VBox):
                 for i, sub_widget in enumerate(widget.children):
                     sub_param = f"{param}.{widget.get_title(i)}"
                     if sub_param in self.selections:

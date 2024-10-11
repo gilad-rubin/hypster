@@ -79,7 +79,15 @@ class HPCall(ABC):
             result = self._get_result_from_selection()
         elif self.default is not None:
             if isinstance(self.default, list):
-                result = self.default
+                result = []
+                for key in self.default:
+                    if self.options:
+                        if key in self.options:
+                            result.append(self.options[key])
+                        else:  # TODO: fix
+                            raise ValueError("Invalid default not in options.")
+                    else:
+                        result.append(key)
                 snapshot = self.default
             else:
                 result = self.options[self.default] if self.options else self.default
@@ -173,7 +181,7 @@ class SelectCall(HPCall):
             selected_key = list(self.options.keys())[0]
             self.hp.current_combination[self.name] = selected_key
 
-        return selected_key
+        return self.options[selected_key]
 
 
 class MultiSelectCall(HPCall):
@@ -186,23 +194,26 @@ class MultiSelectCall(HPCall):
         self.options = processed_options
 
         if self.hp.explore_mode:
-            if self.name in self.hp.current_combination:
-                chosen_keys = self.hp.current_combination[self.name]
-                return chosen_keys
-
-            combinations = self._generate_all_combinations()
-            self.hp.current_space[self.name] = combinations
-            return self.explore(combinations)
+            return self.explore()
 
         result = self.handle_overrides_selections()
 
         logger.info(f"MultiSelect call executed for {self.name}: {result}")
         return result
 
-    def explore(self, combinations) -> List[Any]:
-        selected_combination = combinations[0]
-        self.hp.current_combination[self.name] = selected_combination
-        return selected_combination
+    def explore(self) -> List[Any]:
+        if self.name in self.hp.current_combination:
+            chosen_keys = self.hp.current_combination[self.name]
+        else:
+            combinations = self._generate_all_combinations()
+            self.hp.current_space[self.name] = combinations
+            chosen_keys = combinations[0]
+            self.hp.current_combination[self.name] = chosen_keys
+
+        result = []
+        for key in chosen_keys:
+            result.append(self.options[key])
+        return result
 
     def _generate_all_combinations(self) -> List[List[str]]:
         keys = list(self.options.keys())
@@ -226,6 +237,17 @@ class NumberInputCall(HPCall):
     def execute(self, options: None = None) -> Union[int, float]:
         result = self.handle_overrides_selections()
         logger.info(f"NumberInput call executed for {self.name}: {result}")
+        return result
+
+    def explore(self) -> Union[int, float]:
+        # TODO: handle no defaults in combinations
+        return self.default
+
+
+class IntInputCall(HPCall):
+    def execute(self, options: None = None) -> int:
+        result = self.handle_overrides_selections()
+        logger.info(f"IntInput call executed for {self.name}: {result}")
         return result
 
     def explore(self) -> Union[int, float]:
@@ -267,18 +289,14 @@ class PropagateCall(HPCall):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def execute(self, config_func: Callable) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
+    def execute(
+        self,
+        config_func: Callable,
+        selections: Optional[Dict[str, Any]] = None,
+        overrides: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         if self.hp.explore_mode:
-            # TODO: make sure that this condition is valid and this doesn't need to be recalculated every time
-            if self.name in self.hp.current_combination:
-                selected_dct = self.hp.current_combination[self.name]
-                return selected_dct
-
-            combinations = config_func.get_combinations()
-            defaults = config_func.get_defaults()
-            self.hp.defaults[self.name] = defaults
-            self.hp.current_space[self.name] = combinations
-            return self.explore(combinations)
+            return self.explore(config_func)
 
         original_name_prefix = self.hp.name_prefix
         self.hp.name_prefix = self.name if original_name_prefix is None else f"{original_name_prefix}.{self.name}"
@@ -290,10 +308,23 @@ class PropagateCall(HPCall):
         self.hp.name_prefix = original_name_prefix
         return result
 
-    def explore(self, combinations: List[Dict[str, Any]]) -> Dict[str, Any]:
-        chosen_combination = combinations[0]
-        self.hp.current_combination[self.name] = chosen_combination
-        return chosen_combination
+    def explore(self, config_func: Callable) -> Dict[str, Any]:
+        if self.name in self.hp.current_combination:
+            chosen_combination = self.hp.current_combination[self.name]
+        else:
+            combinations = config_func.get_combinations()
+            defaults = config_func.get_defaults()
+            self.hp.defaults[self.name] = defaults
+            self.hp.current_space[self.name] = combinations
+            chosen_combination = combinations[0]
+            self.hp.current_combination[self.name] = chosen_combination
+
+        nested_config = {}
+        nested_config["selections"] = chosen_combination.copy()
+        nested_config["final_vars"] = []
+        nested_config["overrides"] = {}
+        result = self._run_nested_config(config_func, nested_config)
+        return result
 
     def _prepare_nested_config(self) -> Dict[str, Any]:
         return {
