@@ -69,7 +69,10 @@ def test_error_cases():
 
         @config
         def invalid_dict_keys(hp: HP):
-            var = hp.select({1: "a", 2.0: "b", True: "c", "str": "d", complex(1, 2): "e"}, default="d")
+            var = hp.select(
+                {1: "a", 2.0: "b", True: "c", "str": "d", complex(1, 2): "e"},
+                default="d",
+            )
 
         invalid_dict_keys()
 
@@ -232,6 +235,39 @@ def test_multi_select_defaults_overrides_selections():
     # Test precedence: overrides > selections > defaults
     result = config_func(selections={"options": ["option2"]}, overrides={"options": ["option3"]})
     assert result["options"] == ["option3"]
+
+    # Test invalid selection
+    with pytest.raises(ValueError):
+        config_func(selections={"options": ["invalid_option"]})
+
+
+def test_multi_select_dict_defaults_overrides_selections():
+    @config
+    def config_func(hp: HP):
+        class TestClass:
+            def __init__(self, name):
+                self.name = name
+
+        options = hp.multi_select(
+            {"option1": 1, "option2": 2},
+            default=["option1", "option2"],
+        )
+
+    # Test defaults
+    result = config_func()
+    assert result["options"] == [1, 2]
+
+    # Test selections
+    result = config_func(selections={"options": ["option2"]})
+    assert result["options"] == [2]
+
+    # Test overrides
+    result = config_func(overrides={"options": ["option1"]})
+    assert result["options"] == [1]
+
+    # Test precedence: overrides > selections > defaults
+    result = config_func(selections={"options": ["option2"]}, overrides={"options": ["option1"]})
+    assert result["options"] == [1]
 
     # Test invalid selection
     with pytest.raises(ValueError):
