@@ -1,8 +1,10 @@
 import logging
 from collections import OrderedDict
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .hp_calls import (
+    IntInputCall,
     MultiNumberCall,
     MultiSelectCall,
     MultiTextCall,  # New imports
@@ -54,6 +56,11 @@ class HP:
         logger.debug(f"Added NumberInputCall: {name}")
         return number_input_call.execute()
 
+    def int_input(self, default: int, *, name: Optional[str] = None) -> int:
+        int_input_call = IntInputCall(self, name=name, default=default)
+        logger.debug(f"Added IntInputCall: {name}")
+        return int_input_call.execute()
+
     def multi_text(self, default: List[str] = [], *, name: Optional[str] = None) -> List[str]:
         multi_text_call = MultiTextCall(self, name=name, default=default)
         logger.debug(f"Added MultiTextCall: {name}")
@@ -67,11 +74,20 @@ class HP:
         return multi_number_call.execute()
 
     def propagate(
-        self, config_func: Callable, *, name: Optional[str] = None
+        self,
+        config_func: Union[str, Path, Callable],
+        *,
+        name: Optional[str] = None,
+        selections: Optional[Dict[str, Any]] = None,
+        overrides: Optional[Dict[str, Any]] = None,
     ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
         propagate_call = PropagateCall(self, name=name)
         logger.debug(f"Added PropagateCall: {name}")
-        return propagate_call.execute(config_func)
+        if isinstance(config_func, (str, Path)):
+            from .core import load
+
+            config_func = load(str(config_func))
+        return propagate_call.execute(config_func, selections, overrides)
 
     def get_next_combination(self, explored_combinations: List[Dict[str, Any]]) -> bool:
         for param in reversed(self.current_combination.keys()):

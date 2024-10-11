@@ -177,6 +177,8 @@ class SelectCall(HPCall):
     def explore(self) -> Any:
         if self.name in self.hp.current_combination:
             selected_key = self.hp.current_combination[self.name]
+            if selected_key not in self.options:
+                selected_key = list(self.options.keys())[0]
         else:
             selected_key = list(self.options.keys())[0]
             self.hp.current_combination[self.name] = selected_key
@@ -301,6 +303,8 @@ class PropagateCall(HPCall):
         original_name_prefix = self.hp.name_prefix
         self.hp.name_prefix = self.name if original_name_prefix is None else f"{original_name_prefix}.{self.name}"
         nested_config = self._prepare_nested_config()
+        nested_config["selections"].update(selections or {})
+        nested_config["overrides"].update(overrides or {})
 
         result = self._run_nested_config(config_func, nested_config)
         nested_snapshot = config_func.get_last_snapshot()
