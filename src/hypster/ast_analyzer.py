@@ -1,9 +1,11 @@
 import ast
+
+# from .logging_utils import configure_logging
+# logger = configure_logging()
+from logging import getLogger
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from .logging_utils import configure_logging
-
-logger = configure_logging()
+logger = getLogger(__name__)
 
 
 class VariableGraphBuilder(ast.NodeVisitor):
@@ -443,6 +445,7 @@ def inject_names_to_source_code(code: str, hp_calls: List[HPCall]) -> str:
     injector = NameInjector(hp_calls)
     modified_tree = injector.visit(tree)
     return ast.unparse(modified_tree)
+
 
 def find_independent_select_calls(referenced_vars, hp_calls) -> List[str]:
     independent_vars = {

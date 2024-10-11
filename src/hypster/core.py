@@ -14,7 +14,7 @@ from .hp import HP
 from .utils import find_hp_function_body_and_name, remove_function_signature
 
 # Correct logging configuration
-logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+# logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 HypsterReturn = Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]
