@@ -25,12 +25,12 @@ class HP:
         self.final_vars = final_vars
         self.selections = selections
         self.overrides = overrides
-        self.name_prefix = None
+        self.name_prefix = None  # TODO: rethink this
         self.explore_mode = explore_mode
-        self.current_space = OrderedDict()  # TODO: consider turning these 3 items to a dataclass
-        self.current_combination = OrderedDict()
-        self.defaults = {}
-        self.snapshot = {}
+        self.current_space: OrderedDict[str, Any] = OrderedDict()  # TODO: consider turning these 3 items to a dataclass
+        self.current_combination: OrderedDict[str, Any] = OrderedDict()
+        self.defaults: Dict[str, Any] = {}
+        self.snapshot: Dict[str, Any] = {}
         logger.info(f"Initialized HP with explore_mode: {explore_mode}")
 
     def select(self, options: Union[Dict[str, Any], List[Any]], *, name: Optional[str] = None, default: Any = None):
@@ -78,6 +78,7 @@ class HP:
         config_func: Union[str, Path, Callable],
         *,
         name: Optional[str] = None,
+        # TODO: add "final_vars"
         selections: Optional[Dict[str, Any]] = None,
         overrides: Optional[Dict[str, Any]] = None,
     ) -> Union[Dict[str, Any], List[Dict[str, Any]]]:
