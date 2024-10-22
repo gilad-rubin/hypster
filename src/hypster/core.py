@@ -2,7 +2,7 @@ import logging
 import os
 import textwrap
 import types
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, OrderedDict, Tuple, Union
 
 from .ast_analyzer import (
     collect_hp_calls,
@@ -42,9 +42,9 @@ class Hypster:
 
         self.referenced_vars = find_referenced_vars(self.source_code)
         self.independent_select_calls = find_independent_select_calls(self.referenced_vars, self.hp_calls)
-        self.combinations = []
-        self.defaults = {}
-        self.snapshot_history = []
+        self.combinations: List[Dict[str, Any]] = []
+        self.defaults: Dict[str, Any] = {}
+        self.snapshot_history: List[OrderedDict[str, Any]] = []
 
     def __call__(
         self,
