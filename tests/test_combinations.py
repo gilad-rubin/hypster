@@ -44,14 +44,14 @@ def test_nested_config(tmp_path):
     def inner_config(hp: HP):
         activation = hp.select(["relu", "tanh"], default="relu")
 
-    save(inner_config, "inner_config.py")
+    save(inner_config, "tests/inner_config.py")
 
     @config
     def outer_config(hp: HP):
         from hypster import load
 
         model = hp.select(["cnn", "rnn"], default="cnn")
-        inner = hp.propagate(load("inner_config.py"))
+        inner = hp.propagate(load("tests/inner_config.py"))
 
     combinations = outer_config.get_combinations()
     assert len(combinations) == 4
@@ -67,23 +67,23 @@ def test_multiple_nested_levels(tmp_path):
     def innermost_config(hp: HP):
         dropout = hp.select([0.1, 0.2], default=0.1)
 
-    save(innermost_config, "innermost_config.py")
+    save(innermost_config, "tests/innermost_config.py")
 
     @config
     def inner_config(hp: HP):
         from hypster import load
 
         activation = hp.select(["relu", "tanh"], default="relu")
-        innermost = hp.propagate(load("innermost_config.py"), name="innermost")
+        innermost = hp.propagate(load("tests/innermost_config.py"), name="innermost")
 
-    save(inner_config, "inner_config.py")
+    save(inner_config, "tests/inner_config.py")
 
     @config
     def outer_config(hp: HP):
         from hypster import load
 
         model = hp.select(["cnn", "rnn"], default="cnn")
-        inner = hp.propagate(load("inner_config.py"), name="inner")
+        inner = hp.propagate(load("tests/inner_config.py"), name="inner")
 
     combinations = outer_config.get_combinations()
     assert len(combinations) == 8
@@ -177,13 +177,13 @@ def test_propagation_with_conditionals(tmp_path):
         else:
             layers = hp.select([10, 20])
 
-    save(inner_config, "inner_config.py")
+    save(inner_config, "tests/inner_config.py")
 
     @config
     def outer_config(hp: HP):
         from hypster import load
 
-        inner = hp.propagate(load("inner_config.py"))
+        inner = hp.propagate(load("tests/inner_config.py"))
 
         if inner["model_type"] == "small":
             lr = hp.select([0.001, 0.01], default=0.001)
