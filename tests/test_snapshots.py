@@ -28,14 +28,14 @@ def test_nested_snapshot():
         optimizer = hp.select(["adam", "sgd"], default="adam")
         lr = hp.number_input(0.001)
 
-    save(nested_config, "tests/nested_config.py")
+    save(nested_config, "tests/helper_configs/nested_config.py")
 
     @config
     def main_config(hp: HP):
         from hypster import load
 
         model = hp.select(["cnn", "rnn"], default="cnn")
-        nested_config = load("tests/nested_config.py")
+        nested_config = load("tests/helper_configs/nested_config.py")
         nested_inputs = hp.propagate(nested_config)
 
     # Run with some selections

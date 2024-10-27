@@ -68,16 +68,16 @@ def config_func(hp: HP):
 class NestedStructure(StructureGenerator):
     def apply(self, code: str) -> str:
         return f"""@config
-def nested_func(hp):
+def nested_func(hp: HP):
     {code}
 
 
-nested_func.save("tests/nested_func.py")
+nested_func.save("tests/helper_configs/nested_func.py")
 
 
 @config
 def config_func(hp: HP):
-    result = hp.propagate("tests/nested_func.py")"""
+    result = hp.propagate("tests/helper_configs/nested_func.py")"""
 
 
 class LogicGenerator:

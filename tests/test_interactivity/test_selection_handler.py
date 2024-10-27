@@ -69,14 +69,14 @@ def test_propagate(tmp_path):
         activation = hp.select(["relu", "tanh"], default="relu")
         dropout = hp.select([0.1, 0.2], default=0.1)
 
-    save(inner_config, "tests/inner_config.py")
+    save(inner_config, "tests/helper_configs/inner_config.py")
 
     @config
     def outer_config(hp: HP):
         from hypster import load
 
         model = hp.select(["cnn", "rnn"], default="cnn")
-        inner = hp.propagate(load("tests/inner_config.py"))
+        inner = hp.propagate(load("tests/helper_configs/inner_config.py"))
 
     handler = SelectionHandler(outer_config)
     handler.initialize()

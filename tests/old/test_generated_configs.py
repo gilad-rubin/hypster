@@ -63,14 +63,14 @@ def test_case_3():
 
 def test_case_4():
     @config
-    def nested_func(hp):
+    def nested_func(hp: HP):
         var = hp.select(["option1", "option2"], name="var", default="option1")
 
-    nested_func.save("tests/nested_func.py")
+    nested_func.save("tests/helper_configs/nested_func.py")
 
     @config
     def config_func(hp: HP):
-        result = hp.propagate("tests/nested_func.py")
+        result = hp.propagate("tests/helper_configs/nested_func.py")
 
     result = config_func()
     assert result["result"]["var"] == "option1"
@@ -82,14 +82,14 @@ def test_case_4():
 
 def test_case_5():
     @config
-    def nested_func(hp):
+    def nested_func(hp: HP):
         var = hp.select(["option1", "option2"], name="var")
 
-    nested_func.save("tests/nested_func.py")
+    nested_func.save("tests/helper_configs/nested_func.py")
 
     @config
     def config_func(hp: HP):
-        result = hp.propagate("tests/nested_func.py")
+        result = hp.propagate("tests/helper_configs/nested_func.py")
 
     with pytest.raises(ValueError):
         config_func()
@@ -159,14 +159,14 @@ def test_case_9():
 
 def test_case_10():
     @config
-    def nested_func(hp):
+    def nested_func(hp: HP):
         var = hp.multi_select(["option1", "option2", "option3"], name="var", default=["option1", "option2"])
 
-    nested_func.save("tests/nested_func.py")
+    nested_func.save("tests/helper_configs/nested_func.py")
 
     @config
     def config_func(hp: HP):
-        result = hp.propagate("tests/nested_func.py")
+        result = hp.propagate("tests/helper_configs/nested_func.py")
 
     result = config_func()
     assert result["result"]["var"] == ["option1", "option2"]
@@ -178,14 +178,14 @@ def test_case_10():
 
 def test_case_11():
     @config
-    def nested_func(hp):
+    def nested_func(hp: HP):
         var = hp.multi_select(["option1", "option2", "option3"], name="var")
 
-    nested_func.save("tests/nested_func.py")
+    nested_func.save("tests/helper_configs/nested_func.py")
 
     @config
     def config_func(hp: HP):
-        result = hp.propagate("tests/nested_func.py")
+        result = hp.propagate("tests/helper_configs/nested_func.py")
 
     with pytest.raises(ValueError):
         config_func()
@@ -222,14 +222,14 @@ def test_case_13():
 
 def test_case_14():
     @config
-    def nested_func(hp):
+    def nested_func(hp: HP):
         var = hp.number_input(name="var", default=10)
 
-    nested_func.save("tests/nested_func.py")
+    nested_func.save("tests/helper_configs/nested_func.py")
 
     @config
     def config_func(hp: HP):
-        result = hp.propagate("tests/nested_func.py")
+        result = hp.propagate("tests/helper_configs/nested_func.py")
 
     result = config_func()
     assert result["result"]["var"] == 10
