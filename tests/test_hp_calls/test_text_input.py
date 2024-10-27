@@ -98,5 +98,14 @@ def test_multi_text_invalid_override():
         config_func(overrides={"param": [1, 2]})  # Not strings
 
 
+def test_multi_text_invalid_override_type():
+    @config
+    def config_func(hp: HP):
+        values = hp.multi_text(default=["a", "b"], name="param")
+
+    with pytest.raises(TypeError):
+        config_func(overrides={"param": "c"})  # Not a list
+
+
 if __name__ == "__main__":
     pytest.main([__file__])
