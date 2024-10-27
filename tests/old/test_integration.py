@@ -163,7 +163,7 @@ def test_pythonic_api():
 
 
 def test_save_load_complex_module():
-    complex_config = hypster.load("tests/complex_config.py")
+    complex_config = hypster.load("tests/helper_configs/complex_config.py")
 
     # def nested_config(hp: HP):
     #     b = func(6)
@@ -188,13 +188,13 @@ def test_propagation():
     def nested_config(hp: HP):
         nested_param = hp.select(["a", "b"], default="a")
 
-    hypster.save(nested_config, "tests/nested_config.py")
+    hypster.save(nested_config, "tests/helper_configs/nested_config.py")
 
     @config
     def main_config(hp: HP):
         import hypster
 
-        nested_config = hypster.load("tests/nested_config.py")
+        nested_config = hypster.load("tests/helper_configs/nested_config.py")
         nested = hp.propagate(nested_config)
 
         main_param = hp.select(["x", "y"], default="x")

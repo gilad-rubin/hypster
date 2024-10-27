@@ -35,14 +35,14 @@ def test_nested_defaults(tmp_path):
         activation = hp.select(["relu", "tanh"], default="relu")
         dropout = hp.select([0.1, 0.2], default=0.1)
 
-    save(inner_config, "tests/inner_config.py")
+    save(inner_config, "tests/helper_configs/inner_config.py")
 
     @config
     def outer_config(hp: HP):
         from hypster import load
 
         model = hp.select(["cnn", "rnn"], default="cnn")
-        inner = hp.propagate(load("tests/inner_config.py"))
+        inner = hp.propagate(load("tests/helper_configs/inner_config.py"))
 
     defaults = outer_config.get_defaults()
     assert defaults == {"model": ["cnn"], "inner": {"activation": ["relu"], "dropout": [0.1]}}
@@ -89,23 +89,23 @@ def test_complex_nested_defaults(tmp_path):
     def innermost_config(hp: HP):
         dropout = hp.select([0.1, 0.2], default=0.1)
 
-    save(innermost_config, "tests/innermost_config.py")
+    save(innermost_config, "tests/helper_configs/innermost_config.py")
 
     @config
     def inner_config(hp: HP):
         from hypster import load
 
         activation = hp.select(["relu", "tanh"], default="relu")
-        innermost = hp.propagate(load("tests/innermost_config.py"), name="innermost")
+        innermost = hp.propagate(load("tests/helper_configs/innermost_config.py"), name="innermost")
 
-    save(inner_config, "tests/inner_config.py")
+    save(inner_config, "tests/helper_configs/inner_config.py")
 
     @config
     def outer_config(hp: HP):
         from hypster import load
 
         model = hp.select(["cnn", "rnn"], default="cnn")
-        inner = hp.propagate(load("tests/inner_config.py"), name="inner")
+        inner = hp.propagate(load("tests/helper_configs/inner_config.py"), name="inner")
 
     defaults = outer_config.get_defaults()
     assert defaults == {"model": ["cnn"], "inner": {"activation": ["relu"], "innermost": {"dropout": [0.1]}}}
