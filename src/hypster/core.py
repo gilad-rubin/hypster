@@ -208,7 +208,10 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
 
     func_name, hp_func_source = result
 
-    modified_source = "from hypster import HP\n\n" + hp_func_source
+    modified_source = "from hypster import HP\n\n\n" + hp_func_source
+    modified_source = modified_source.rstrip("\n")
+    modified_source = modified_source + "\n"
+
     directory = os.path.dirname(path)
     if directory and not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
