@@ -2,7 +2,7 @@ import collections
 import itertools
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 if TYPE_CHECKING:
     from .hp import HP  # Adjust the import path as needed
@@ -125,9 +125,11 @@ class HPCall(ABC):
     def _get_result_from_selection(self):
         # TODO: add error if there's a selection for something that only works with overrides,
         # like text, number input (including multi)
+
         selected_value = self.hp.selections[self.name]
         logger.debug("Found selection for %s: %s", self.name, selected_value)
         snapshot = None
+        # TODO: add 'if selected_value is not a list and we're at multi_...' - error
         if isinstance(selected_value, list):
             result = []
             snapshot = []
@@ -191,6 +193,10 @@ class MultiSelectCall(HPCall):
         super().__init__(*args, **kwargs)
         self.all_combinations = None
 
+    def _validate_list_type(self, value: Any, source: str):
+        if not isinstance(value, list):
+            raise TypeError(f"{source} value must be a list, got {type(value).__name__}")
+
     def execute(self, options: Union[Dict[str, Any], List[Any]]) -> List[Any]:
         processed_options = self.validate_and_process_options(options)
         self.options = processed_options
@@ -198,8 +204,13 @@ class MultiSelectCall(HPCall):
         if self.hp.explore_mode:
             return self.explore()
 
-        result = self.handle_overrides_selections()
+        # Validate selections and overrides before handling them
+        if self.name in self.hp.selections:
+            self._validate_list_type(self.hp.selections[self.name], "selection")
+        if self.name in self.hp.overrides:
+            self._validate_list_type(self.hp.overrides[self.name], "override")
 
+        result = self.handle_overrides_selections()
         logger.info(f"MultiSelect call executed for {self.name}: {result}")
         return result
 
@@ -225,9 +236,32 @@ class MultiSelectCall(HPCall):
         return [list(combo) for combo in all_combinations]
 
 
+class InputValidator:
+    @staticmethod
+    def validate_type(value: Any, expected_type: Union[type, Tuple[type, ...]], type_name: str, source: str = ""):
+        if value is not None and not isinstance(value, expected_type):
+            source_msg = f" in {source}" if source else ""
+            raise TypeError(f"Value must be {type_name}{source_msg}, got {type(value).__name__}")
+
+    @staticmethod
+    def validate_list_types(
+        values: List[Any], expected_type: Union[type, Tuple[type, ...]], type_name: str, source: str = ""
+    ):
+        if values is not None:
+            if not isinstance(values, list):
+                raise TypeError(f"Value must be a list of {type_name}s")
+            if not all(isinstance(x, expected_type) for x in values):
+                raise TypeError(f"All values must be {type_name}s")
+
+
 class TextInputCall(HPCall):
+    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: Any = None):
+        InputValidator.validate_type(default, str, "string", "default")
+        super().__init__(hp_instance, name, default)
+
     def execute(self, options: None = None) -> str:
         result = self.handle_overrides_selections()
+        InputValidator.validate_type(result, str, "string", "result")
         logger.info(f"TextInput call executed for {self.name}: {result}")
         return result
 
@@ -236,8 +270,13 @@ class TextInputCall(HPCall):
 
 
 class NumberInputCall(HPCall):
+    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: Any = None):
+        InputValidator.validate_type(default, (int, float), "number", "default")
+        super().__init__(hp_instance, name, default)
+
     def execute(self, options: None = None) -> Union[int, float]:
         result = self.handle_overrides_selections()
+        InputValidator.validate_type(result, (int, float), "number", "result")
         logger.info(f"NumberInput call executed for {self.name}: {result}")
         return result
 
@@ -247,8 +286,13 @@ class NumberInputCall(HPCall):
 
 
 class IntInputCall(HPCall):
+    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: Any = None):
+        InputValidator.validate_type(default, int, "integer", "default")
+        super().__init__(hp_instance, name, default)
+
     def execute(self, options: None = None) -> int:
         result = self.handle_overrides_selections()
+        InputValidator.validate_type(result, int, "integer", "result")
         logger.info(f"IntInput call executed for {self.name}: {result}")
         return result
 
@@ -258,13 +302,14 @@ class IntInputCall(HPCall):
 
 
 class MultiTextCall(HPCall):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.current_values = self.default or []
+    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: List[str] = None):
+        InputValidator.validate_list_types(default, str, "string", "default")
+        super().__init__(hp_instance, name, default or [])
+        self.current_values = self.default
 
     def execute(self, options: None = None) -> List[str]:
         result = self.handle_overrides_selections()
-
+        InputValidator.validate_list_types(result, str, "string", "result")
         logger.info(f"MultiText call executed for {self.name}: {result}")
         return result
 
@@ -273,13 +318,14 @@ class MultiTextCall(HPCall):
 
 
 class MultiNumberCall(HPCall):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.current_values = self.default or []
+    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: List[Union[int, float]] = None):
+        InputValidator.validate_list_types(default, (int, float), "number", "default")
+        super().__init__(hp_instance, name, default or [])
+        self.current_values = self.default
 
     def execute(self, options: None = None) -> List[Union[int, float]]:
         result = self.handle_overrides_selections()
-
+        InputValidator.validate_list_types(result, (int, float), "number", "result")
         logger.info(f"MultiNumber call executed for {self.name}: {result}")
         return result
 
@@ -393,3 +439,19 @@ class PropagateCall(HPCall):
         dict_style_vars = list(PropagateCall.extract_nested_config(dict.fromkeys(final_vars, None), name).keys())
         dict_style_vars = [var for var in dict_style_vars if var not in dot_notation_vars]  # remove dups
         return dot_notation_vars + dict_style_vars
+
+
+class MultiIntCall(HPCall):
+    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: List[int] = None):
+        InputValidator.validate_list_types(default, int, "integer", "default")
+        super().__init__(hp_instance, name, default or [])
+        self.current_values = self.default
+
+    def execute(self, options: None = None) -> List[int]:
+        result = self.handle_overrides_selections()
+        InputValidator.validate_list_types(result, int, "integer", "result")
+        logger.info(f"MultiInt call executed for {self.name}: {result}")
+        return result
+
+    def explore(self) -> List[int]:
+        pass

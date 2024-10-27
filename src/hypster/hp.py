@@ -5,9 +5,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .hp_calls import (
     IntInputCall,
+    MultiIntCall,
     MultiNumberCall,
     MultiSelectCall,
-    MultiTextCall,  # New imports
+    MultiTextCall,
     NumberInputCall,
     PropagateCall,
     SelectCall,
@@ -72,6 +73,11 @@ class HP:
         multi_number_call = MultiNumberCall(self, name=name, default=default)
         logger.debug(f"Added MultiNumberCall: {name}")
         return multi_number_call.execute()
+
+    def multi_int(self, default: List[int] = [], *, name: Optional[str] = None) -> List[int]:
+        multi_int_call = MultiIntCall(self, name=name, default=default)
+        logger.debug(f"Added MultiIntCall: {name}")
+        return multi_int_call.execute()
 
     def propagate(
         self,
