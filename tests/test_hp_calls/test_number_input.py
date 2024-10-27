@@ -14,7 +14,7 @@ def test_number_input_with_default():
 
 
 def test_number_input_without_default():
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
 
         @config
         def config_func(hp: HP):
@@ -62,13 +62,12 @@ def test_multi_number_with_default():
 
 
 def test_multi_number_without_default():
-    with pytest.raises(ValueError):
+    @config
+    def config_func(hp: HP):
+        values = hp.multi_number(name="param")
 
-        @config
-        def config_func(hp: HP):
-            values = hp.multi_number(name="param")
-
-        config_func()
+    result = config_func()
+    assert result["values"] == []
 
 
 def test_multi_number_invalid_default():
@@ -88,6 +87,15 @@ def test_multi_number_with_override():
 
     result = config_func(overrides={"param": [3.0, 4.0]})
     assert result["values"] == [3.0, 4.0]
+
+
+def test_multi_number_invalid_override_type():
+    @config
+    def config_func(hp: HP):
+        values = hp.multi_number(default=[1.0, 2.0], name="param")
+
+    with pytest.raises(TypeError):
+        config_func(overrides={"param": 3.0})  # Not a list
 
 
 def test_multi_number_invalid_override():
