@@ -1,61 +1,10 @@
 import ast
+import logging
+from typing import Dict, List, Optional, Set
 
-# from .logging_utils import configure_logging
-# logger = configure_logging()
-from logging import getLogger
-from typing import Any, Dict, List, Optional, Set, Tuple
-
-logger = getLogger(__name__)
-
-
-class VariableGraphBuilder(ast.NodeVisitor):
-    def __init__(self):
-        self.graph = {}
-        self.current_path = []
-
-    def visit_Assign(self, node):
-        target = self.get_target_name(node.targets[0])
-        logger.debug(f"VariableGraphBuilder: Visiting assignment to {target}")
-        self.current_path = [target]
-        self.graph[target] = self.build_subgraph(node.value)
-
-    def build_subgraph(self, node):
-        logger.debug(f"VariableGraphBuilder: Building subgraph for node type {type(node).__name__}")
-        if isinstance(node, ast.Dict):
-            return {self.get_key_name(k): self.build_subgraph(v) for k, v in zip(node.keys, node.values)}
-        elif isinstance(node, ast.Call):
-            return {
-                "__call__": self.get_target_name(node.func),
-                "args": [self.get_node_value(arg) for arg in node.args],
-                "kwargs": {kw.arg: self.get_node_value(kw.value) for kw in node.keywords},
-            }
-        elif isinstance(node, (ast.Name, ast.Attribute)):
-            return self.get_target_name(node)
-        elif isinstance(node, ast.Constant):
-            return node.value
-        else:
-            return {"__unknown__": ast.unparse(node)}
-
-    def get_node_value(self, node):
-        if isinstance(node, ast.Constant):
-            return node.value
-        elif isinstance(node, (ast.Name, ast.Attribute)):
-            return self.get_target_name(node)
-        else:
-            return ast.unparse(node)
-
-    def get_target_name(self, node):
-        if isinstance(node, ast.Name):
-            return node.id
-        elif isinstance(node, ast.Attribute):
-            return f"{self.get_target_name(node.value)}.{node.attr}"
-        else:
-            return "Unknown"
-
-    def get_key_name(self, node):
-        if isinstance(node, ast.Str):
-            return node.s
-        return self.get_target_name(node)
+# Configure logging for detailed debug output
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
 class HPCall:
@@ -65,7 +14,7 @@ class HPCall:
         col_offset: int,
         method_name: str,
         implicit_name: Optional[str] = None,
-        has_explicit_name: Optional[bool] = None,
+        has_explicit_name: bool = False,
     ):
         self.lineno = lineno
         self.col_offset = col_offset
@@ -74,196 +23,229 @@ class HPCall:
         self.has_explicit_name = has_explicit_name
         self.call_index = 0  # Will be set later
 
+    def __repr__(self):
+        return (
+            f"HPCall(lineno={self.lineno}, col_offset={self.col_offset}, "
+            f"method_name='{self.method_name}', implicit_name='{self.implicit_name}', "
+            f"has_explicit_name={self.has_explicit_name}, call_index={self.call_index})"
+        )
 
-class HPCallAnalyzer(ast.NodeVisitor):
-    def __init__(self, variable_graph):
-        self.variable_graph = variable_graph
-        self.results = {}
-        self.current_assignment = None
-        self.current_complex_assignment = None
-        self.hp_calls = []
 
-    def visit_Assign(self, node):
-        logger.debug(f"HPCallAnalyzer: Visiting assignment on line {node.lineno}")
-        self.current_assignment = node
-        start_line = node.lineno
-        end_line = self.get_last_line(node)
+def build_parent_map(node: ast.AST) -> Dict[ast.AST, ast.AST]:
+    """
+    Build a parent map for all nodes in the AST.
 
-        if isinstance(node.value, (ast.Dict, ast.Call)):
-            self.current_complex_assignment = node
+    Args:
+        node (ast.AST): The root of the AST.
 
-        self.results[start_line] = {
-            "code": ast.unparse(node),
-            "hp_calls": [],
-            "end_line": end_line,
-        }
-        self.generic_visit(node)
+    Returns:
+        Dict[ast.AST, ast.AST]: A mapping from each node to its parent.
+    """
+    parent_map = {}
+    stack = [(node, None)]  # (child, parent)
 
-        self.current_complex_assignment = None
-        self.current_assignment = None
+    while stack:
+        current, parent = stack.pop()
+        if parent is not None:
+            parent_map[current] = parent
+        for child in ast.iter_child_nodes(current):
+            stack.append((child, current))
 
-    def visit_Call(self, node):
+    logger.debug("Parent map built with %d entries", len(parent_map))
+    return parent_map
+
+
+class HPCallVisitor(ast.NodeVisitor):
+    def __init__(self, parent_map: Dict[ast.AST, ast.AST]):
+        self.parent_map = parent_map
+        self.hp_calls: List[HPCall] = []
+        logger.debug("Initialized HPCallVisitor")
+
+    def visit_Call(self, node: ast.Call):
         if self.is_hp_call(node):
-            logger.debug(f"HPCallAnalyzer: hp call detected on line {node.lineno}")
-            line_number = node.lineno
-            call_index = len([c for c in self.hp_calls if c.lineno == line_number])
-
+            logger.debug(f"Detected hp call at line {node.lineno}, column {node.col_offset}")
+            implicit_name = self.infer_implicit_name(node)
+            has_explicit_name = self.has_explicit_name(node)
             method_name = node.func.attr
-            inferred_name = self.infer_name(node)
-
-            if not node.has_explicit_name and inferred_name and self.is_valid_inference(inferred_name):
-                implicit_name = inferred_name
-            else:
-                implicit_name = None
 
             hp_call = HPCall(
-                line_number,
-                call_index,
-                method_name,
-                node.has_explicit_name,
-                implicit_name,
+                lineno=node.lineno,
+                col_offset=node.col_offset,
+                method_name=method_name,
+                implicit_name=implicit_name,
+                has_explicit_name=has_explicit_name,
             )
+            logger.debug(f"Created HPCall instance: {hp_call}")
             self.hp_calls.append(hp_call)
-
-            if (
-                self.current_complex_assignment
-                and self.current_complex_assignment.lineno
-                <= line_number
-                <= self.get_last_line(self.current_complex_assignment)
-            ):
-                logger.debug(
-                    f"HPCallAnalyzer: hp call is part of a complex\
-                          assignment starting on line {self.current_complex_assignment.lineno}"
-                )
-                line_number = self.current_complex_assignment.lineno
-
-            if line_number in self.results:
-                self.results[line_number]["hp_calls"].append(hp_call)
-            else:
-                self.results[line_number] = {
-                    "code": ast.unparse(self.current_complex_assignment or node),
-                    "hp_calls": [hp_call],
-                    "end_line": self.get_last_line(self.current_complex_assignment or node),
-                }
 
         self.generic_visit(node)
 
-    def is_valid_inference(self, inferred_name):
-        logger.debug(f"HPCallAnalyzer: Checking validity of inferred name: {inferred_name}")
-        parts = inferred_name.split(".")
-        valid = len(parts) <= 4 and all(not part.startswith("arg") for part in parts)
-        logger.debug(f"HPCallAnalyzer: Inferred name {'is' if valid else 'is not'} valid")
-        return valid
-
-    def get_last_line(self, node):
-        return max(getattr(node, "lineno", 0), getattr(node, "end_lineno", 0))
-
-    def is_hp_call(self, node):
-        return (
+    def is_hp_call(self, node: ast.Call) -> bool:
+        is_hp = (
             isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "hp"
         )
+        logger.debug(f"Checking if node is HP call: {is_hp}")
+        return is_hp
 
-    # def get_hp_call_name(self, node):
-    #     logger.debug(f"HPCallAnalyzer: Attempting to get hp call name for node on line {node.lineno}")
-    #     if len(node.args) >= 2:
-    #         name = self.get_node_value(node.args[1])
-    #         logger.debug(f"HPCallAnalyzer: Found name in second argument: {name}")
-    #         return name
-    #     for keyword in node.keywords:
-    #         if keyword.arg == "name":
-    #             name = self.get_node_value(keyword.value)
-    #             logger.debug(f"HPCallAnalyzer: Found name in keyword argument: {name}")
-    #             return name
-    #     logger.debug("HPCallAnalyzer: No explicit name found for hp call")
-    #     return None
+    def has_explicit_name(self, node: ast.Call) -> bool:
+        for kw in node.keywords:
+            if kw.arg == "name":
+                logger.debug(f"HP call at line {node.lineno} has explicit name: {ast.dump(kw.value)}")
+                return True
+        logger.debug(f"HP call at line {node.lineno} does not have an explicit name")
+        return False
 
-    def get_node_value(self, node):
-        if isinstance(node, ast.Constant):
-            return node.value
-        elif isinstance(node, ast.Name):
-            return node.id
-        else:
-            return ast.unparse(node)
+    def infer_implicit_name(self, node: ast.Call) -> Optional[str]:
+        """
+        Infer the implicit name for an HP call by traversing its context.
 
-    def infer_name(self, node):
-        logger.debug(f"HPCallAnalyzer: Attempting to infer name for node on line {node.lineno}")
-        if self.current_assignment:
-            target = self.get_target_name(self.current_assignment.targets[0])
-            if isinstance(self.current_assignment.value, ast.Call) and self.is_hp_call(self.current_assignment.value):
-                logger.debug(f"HPCallAnalyzer: Direct assignment to hp call detected: {target}")
-                return target
-            inferred = self.find_node_in_assignment(self.current_assignment.value, node, [target])
-            logger.debug(f"HPCallAnalyzer: Inferred name from current assignment: {inferred}")
-            return inferred
+        Args:
+            node (ast.Call): The HP call node.
 
-        for var, subgraph in self.variable_graph.items():
-            path = self.find_node_in_graph(subgraph, node)
-            if path:
-                inferred = ".".join([var] + [p for p in path if p != "kwargs"])
-                logger.debug(f"HPCallAnalyzer: Inferred name from variable graph: {inferred}")
-                return inferred
-        logger.debug("HPCallAnalyzer: Unable to infer name")
+        Returns:
+            Optional[str]: The inferred implicit name or None if unsupported.
+        """
+        context = []
+        current_node = node
+
+        while True:
+            parent = self.parent_map.get(current_node)
+            if parent is None:
+                logger.debug(f"No parent found for node at line {current_node.lineno}")
+                break
+
+            # Handle different parent types
+            if isinstance(parent, ast.Assign):
+                target = parent.targets[0]
+                target_name = self.get_target_name(target)
+                context.append(("assignment", target_name))
+                logger.debug(f"Found assignment to variable '{target_name}'")
+                current_node = parent
+
+            elif isinstance(parent, ast.keyword):
+                arg_name = parent.arg
+                context.append(("keyword", arg_name))
+                logger.debug(f"Found keyword argument '{arg_name}'")
+                current_node = self.parent_map.get(parent)
+
+            elif isinstance(parent, ast.Call):
+                if self.is_method_call(parent):
+                    # Stop inference as it's within a method call
+                    logger.debug(f"Found method call '{parent.func.attr}', stopping inference")
+                    return None
+                elif self.is_class_call(parent):
+                    class_name = self.get_target_name(parent.func)
+                    context.append(("class", class_name))
+                    logger.debug(f"Found class call to '{class_name}'")
+                    current_node = parent
+                else:
+                    # It's a function call
+                    func_name = self.get_target_name(parent.func)
+                    context.append(("function", func_name))
+                    logger.debug(f"Found function call to '{func_name}'")
+                    current_node = parent
+
+            elif isinstance(parent, ast.Dict):
+                key = self.get_dict_key(parent, current_node)
+                if key:
+                    context.append(("dct", key))
+                    logger.debug(f"Found dictionary key '{key}'")
+                    current_node = parent
+                else:
+                    logger.debug("Dictionary key not found for current node")
+                    break
+
+            elif isinstance(parent, ast.Attribute):
+                attr_name = parent.attr
+                context.append(("attribute", attr_name))
+                logger.debug(f"Found attribute '{attr_name}'")
+                current_node = parent
+
+            elif isinstance(parent, ast.Subscript):
+                # Extract the subscript key and include it in the context
+                key = self.get_subscript_key(parent)
+                if key:
+                    context.append(("subscript", key))
+                    logger.debug(f"Found subscript key '{key}'")
+                    current_node = parent
+                else:
+                    logger.debug("Subscript key not found for current node")
+                    break
+
+            else:
+                logger.debug(f"Encountered unsupported parent type '{type(parent).__name__}'")
+                break
+
+        if context:
+            reversed_context = list(reversed([name for _, name in context]))
+            implicit_name = ".".join(reversed_context)
+            logger.debug(f"Inferred implicit name: '{implicit_name}'")
+            return implicit_name
+        logger.debug("Could not infer implicit name for hp call")
         return None
 
-    def find_node_in_assignment(self, value_node, target_node, path):
-        logger.debug(f"HPCallAnalyzer: Searching for node in assignment, current path: {'.'.join(path)}")
-        if isinstance(value_node, ast.Dict):
-            for key, value in zip(value_node.keys, value_node.values):
-                if value == target_node:
-                    result = ".".join(path + [self.get_node_value(key)])
-                    logger.debug(f"HPCallAnalyzer: Found node in dictionary: {result}")
-                    return result
-                result = self.find_node_in_assignment(value, target_node, path + [self.get_node_value(key)])
-                if result:
-                    return result
-        elif isinstance(value_node, ast.Call):
-            for idx, arg in enumerate(value_node.args):
-                if arg == target_node:
-                    result = ".".join(path + [f"arg{idx}"])
-                    logger.debug(f"HPCallAnalyzer: Found node in function argument: {result}")
-                    return result
-                result = self.find_node_in_assignment(arg, target_node, path + [f"arg{idx}"])
-                if result:
-                    return result
-            for keyword in value_node.keywords:
-                if keyword.value == target_node:
-                    result = ".".join(path + [keyword.arg])
-                    logger.debug(f"HPCallAnalyzer: Found node in keyword argument: {result}")
-                    return result
-                result = self.find_node_in_assignment(keyword.value, target_node, path + [keyword.arg])
-                if result:
-                    return result
-        logger.debug("HPCallAnalyzer: Node not found in assignment")
+    def get_subscript_key(self, node: ast.Subscript) -> Optional[str]:
+        """
+        Extract the key from a subscript node.
+
+        Args:
+            node (ast.Subscript): The subscript node.
+
+        Returns:
+            Optional[str]: The key as a string or None.
+        """
+        if isinstance(node.slice, ast.Constant):
+            return str(node.slice.value)
+        elif isinstance(node.slice, ast.Index):  # For Python <3.9
+            return self.get_node_value(node.slice.value)
         return None
 
-    def find_node_in_graph(self, graph, node, path=None):
-        if path is None:
-            path = []
+    def is_class_call(self, node: ast.Call) -> bool:
+        """
+        Determine if a call node is a class instantiation.
 
-        logger.debug(f"HPCallAnalyzer: Searching for node in graph, current path: {'.'.join(path)}")
-        if isinstance(graph, dict):
-            if (
-                graph.get("__call__", "").startswith("hp.")
-                and graph["args"]
-                and self.get_node_value(node.args[0]) == graph["args"][0]
-            ):
-                logger.debug(f"HPCallAnalyzer: Found matching hp call in graph at path: {'.'.join(path)}")
-                return path
-            for key, value in graph.items():
-                new_path = self.find_node_in_graph(value, node, path + [key])
-                if new_path:
-                    return new_path
-        elif isinstance(graph, list):
-            for i, item in enumerate(graph):
-                new_path = self.find_node_in_graph(item, node, path + [str(i)])
-                if new_path:
-                    return new_path
-        logger.debug("HPCallAnalyzer: Node not found in graph")
-        return None
+        Args:
+            node (ast.Call): The call node.
 
-    def get_target_name(self, node):
+        Returns:
+            bool: True if it's a class instantiation, False otherwise.
+        """
+        if isinstance(node.func, ast.Name):
+            # Simple class name (conventionally starts with uppercase)
+            is_class = node.func.id[0].isupper()
+            logger.debug(f"Checking if call to '{node.func.id}' is a class: {is_class}")
+            return is_class
+        elif isinstance(node.func, ast.Attribute):
+            # Possibly a class from a module (e.g., module.ClassName)
+            is_class = node.func.attr[0].isupper()
+            logger.debug(f"Checking if call to attribute '{node.func.attr}' is a class: {is_class}")
+            return is_class
+        return False
+
+    def is_method_call(self, node: ast.Call) -> bool:
+        """
+        Determine if a call node is a method call.
+
+        Args:
+            node (ast.Call): The call node.
+
+        Returns:
+            bool: True if it's a method call, False otherwise.
+        """
+        return isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Call)
+
+    def get_target_name(self, node: ast.AST) -> str:
+        """
+        Extract the target name from assignment targets.
+
+        Args:
+            node (ast.AST): The target node.
+
+        Returns:
+            str: The name of the target.
+        """
         if isinstance(node, ast.Name):
             return node.id
         elif isinstance(node, ast.Attribute):
@@ -271,183 +253,193 @@ class HPCallAnalyzer(ast.NodeVisitor):
         else:
             return "Unknown"
 
+    def get_keyword_arg(self, call_node: ast.Call, child_node: ast.AST) -> Optional[str]:
+        """
+        Get the keyword argument name for a given child node.
 
-def analyze_hp_calls(code: str) -> Tuple[Dict[int, Dict[str, Any]], List[HPCall]]:
-    logger.info("Starting HP calls analysis")
-    tree = ast.parse(code)
+        Args:
+            call_node (ast.Call): The call node containing the keyword.
+            child_node (ast.AST): The child node corresponding to the keyword's value.
 
-    logger.debug("Building variable graph")
-    graph_builder = VariableGraphBuilder()
-    graph_builder.visit(tree)
+        Returns:
+            Optional[str]: The keyword argument name or None.
+        """
+        for kw in call_node.keywords:
+            if kw.value == child_node:
+                return kw.arg
+        return None
 
-    logger.debug("Analyzing HP calls")
-    analyzer = HPCallAnalyzer(graph_builder.graph)
-    analyzer.visit(tree)
+    def get_dict_key(self, dict_node: ast.Dict, child_node: ast.AST) -> Optional[str]:
+        """
+        Get the dictionary key for a given child node.
 
-    logger.info("HP calls analysis complete")
-    return analyzer.results, analyzer.hp_calls
+        Args:
+            dict_node (ast.Dict): The dictionary node.
+            child_node (ast.AST): The value node within the dictionary.
+
+        Returns:
+            Optional[str]: The key as a string or None.
+        """
+        for key, value in zip(dict_node.keys, dict_node.values):
+            if value == child_node:
+                return self.get_node_value(key)
+        return None
+
+    def get_node_value(self, node: ast.AST) -> str:
+        """
+        Safely extract the value from a node.
+
+        Args:
+            node (ast.AST): The node to extract the value from.
+
+        Returns:
+            str: The extracted value as a string.
+        """
+        if isinstance(node, ast.Constant):
+            return str(node.value)
+        elif isinstance(node, ast.Str):  # For Python <3.8
+            return node.s
+        else:
+            try:
+                return ast.unparse(node)
+            except AttributeError:
+                return "Unknown"
 
 
-class HPCallVisitor(ast.NodeVisitor):
+class VariableReferenceCollector(ast.NodeVisitor):
     def __init__(self):
-        self.hp_calls = []
-        self.call_index = {}
-        self.current_assignment = None
-        self.current_path = []
+        self.referenced_vars: Set[str] = set()
+        logger.debug("Initialized VariableReferenceCollector")
 
-    def visit_Call(self, node):
+    def visit_Name(self, node: ast.Name):
+        if isinstance(node.ctx, ast.Load):
+            self.referenced_vars.add(node.id)
+            logger.debug(f"Referenced variable found: '{node.id}'")
+        self.generic_visit(node)
+
+
+def collect_hp_calls(code: str) -> List[HPCall]:
+    """
+    Collect all HP calls from the given source code.
+
+    Args:
+        code (str): The source code to analyze.
+
+    Returns:
+        List[HPCall]: A list of HPCall instances found in the code.
+    """
+    logger.info("Starting HP calls collection")
+    try:
+        tree = ast.parse(code)
+        logger.debug("AST parsing successful")
+    except SyntaxError as e:
+        logger.error(f"Syntax error while parsing code: {e}")
+        return []
+
+    # Build parent map
+    parent_map = build_parent_map(tree)
+
+    # Initialize visitor with parent map
+    visitor = HPCallVisitor(parent_map)
+    visitor.visit(tree)
+
+    logger.info(f"Collected {len(visitor.hp_calls)} HP calls")
+    for call in visitor.hp_calls:
+        logger.debug(f"HP Call: {call}")
+
+    return visitor.hp_calls
+
+
+def inject_names_to_source_code(code: str, hp_calls: List[HPCall]) -> str:
+    """
+    Inject implicit names into HP calls that lack an explicit name.
+
+    Args:
+        code (str): The original source code.
+        hp_calls (List[HPCall]): The list of HPCall instances to process.
+
+    Returns:
+        str: The modified source code with injected names.
+    """
+    logger.info("Starting name injection into source code")
+    tree = ast.parse(code)
+    injector = NameInjector(hp_calls)
+    modified_tree = injector.visit(tree)
+    ast.fix_missing_locations(modified_tree)
+    try:
+        modified_code = ast.unparse(modified_tree)
+        logger.debug("AST unparsed successfully using ast.unparse")
+    except AttributeError:
+        # For Python versions < 3.9 where ast.unparse is not available
+        import astor
+
+        modified_code = astor.to_source(modified_tree)
+        logger.debug("AST unparsed successfully using astor.to_source")
+    logger.info("Name injection completed")
+    return modified_code
+
+
+class NameInjector(ast.NodeTransformer):
+    def __init__(self, hp_calls: List[HPCall]):
+        self.hp_calls = hp_calls
+        self.call_index = 0
+        logger.debug("Initialized NameInjector")
+
+    def visit_Call(self, node: ast.Call):
         if (
             isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "hp"
         ):
-            lineno = node.lineno
-            method_name = node.func.attr
-
-            if lineno not in self.call_index:
-                self.call_index[lineno] = {}
-            if method_name not in self.call_index[lineno]:
-                self.call_index[lineno][method_name] = 0
+            if self.call_index < len(self.hp_calls):
+                hp_call = self.hp_calls[self.call_index]
+                if hp_call.implicit_name and not hp_call.has_explicit_name:
+                    logger.debug(f"Injecting name '{hp_call.implicit_name}' into hp call on line {hp_call.lineno}")
+                    # Avoid duplicate 'name' arguments
+                    if not any(kw.arg == "name" for kw in node.keywords):
+                        node.keywords.append(
+                            ast.keyword(
+                                arg="name",
+                                value=ast.Constant(value=hp_call.implicit_name),
+                            )
+                        )
+                else:
+                    logger.debug(f"No injection needed for hp call on line {hp_call.lineno}")
+                self.call_index += 1
             else:
-                self.call_index[lineno][method_name] += 1
-
-            implicit_name = self.get_implicit_name(node)
-            has_explicit_name = self.has_explicit_name(node)
-
-            hp_call = HPCall(
-                lineno=lineno,
-                col_offset=node.col_offset,
-                method_name=method_name,
-                implicit_name=implicit_name,
-                has_explicit_name=has_explicit_name,
-            )
-            hp_call.call_index = self.call_index[lineno][method_name]
-            self.hp_calls.append(hp_call)
-
-        self.generic_visit(node)
-
-    def visit_Assign(self, node):
-        self.current_assignment = node  # Track the current assignment
-        self.generic_visit(node)
-        self.current_assignment = None  # Reset after processing
-
-    def get_implicit_name(self, node):
-        if self.current_assignment:
-            target = self.get_target_name(self.current_assignment.targets[0])
-            if isinstance(self.current_assignment.value, ast.Call) and self.is_hp_call(self.current_assignment.value):
-                return target
-            return self.find_node_in_assignment(self.current_assignment.value, node, [target])
-        return self.find_node_in_current_path(node)
-
-    def has_explicit_name(self, node):
-        for kw in node.keywords:
-            if kw.arg == "name":
-                return True
-        return False
-
-    def get_target_name(self, node):
-        if isinstance(node, ast.Name):
-            return node.id
-        elif isinstance(node, ast.Attribute):
-            return f"{self.get_target_name(node.value)}.{node.attr}"
-        return "Unknown"
-
-    def is_hp_call(self, node):
-        return (
-            isinstance(node.func, ast.Attribute)
-            and isinstance(node.func.value, ast.Name)
-            and node.func.value.id == "hp"
-        )
-
-    def find_node_in_assignment(self, value_node, target_node, path):
-        if isinstance(value_node, ast.Dict):
-            for key, value in zip(value_node.keys, value_node.values):
-                if value == target_node:
-                    return ".".join(path + [self.get_node_value(key)])
-                result = self.find_node_in_assignment(value, target_node, path + [self.get_node_value(key)])
-                if result:
-                    return result
-        elif isinstance(value_node, ast.Call):
-            for idx, arg in enumerate(value_node.args):
-                if arg == target_node:
-                    return ".".join(path + [f"arg{idx}"])
-                result = self.find_node_in_assignment(arg, target_node, path + [f"arg{idx}"])
-                if result:
-                    return result
-            for keyword in value_node.keywords:
-                if keyword.value == target_node:
-                    return ".".join(path + [keyword.arg])
-                result = self.find_node_in_assignment(keyword.value, target_node, path + [keyword.arg])
-                if result:
-                    return result
-        return None
-
-    def find_node_in_current_path(self, node):
-        return ".".join(self.current_path) if self.current_path else None
-
-    def get_node_value(self, node):
-        if isinstance(node, ast.Constant):
-            return str(node.value)
-        elif isinstance(node, ast.Name):
-            return node.id
-        return ast.unparse(node)
-
-
-class VariableReferenceCollector(ast.NodeVisitor):
-    def __init__(self):
-        self.referenced_vars = set()
-
-    def visit_Name(self, node):
-        if isinstance(node.ctx, ast.Load):
-            self.referenced_vars.add(node.id)
-        self.generic_visit(node)
-
-
-def collect_hp_calls(code: str) -> List[HPCall]:
-    tree = ast.parse(code)
-    visitor = HPCallVisitor()
-    visitor.visit(tree)
-    return visitor.hp_calls
+                logger.warning("More hp_calls than hp.Call nodes encountered")
+        return self.generic_visit(node)
 
 
 def find_referenced_vars(code: str) -> Set[str]:
+    """
+    Find all variables that are referenced (read) in the given source code.
+
+    Args:
+        code (str): The source code to analyze.
+
+    Returns:
+        Set[str]: A set of variable names that are referenced.
+    """
+    logger.info("Starting referenced variables collection")
     tree = ast.parse(code)
     collector = VariableReferenceCollector()
     collector.visit(tree)
+    logger.info(f"Referenced variables collected: {collector.referenced_vars}")
     return collector.referenced_vars
 
 
-def inject_names_to_source_code(code: str, hp_calls: List[HPCall]) -> str:
-    tree = ast.parse(code)
+def find_independent_select_calls(referenced_vars: Set[str], hp_calls: List[HPCall]) -> List[str]:
+    """
+    Identify independent hp.select calls not influenced by referenced variables.
 
-    class NameInjector(ast.NodeTransformer):
-        def __init__(self, hp_calls):
-            self.hp_calls = hp_calls
-            self.call_index = 0
+    Args:
+        referenced_vars (Set[str]): Set of variables that are referenced in the code.
+        hp_calls (List[HPCall]): List of collected HPCall instances.
 
-        def visit_Call(self, node):
-            if (
-                isinstance(node.func, ast.Attribute)
-                and isinstance(node.func.value, ast.Name)
-                and node.func.value.id == "hp"
-            ):
-                if (
-                    self.call_index < len(self.hp_calls)
-                    and self.hp_calls[self.call_index].implicit_name
-                    and self.hp_calls[self.call_index].has_explicit_name is False
-                ):
-                    node.keywords.append(
-                        ast.keyword(arg="name", value=ast.Constant(value=self.hp_calls[self.call_index].implicit_name))
-                    )
-                self.call_index += 1
-            return self.generic_visit(node)
-
-    injector = NameInjector(hp_calls)
-    modified_tree = injector.visit(tree)
-    return ast.unparse(modified_tree)
-
-
-def find_independent_select_calls(referenced_vars, hp_calls) -> List[str]:
+    Returns:
+        List[str]: List of independent hp.select implicit names.
+    """
     independent_vars = {
         call.implicit_name.split(".")[0]
         for call in hp_calls
@@ -455,5 +447,5 @@ def find_independent_select_calls(referenced_vars, hp_calls) -> List[str]:
         and call.method_name == "select"
         and call.implicit_name.split(".")[0] not in referenced_vars
     }
-
+    logger.debug(f"Independent select calls identified: {independent_vars}")
     return list(independent_vars)
