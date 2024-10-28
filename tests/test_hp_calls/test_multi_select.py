@@ -215,3 +215,35 @@ def test_multi_select_missing_default():
             hp.multi_select(["a", "b"], name="param")
 
         missing_default()
+
+
+def test_multi_select_with_disable_overrides():
+    @config
+    def config_func(hp: HP):
+        values = hp.multi_select(["a", "b", "c"], default=["a"], name="param", disable_overrides=True)
+
+    # Should work with selections
+    result = config_func(selections={"param": ["b", "c"]})
+    assert result["values"] == ["b", "c"]
+
+    # Should fail with overrides
+    with pytest.raises(ValueError, match="Overrides are disabled for 'param'"):
+        config_func(overrides={"param": ["c"]})
+
+
+def test_multi_select_rejects_non_list_override():
+    @config
+    def config_func(hp: HP):
+        values = hp.multi_select(["a", "b", "c"], default=["a"], name="param")
+
+    with pytest.raises(TypeError, match="Override for 'param' must be a list"):
+        config_func(overrides={"param": "b"})
+
+
+def test_multi_select_rejects_non_list_selection():
+    @config
+    def config_func(hp: HP):
+        values = hp.multi_select(["a", "b", "c"], default=["a"], name="param")
+
+    with pytest.raises(TypeError, match="Selection for 'param' must be a list"):
+        config_func(selections={"param": "b"})

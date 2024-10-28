@@ -185,3 +185,35 @@ def test_select_missing_default():
             hp.select(["a", "b"], name="param")
 
         missing_default()
+
+
+def test_select_with_disable_overrides():
+    @config
+    def config_func(hp: HP):
+        value = hp.select(["a", "b", "c"], default="a", name="param", disable_overrides=True)
+
+    # Should work with selections
+    result = config_func(selections={"param": "b"})
+    assert result["value"] == "b"
+
+    # Should fail with overrides
+    with pytest.raises(ValueError, match="Overrides are disabled for 'param'"):
+        config_func(overrides={"param": "c"})
+
+
+def test_select_rejects_list_selection():
+    @config
+    def config_func(hp: HP):
+        value = hp.select(["a", "b", "c"], default="a", name="param")
+
+    with pytest.raises(TypeError, match="Selection for 'param' must not be a list"):
+        config_func(selections={"param": ["b"]})
+
+
+def test_select_rejects_list_override_with_valid_options():
+    @config
+    def config_func(hp: HP):
+        value = hp.select(["a", "b", "c"], default="a", name="param")
+
+    with pytest.raises(ValueError, match="Override values \\['b', 'c'\\] for 'param' are not all valid options"):
+        config_func(overrides={"param": ["b", "c"]})
