@@ -48,7 +48,7 @@ class SelectCall(HPCall):
         self.options = validate_and_process_options(name, options)
         self.validate_default(default)
 
-    def validate_default(self, default: ValidKeyType):  # TODO: change type to union of str, int, float, bool
+    def validate_default(self, default: ValidKeyType):
         if default is None:
             return
         if isinstance(default, list):
@@ -63,8 +63,9 @@ class SelectCall(HPCall):
         if self.name in overrides:
             override_value = overrides[self.name]
 
-            # handle a case where the override is a list and one or more values\
-            # are in the options keys - this is probably a mistake
+            # this handles the case where the override is a list and one or more values\
+            # are in the options keys - this is probably a mistake, since we're using hp.select()
+            # which expects a single value
             if isinstance(override_value, list) and any(v in self.options for v in override_value):
                 raise ValueError(
                     f"Override values {override_value} for '{self.name}' are not all valid options."
@@ -129,3 +130,99 @@ class MultiSelectCall(HPCall):
             return [self.options.get(d) for d in self.default]
         else:
             raise ValueError(f"No overrides, selections or default provided for '{self.name}'.")
+
+
+class SingleValueCall(HPCall):
+    """Base class for all single-value hyperparameter calls."""
+
+    def __init__(self, name: str, default: Any, expected_type: Union[type, tuple]):
+        super().__init__(name, default)
+        self.expected_type = expected_type
+        if not isinstance(default, expected_type):
+            type_name = self._get_type_name(expected_type)
+            raise TypeError(f"Default value for '{name}' must be of type {type_name}")
+
+    def execute(self, overrides: Dict[str, Any]) -> Any:
+        if self.name in overrides:
+            override_value = overrides[self.name]
+            if isinstance(override_value, list):
+                raise TypeError(f"Override for '{self.name}' must not be a list")
+            if not isinstance(override_value, self.expected_type):
+                type_name = self._get_type_name(self.expected_type)
+                raise TypeError(f"Override for '{self.name}' must be of type {type_name}")
+            return override_value
+        return self.default
+
+    @staticmethod
+    def _get_type_name(type_obj: Union[type, tuple]) -> str:
+        if isinstance(type_obj, tuple):
+            return " or ".join(t.__name__ for t in type_obj)
+        return type_obj.__name__
+
+
+class MultiValueCall(HPCall):
+    """Base class for all multi-value hyperparameter calls."""
+
+    def __init__(self, name: str, default: List[Any], expected_type: Union[type, tuple]):
+        super().__init__(name, default)
+        self.expected_type = expected_type
+        if not isinstance(default, list) or not all(isinstance(x, expected_type) for x in default):
+            type_name = self._get_type_name(expected_type)
+            raise TypeError(f"Default value for '{name}' must be a list of {type_name}")
+
+    def execute(self, overrides: Dict[str, Any]) -> List[Any]:
+        if self.name in overrides:
+            override_values = overrides[self.name]
+            if not isinstance(override_values, list):
+                raise TypeError(f"Override for '{self.name}' must be a list")
+            if not all(isinstance(x, self.expected_type) for x in override_values):
+                type_name = self._get_type_name(self.expected_type)
+                raise TypeError(f"All override values for '{self.name}' must be of type {type_name}")
+            return override_values
+        return self.default
+
+    @staticmethod
+    def _get_type_name(type_obj: Union[type, tuple]) -> str:
+        if isinstance(type_obj, tuple):
+            return " or ".join(t.__name__ for t in type_obj)
+        return type_obj.__name__
+
+
+class TextInputCall(SingleValueCall):
+    def __init__(self, name: str, default: str):
+        super().__init__(name, default, str)
+
+
+class MultiTextCall(MultiValueCall):
+    def __init__(self, name: str, default: List[str]):
+        super().__init__(name, default, str)
+
+
+class NumberInputCall(SingleValueCall):
+    def __init__(self, name: str, default: Union[int, float]):
+        super().__init__(name, default, (int, float))
+
+
+class MultiNumberCall(MultiValueCall):
+    def __init__(self, name: str, default: List[Union[int, float]]):
+        super().__init__(name, default, (int, float))
+
+
+class IntInputCall(SingleValueCall):
+    def __init__(self, name: str, default: int):
+        super().__init__(name, default, int)
+
+
+class MultiIntCall(MultiValueCall):
+    def __init__(self, name: str, default: List[int]):
+        super().__init__(name, default, int)
+
+
+class BoolInputCall(SingleValueCall):
+    def __init__(self, name: str, default: bool):
+        super().__init__(name, default, bool)
+
+
+class MultiBoolCall(MultiValueCall):
+    def __init__(self, name: str, default: List[bool]):
+        super().__init__(name, default, bool)
