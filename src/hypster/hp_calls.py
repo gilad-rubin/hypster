@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 ValidKeyType = Union[str, int, float, bool]
 OptionsType = Union[Dict[ValidKeyType, Any], List[ValidKeyType]]
@@ -142,7 +142,9 @@ class SingleValueCall(HPCall):
             type_name = self._get_type_name(expected_type)
             raise TypeError(f"Default value for '{name}' must be of type {type_name}")
 
-    def execute(self, overrides: Dict[str, Any]) -> Any:
+    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
+        if self.name in selections:
+            raise ValueError(f"Selections are not supported for '{self.name}'.")
         if self.name in overrides:
             override_value = overrides[self.name]
             if isinstance(override_value, list):
@@ -170,7 +172,9 @@ class MultiValueCall(HPCall):
             type_name = self._get_type_name(expected_type)
             raise TypeError(f"Default value for '{name}' must be a list of {type_name}")
 
-    def execute(self, overrides: Dict[str, Any]) -> List[Any]:
+    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> List[Any]:
+        if self.name in selections:
+            raise ValueError(f"Selections are not supported for '{self.name}'.")
         if self.name in overrides:
             override_values = overrides[self.name]
             if not isinstance(override_values, list):
@@ -198,26 +202,6 @@ class MultiTextCall(MultiValueCall):
         super().__init__(name, default, str)
 
 
-class NumberInputCall(SingleValueCall):
-    def __init__(self, name: str, default: Union[int, float]):
-        super().__init__(name, default, (int, float))
-
-
-class MultiNumberCall(MultiValueCall):
-    def __init__(self, name: str, default: List[Union[int, float]]):
-        super().__init__(name, default, (int, float))
-
-
-class IntInputCall(SingleValueCall):
-    def __init__(self, name: str, default: int):
-        super().__init__(name, default, int)
-
-
-class MultiIntCall(MultiValueCall):
-    def __init__(self, name: str, default: List[int]):
-        super().__init__(name, default, int)
-
-
 class BoolInputCall(SingleValueCall):
     def __init__(self, name: str, default: bool):
         super().__init__(name, default, bool)
@@ -226,3 +210,85 @@ class BoolInputCall(SingleValueCall):
 class MultiBoolCall(MultiValueCall):
     def __init__(self, name: str, default: List[bool]):
         super().__init__(name, default, bool)
+
+
+class NumericValidationMixin:
+    """Mixin for validating numeric bounds on values."""
+
+    def __init__(
+        self, *args, min_val: Optional[Union[int, float]] = None, max_val: Optional[Union[int, float]] = None, **kwargs
+    ):
+        self.min_val = min_val
+        self.max_val = max_val
+        super().__init__(*args, **kwargs)
+
+    def validate_bounds(self, value: Union[int, float]):
+        """Validate a single value against min/max bounds."""
+        if self.min_val is not None and value < self.min_val:
+            raise ValueError(f"Value {value} for '{self.name}' must be greater than or equal to {self.min_val}")
+        if self.max_val is not None and value > self.max_val:
+            raise ValueError(f"Value {value} for '{self.name}' must be less than or equal to {self.max_val}")
+
+    def validate_value(self, value: Union[Union[int, float], List[Union[int, float]]]):
+        """Validate a value or list of values against bounds."""
+        if isinstance(value, list):
+            for v in value:
+                self.validate_bounds(v)
+        else:
+            self.validate_bounds(value)
+
+
+class NumberInputCall(NumericValidationMixin, SingleValueCall):
+    def __init__(
+        self,
+        name: str,
+        default: Union[int, float],
+        min: Optional[Union[int, float]] = None,
+        max: Optional[Union[int, float]] = None,
+    ):
+        super().__init__(name=name, default=default, expected_type=(int, float), min_val=min, max_val=max)
+        self.validate_value(default)
+
+    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
+        value = super().execute(selections, overrides)
+        self.validate_value(value)
+        return value
+
+
+class MultiNumberCall(NumericValidationMixin, MultiValueCall):
+    def __init__(
+        self,
+        name: str,
+        default: List[Union[int, float]],
+        min: Optional[Union[int, float]] = None,
+        max: Optional[Union[int, float]] = None,
+    ):
+        super().__init__(name=name, default=default, expected_type=(int, float), min_val=min, max_val=max)
+        self.validate_value(default)
+
+    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> List[Any]:
+        values = super().execute(selections, overrides)
+        self.validate_value(values)
+        return values
+
+
+class IntInputCall(NumericValidationMixin, SingleValueCall):
+    def __init__(self, name: str, default: int, min: Optional[int] = None, max: Optional[int] = None):
+        super().__init__(name=name, default=default, expected_type=int, min_val=min, max_val=max)
+        self.validate_value(default)
+
+    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
+        value = super().execute(selections, overrides)
+        self.validate_value(value)
+        return value
+
+
+class MultiIntCall(NumericValidationMixin, MultiValueCall):
+    def __init__(self, name: str, default: List[int], min: Optional[int] = None, max: Optional[int] = None):
+        super().__init__(name=name, default=default, expected_type=int, min_val=min, max_val=max)
+        self.validate_value(default)
+
+    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> List[Any]:
+        values = super().execute(selections, overrides)
+        self.validate_value(values)
+        return values
