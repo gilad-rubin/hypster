@@ -455,3 +455,34 @@ class MultiIntCall(HPCall):
 
     def explore(self) -> List[int]:
         pass
+
+
+class BoolInputCall(HPCall):
+    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: Any = None):
+        InputValidator.validate_type(default, bool, "boolean", "default")
+        super().__init__(hp_instance, name, default)
+
+    def execute(self, options: None = None) -> bool:
+        result = self.handle_overrides_selections()
+        InputValidator.validate_type(result, bool, "boolean", "result")
+        logger.info(f"BoolInput call executed for {self.name}: {result}")
+        return result
+
+    def explore(self) -> bool:
+        return self.default if self.default is not None else False
+
+
+class MultiBoolCall(HPCall):
+    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: List[bool] = None):
+        InputValidator.validate_list_types(default, bool, "boolean", "default")
+        super().__init__(hp_instance, name, default or [])
+        self.current_values = self.default
+
+    def execute(self, options: None = None) -> List[bool]:
+        result = self.handle_overrides_selections()
+        InputValidator.validate_list_types(result, bool, "boolean", "result")
+        logger.info(f"MultiBool call executed for {self.name}: {result}")
+        return result
+
+    def explore(self) -> List[bool]:
+        return self.default if self.default is not None else []

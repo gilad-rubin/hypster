@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .hp_calls import (
+    BoolInputCall,
     IntInputCall,
+    MultiBoolCall,
     MultiIntCall,
     MultiNumberCall,
     MultiSelectCall,
@@ -147,6 +149,16 @@ class HP:
                 self.current_combination.pop(name)
             if name == param:
                 reset = True
+
+    def bool_input(self, default: bool, *, name: Optional[str] = None) -> bool:
+        bool_input_call = BoolInputCall(self, name=name, default=default)
+        logger.debug(f"Added BoolInputCall: {name}")
+        return bool_input_call.execute()
+
+    def multi_bool(self, default: List[bool] = [], *, name: Optional[str] = None) -> List[bool]:
+        multi_bool_call = MultiBoolCall(self, name=name, default=default)
+        logger.debug(f"Added MultiBoolCall: {name}")
+        return multi_bool_call.execute()
 
 
 class InvalidSelectionError(Exception):
