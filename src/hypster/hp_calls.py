@@ -1,488 +1,131 @@
-import collections
-import itertools
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Union
 
-if TYPE_CHECKING:
-    from .hp import HP  # Adjust the import path as needed
+ValidKeyType = Union[str, int, float, bool]
+OptionsType = Union[Dict[ValidKeyType, Any], List[ValidKeyType]]
 
 logger = logging.getLogger(__name__)
 
 
 class HPCall(ABC):
-    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: Any = None):
-        if name is None:
-            raise ValueError("`name` argument is missing and must be provided explicitly.")
-        self.hp = hp_instance
-        self.name = self._get_full_name(name)
+    def __init__(self, name: str, default: Any = None):
+        if not name:
+            raise ValueError("`name` argument is required.")
+        self.name = name
         self.default = default
-        # TODO: improve this
-        if default is not None:
-            if self.name not in self.hp.defaults:
-                self.hp.defaults[self.name] = [default]
-            elif default not in self.hp.defaults[self.name]:
-                self.hp.defaults[self.name].append(default)
-        self.options = None
-
-    def _get_full_name(self, name: str) -> str:
-        if self.hp.name_prefix:
-            return f"{self.hp.name_prefix}.{name}"
-        return name
-
-    def validate_and_process_options(
-        self, options: Optional[Union[Dict[str, Any], List[Any]]]
-    ) -> Optional[Dict[Any, Any]]:
-        if options is not None:
-            self._check_options_exists(options)
-            if isinstance(options, dict):
-                self._validate_dict_keys(options)
-            elif isinstance(options, list):
-                self._validate_list_values(options)
-                options = {v: v for v in options}
-            else:
-                raise ValueError("Options must be a dictionary or a list.")
-
-            if self.default is not None:
-                self._validate_default(self.default, options)
-            self.options = options
-            return options
-        return None
-
-    def _check_options_exists(self, options: Union[Dict[str, Any], List[Any]]):
-        if not isinstance(options, (list, dict)) or len(options) == 0:
-            raise ValueError("Options must be a non-empty list or dictionary.")
-
-    def _validate_dict_keys(self, options: Dict[str, Any]):
-        if not all(isinstance(k, (str, int, bool, float)) for k in options.keys()):
-            bad_keys = [key for key in options.keys() if not isinstance(key, (str, int, bool, float))]
-            raise ValueError(f"Dictionary keys must be str, int, bool, float. Got {bad_keys} instead.")
-
-    def _validate_list_values(self, options: List[Any]):
-        if not all(isinstance(v, (str, int, bool, float)) for v in options):
-            raise ValueError(
-                "List values must be one of: str, int, bool, float. For complex types - use a dictionary instead"
-            )
-
-    def _validate_default(self, default: Any, options: Dict[str, Any]):
-        if default is not None and isinstance(default, list):
-            for key in default:
-                if key not in options:
-                    raise ValueError("Default values must be one of the options.")
-        elif default is not None and default not in options:  # TODO: add var/param names to error
-            raise ValueError("Default value must be one of the options.")
-
-    def handle_overrides_selections(self) -> Any:
-        if self.name in self.hp.overrides:
-            result = self._get_result_from_override()
-        elif self.name in self.hp.selections:
-            result = self._get_result_from_selection()
-        elif self.default is not None:
-            if isinstance(self.default, list):
-                result = []
-                for key in self.default:
-                    if self.options:
-                        if key in self.options:
-                            result.append(self.options[key])
-                        else:  # TODO: fix
-                            raise ValueError("Invalid default not in options.")
-                    else:
-                        result.append(key)
-                snapshot = self.default
-            else:
-                result = self.options[self.default] if self.options else self.default
-                snapshot = self.default
-            self.hp.snapshot[self.name] = snapshot
-        else:
-            raise ValueError(f"`{self.name}` has no selections, overrides or defaults provided.")
-
-        return result
-
-    def _get_result_from_override(self):
-        override_value = self.hp.overrides[self.name]
-        logger.debug("Found override for %s: %s", self.name, override_value)
-        snapshot = None
-        if isinstance(override_value, list):
-            result = []
-            snapshot = []
-            for value in override_value:
-                snapshot.append(value)
-                if self.options and value in self.options:
-                    result.append(self.options[value])
-                else:
-                    result.append(value)
-        elif self.options and override_value in self.options:
-            result = self.options[override_value]
-        else:
-            result = override_value
-
-        if snapshot is None:
-            snapshot = override_value
-        self.hp.snapshot[self.name] = snapshot
-        logger.info("Applied override for %s: %s", self.name, result)
-        return result
-
-    def _get_result_from_selection(self):
-        # TODO: add error if there's a selection for something that only works with overrides,
-        # like text, number input (including multi)
-
-        selected_value = self.hp.selections[self.name]
-        logger.debug("Found selection for %s: %s", self.name, selected_value)
-        snapshot = None
-        # TODO: add 'if selected_value is not a list and we're at multi_...' - error
-        if isinstance(selected_value, list):
-            result = []
-            snapshot = []
-            for key in selected_value:
-                if self.options and key in self.options:
-                    result.append(self.options[key])
-                    snapshot.append(key)
-                else:
-                    raise ValueError(
-                        f"Invalid selection '{key}' for '{self.name}'. Not in options: "
-                        f"{list(self.options.keys() if self.options else [])}"
-                    )
-        elif self.options and selected_value in self.options:
-            result = self.options[selected_value]
-            logger.info("Applied selection for %s: %s", self.name, result)
-        else:
-            raise ValueError(
-                f"Invalid selection '{selected_value}' for '{self.name}'. "
-                f"Not in options: {list(self.options.keys() if self.options else [])}"
-            )
-
-        if snapshot is None:  # not a list
-            snapshot = selected_value
-        if self.name not in self.hp.snapshot:
-            self.hp.snapshot[self.name] = snapshot
-        return result
-
-    # TODO: handle different cases where options is a list, one item, or empty.
 
     @abstractmethod
-    def explore(self) -> Any:
+    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
         pass
 
-    @abstractmethod
-    def explore(self) -> bool:
-        pass
+
+def validate_and_process_options(name: str, options: OptionsType) -> Dict[ValidKeyType, Any]:
+    if not options:
+        raise ValueError(f"Options must be provided and cannot be empty for '{name}'.")
+
+    if isinstance(options, list):
+        validate_items(name, options)
+        options = {v: v for v in options}
+    elif isinstance(options, dict):
+        validate_items(name, options.keys())
+    else:
+        raise ValueError(f"Options for '{name}' must be a dictionary or a list.")
+
+    return options
+
+
+def validate_items(name: str, items: List[ValidKeyType]):
+    if not all(isinstance(item, ValidKeyType) for item in items):
+        invalid_items = [item for item in items if not isinstance(item, ValidKeyType)]
+        raise ValueError(f"Items for '{name}' must be one of: str, int, bool, float. Invalid items: {invalid_items}")
 
 
 class SelectCall(HPCall):
-    def execute(self, options: Optional[Union[Dict[str, Any], List[Any]]] = None) -> Any:
-        self.options = self.validate_and_process_options(options)
-        if self.hp.explore_mode:
-            self.hp.current_space[self.name] = list(self.options.keys())
-            return self.explore()
-        return self.handle_overrides_selections()
+    def __init__(self, name: str, options: OptionsType, default: Any = None, disable_overrides: bool = False):
+        super().__init__(name, default)
+        self.disable_overrides = disable_overrides
+        self.options = validate_and_process_options(name, options)
+        self.validate_default(default)
 
-    def explore(self) -> Any:
-        if self.name in self.hp.current_combination:
-            selected_key = self.hp.current_combination[self.name]
-            if selected_key not in self.options:
-                selected_key = list(self.options.keys())[0]
+    def validate_default(self, default: ValidKeyType):  # TODO: change type to union of str, int, float, bool
+        if default is None:
+            return
+        if isinstance(default, list):
+            raise ValueError(f"Default for '{self.name}' must not be a list.")
+        if default not in self.options:
+            raise ValueError(f"Default value '{default}' for '{self.name}' must be one of the options.")
+
+    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
+        if self.disable_overrides and self.name in overrides:
+            raise ValueError(f"Overrides are disabled for '{self.name}'.")
+
+        if self.name in overrides:
+            override_value = overrides[self.name]
+
+            # handle a case where the override is a list and one or more values\
+            # are in the options keys - this is probably a mistake
+            if isinstance(override_value, list) and any(v in self.options for v in override_value):
+                raise ValueError(
+                    f"Override values {override_value} for '{self.name}' are not all valid options."
+                )  # TODO: improve message and comment
+
+            return self.options.get(override_value, override_value)
+
+        if self.name in selections:
+            selected_value = selections[self.name]
+            if isinstance(selected_value, list):
+                raise TypeError(f"Selection for '{self.name}' must not be a list.")
+            if selected_value not in self.options:
+                raise ValueError(
+                    f"Invalid selection '{selected_value}' for parameter '{self.name}'. "
+                    f"Not in options: {list(self.options.keys())}"
+                )
+            return self.options.get(selected_value, selected_value)
+        elif self.default:
+            return self.options.get(self.default)
         else:
-            selected_key = list(self.options.keys())[0]
-            self.hp.current_combination[self.name] = selected_key
-
-        return self.options[selected_key]
+            raise ValueError(f"No overrides, selections or default provided for '{self.name}'.")
 
 
 class MultiSelectCall(HPCall):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.all_combinations = None
+    def __init__(self, name: str, options: OptionsType, default=None, disable_overrides=False):
+        super().__init__(name, default)
+        self.disable_overrides = disable_overrides
+        self.options = validate_and_process_options(name, options)
+        self.validate_default(default)
 
-    def _validate_list_type(self, value: Any, source: str):
-        if not isinstance(value, list):
-            raise TypeError(f"{source} value must be a list, got {type(value).__name__}")
+    def validate_default(self, default: List[ValidKeyType]):
+        if not isinstance(default, list):
+            raise ValueError(f"Default for '{self.name}' must be a list.")
+        invalid_defaults = [d for d in default if d not in self.options]
+        if invalid_defaults:
+            raise ValueError(f"Default values {invalid_defaults} for '{self.name}' must be one of the options.")
 
-    def execute(self, options: Union[Dict[str, Any], List[Any]]) -> List[Any]:
-        processed_options = self.validate_and_process_options(options)
-        self.options = processed_options
+    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> List[Any]:
+        if self.disable_overrides and self.name in overrides:
+            raise ValueError(f"Overrides are disabled for '{self.name}'.")
 
-        if self.hp.explore_mode:
-            return self.explore()
+        if self.name in overrides:
+            override_values = overrides[self.name]
+            if not isinstance(override_values, list):
+                raise TypeError(f"Override for '{self.name}' must be a list.")
+            return [self.options.get(v, v) for v in override_values]
 
-        # Validate selections and overrides before handling them
-        if self.name in self.hp.selections:
-            self._validate_list_type(self.hp.selections[self.name], "selection")
-        if self.name in self.hp.overrides:
-            self._validate_list_type(self.hp.overrides[self.name], "override")
+        elif self.name in selections:
+            selected_values = selections[self.name]
+            if not isinstance(selected_values, list):
+                raise TypeError(f"Selection for '{self.name}' must be a list.")
 
-        result = self.handle_overrides_selections()
-        logger.info(f"MultiSelect call executed for {self.name}: {result}")
-        return result
+            invalid_selections = [v for v in selected_values if v not in self.options]
+            if invalid_selections:
+                raise ValueError(
+                    f"Selection values {invalid_selections} for parameter '{self.name}'. "
+                    f"Not in options: {list(self.options.keys())}."
+                )
 
-    def explore(self) -> List[Any]:
-        if self.name in self.hp.current_combination:
-            chosen_keys = self.hp.current_combination[self.name]
+            return [self.options.get(v) for v in selected_values]
+        elif self.default is not None:
+            return [self.options.get(d) for d in self.default]
         else:
-            combinations = self._generate_all_combinations()
-            self.hp.current_space[self.name] = combinations
-            chosen_keys = combinations[0]
-            self.hp.current_combination[self.name] = chosen_keys
-
-        result = []
-        for key in chosen_keys:
-            result.append(self.options[key])
-        return result
-
-    def _generate_all_combinations(self) -> List[List[str]]:
-        keys = list(self.options.keys())
-        all_combinations = [[]]  # Include empty list for none selected
-        for r in range(1, len(keys) + 1):
-            all_combinations.extend(itertools.combinations(keys, r))
-        return [list(combo) for combo in all_combinations]
-
-
-class InputValidator:
-    @staticmethod
-    def validate_type(value: Any, expected_type: Union[type, Tuple[type, ...]], type_name: str, source: str = ""):
-        if value is not None and not isinstance(value, expected_type):
-            source_msg = f" in {source}" if source else ""
-            raise TypeError(f"Value must be {type_name}{source_msg}, got {type(value).__name__}")
-
-    @staticmethod
-    def validate_list_types(
-        values: List[Any], expected_type: Union[type, Tuple[type, ...]], type_name: str, source: str = ""
-    ):
-        if values is not None:
-            if not isinstance(values, list):
-                raise TypeError(f"Value must be a list of {type_name}s")
-            if not all(isinstance(x, expected_type) for x in values):
-                raise TypeError(f"All values must be {type_name}s")
-
-
-class TextInputCall(HPCall):
-    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: Any = None):
-        InputValidator.validate_type(default, str, "string", "default")
-        super().__init__(hp_instance, name, default)
-
-    def execute(self, options: None = None) -> str:
-        result = self.handle_overrides_selections()
-        InputValidator.validate_type(result, str, "string", "result")
-        logger.info(f"TextInput call executed for {self.name}: {result}")
-        return result
-
-    def explore(self) -> str:
-        return self.default if self.default is not None else ""
-
-
-class NumberInputCall(HPCall):
-    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: Any = None):
-        InputValidator.validate_type(default, (int, float), "number", "default")
-        super().__init__(hp_instance, name, default)
-
-    def execute(self, options: None = None) -> Union[int, float]:
-        result = self.handle_overrides_selections()
-        InputValidator.validate_type(result, (int, float), "number", "result")
-        logger.info(f"NumberInput call executed for {self.name}: {result}")
-        return result
-
-    def explore(self) -> Union[int, float]:
-        # TODO: handle no defaults in combinations
-        return self.default
-
-
-class IntInputCall(HPCall):
-    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: Any = None):
-        InputValidator.validate_type(default, int, "integer", "default")
-        super().__init__(hp_instance, name, default)
-
-    def execute(self, options: None = None) -> int:
-        result = self.handle_overrides_selections()
-        InputValidator.validate_type(result, int, "integer", "result")
-        logger.info(f"IntInput call executed for {self.name}: {result}")
-        return result
-
-    def explore(self) -> Union[int, float]:
-        # TODO: handle no defaults in combinations
-        return self.default
-
-
-class MultiTextCall(HPCall):
-    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: List[str] = None):
-        InputValidator.validate_list_types(default, str, "string", "default")
-        super().__init__(hp_instance, name, default or [])
-        self.current_values = self.default
-
-    def execute(self, options: None = None) -> List[str]:
-        result = self.handle_overrides_selections()
-        InputValidator.validate_list_types(result, str, "string", "result")
-        logger.info(f"MultiText call executed for {self.name}: {result}")
-        return result
-
-    def explore(self) -> List[str]:
-        pass
-
-
-class MultiNumberCall(HPCall):
-    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: List[Union[int, float]] = None):
-        InputValidator.validate_list_types(default, (int, float), "number", "default")
-        super().__init__(hp_instance, name, default or [])
-        self.current_values = self.default
-
-    def execute(self, options: None = None) -> List[Union[int, float]]:
-        result = self.handle_overrides_selections()
-        InputValidator.validate_list_types(result, (int, float), "number", "result")
-        logger.info(f"MultiNumber call executed for {self.name}: {result}")
-        return result
-
-    def explore(self) -> List[Union[int, float]]:
-        pass
-
-
-class PropagateCall(HPCall):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def execute(
-        self,
-        config_func: Callable,
-        selections: Optional[Dict[str, Any]] = None,
-        overrides: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        if self.hp.explore_mode:
-            return self.explore(config_func)
-
-        original_name_prefix = self.hp.name_prefix
-        self.hp.name_prefix = self.name if original_name_prefix is None else f"{original_name_prefix}.{self.name}"
-        nested_config = self._prepare_nested_config()
-        nested_config["selections"].update(selections or {})
-        nested_config["overrides"].update(overrides or {})
-
-        result = self._run_nested_config(config_func, nested_config)
-        nested_snapshot = config_func.get_last_snapshot()
-        self.hp.snapshot[self.name] = nested_snapshot
-        self.hp.name_prefix = original_name_prefix
-        return result
-
-    def explore(self, config_func: Callable) -> Dict[str, Any]:
-        if self.name in self.hp.current_combination:
-            chosen_combination = self.hp.current_combination[self.name]
-        else:
-            combinations = config_func.get_combinations()
-            defaults = config_func.get_defaults()
-            self.hp.defaults[self.name] = defaults
-            self.hp.current_space[self.name] = combinations
-            chosen_combination = combinations[0]
-            self.hp.current_combination[self.name] = chosen_combination
-
-        nested_config = {}
-        nested_config["selections"] = chosen_combination.copy()
-        nested_config["final_vars"] = []
-        nested_config["overrides"] = {}
-        result = self._run_nested_config(config_func, nested_config)
-        return result
-
-    def _prepare_nested_config(self) -> Dict[str, Any]:
-        return {
-            "selections": self.extract_nested_config(self.hp.selections, self.name),
-            "overrides": self.extract_nested_config(self.hp.overrides, self.name),
-            "final_vars": self.process_final_vars(self.hp.final_vars, self.name),
-        }
-
-    def _run_nested_config(self, config_func: Callable, nested_config: Dict[str, Any]) -> Dict[str, Any]:
-        logger.debug(f"Running nested configuration with: {nested_config}")
-        return config_func(
-            final_vars=nested_config["final_vars"],
-            selections=nested_config["selections"],
-            overrides=nested_config["overrides"],
-        )
-
-    @staticmethod
-    def extract_nested_config(config: Dict[str, Any], prefix: str) -> Dict[str, Any]:
-        result = collections.defaultdict(dict)
-        prefix_dot = f"{prefix}."
-
-        def process_item(key: str, value: Any, target: Dict[str, Any]):
-            if key.startswith(prefix_dot):
-                nested_key = key[len(prefix_dot) :]
-                target[nested_key] = value
-            elif key == prefix and isinstance(value, dict):
-                target.update(value)
-
-        for key, value in config.items():
-            process_item(key, value, result)
-
-        # Check for discrepancies
-        flat_result = {k: v for k, v in PropagateCall._flatten_dict(result).items()}
-        flat_dot_notation = {k[len(prefix_dot) :]: v for k, v in config.items() if k.startswith(prefix_dot)}
-
-        # Check for keys with different values
-        discrepancies = {
-            k: (flat_result[k], flat_dot_notation[k])
-            for k in set(flat_result) & set(flat_dot_notation)
-            if flat_result[k] != flat_dot_notation[k]
-        }
-
-        if discrepancies:
-            raise ValueError(f"Discrepancies found in nested configuration for '{prefix}': {discrepancies}")
-
-        return dict(result)
-
-    @staticmethod
-    def _flatten_dict(d: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
-        items = []
-        for k, v in d.items():
-            new_key = f"{parent_key}{sep}{k}" if parent_key else k
-            if isinstance(v, dict):
-                items.extend(PropagateCall._flatten_dict(v, new_key, sep=sep).items())
-            else:
-                items.append((new_key, v))
-        return dict(items)
-
-    @staticmethod
-    def process_final_vars(final_vars: List[str], name: str) -> List[str]:
-        dot_notation_vars = [var[len(name) + 1 :] for var in final_vars if var.startswith(f"{name}.")]
-        dict_style_vars = list(PropagateCall.extract_nested_config(dict.fromkeys(final_vars, None), name).keys())
-        dict_style_vars = [var for var in dict_style_vars if var not in dot_notation_vars]  # remove dups
-        return dot_notation_vars + dict_style_vars
-
-
-class MultiIntCall(HPCall):
-    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: List[int] = None):
-        InputValidator.validate_list_types(default, int, "integer", "default")
-        super().__init__(hp_instance, name, default or [])
-        self.current_values = self.default
-
-    def execute(self, options: None = None) -> List[int]:
-        result = self.handle_overrides_selections()
-        InputValidator.validate_list_types(result, int, "integer", "result")
-        logger.info(f"MultiInt call executed for {self.name}: {result}")
-        return result
-
-    def explore(self) -> List[int]:
-        pass
-
-
-class BoolInputCall(HPCall):
-    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: Any = None):
-        InputValidator.validate_type(default, bool, "boolean", "default")
-        super().__init__(hp_instance, name, default)
-
-    def execute(self, options: None = None) -> bool:
-        result = self.handle_overrides_selections()
-        InputValidator.validate_type(result, bool, "boolean", "result")
-        logger.info(f"BoolInput call executed for {self.name}: {result}")
-        return result
-
-    def explore(self) -> bool:
-        return self.default if self.default is not None else False
-
-
-class MultiBoolCall(HPCall):
-    def __init__(self, hp_instance: "HP", name: Optional[str] = None, default: List[bool] = None):
-        InputValidator.validate_list_types(default, bool, "boolean", "default")
-        super().__init__(hp_instance, name, default or [])
-        self.current_values = self.default
-
-    def execute(self, options: None = None) -> List[bool]:
-        result = self.handle_overrides_selections()
-        InputValidator.validate_list_types(result, bool, "boolean", "result")
-        logger.info(f"MultiBool call executed for {self.name}: {result}")
-        return result
-
-    def explore(self) -> List[bool]:
-        return self.default if self.default is not None else []
+            raise ValueError(f"No overrides, selections or default provided for '{self.name}'.")
