@@ -1,6 +1,7 @@
 import logging
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Union
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from .hp_calls import (
     BoolInputCall,
@@ -12,6 +13,7 @@ from .hp_calls import (
     MultiTextCall,
     NumberInputCall,
     OptionsType,
+    PropagateCall,
     SelectCall,
     TextInputCall,
     ValidKeyType,
@@ -126,3 +128,28 @@ class HP:
         multi_bool_call = MultiBoolCall(name=name, default=default)
         logger.debug(f"Added MultiBoolCall: {name}")
         return multi_bool_call.execute(self.selections, self.overrides)
+
+    def propagate(
+        self,
+        config_func: Union[str, Path, Callable],
+        *,
+        name: Optional[str] = None,
+        final_vars: List[str] = [],
+        selections: Dict[str, Any] = {},
+        overrides: Dict[str, Any] = {},
+    ) -> Dict[str, Any]:
+        propagate_call = PropagateCall(name=name)
+        logger.debug(f"Added PropagateCall: {name}")
+        if isinstance(config_func, (str, Path)):
+            from .core import load
+
+            config_func = load(str(config_func))
+        return propagate_call.execute(
+            config_func,
+            final_vars=final_vars,
+            original_final_vars=self.final_vars,
+            selections=selections,
+            original_selections=self.selections,
+            overrides=overrides,
+            original_overrides=self.overrides,
+        )
