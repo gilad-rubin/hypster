@@ -47,53 +47,53 @@ def test_basic_two_layer_defaults():
     assert result["nested"]["nested_number"] == 1.0
 
 
-def test_basic_dot_notation_selections():
+def test_basic_dot_notation_values():
     @config
     def main_config(hp: HP):
         nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test dot notation selections
-    result = main_config(selections={"nested.nested_param": "b"}, overrides={"nested.nested_number": 1.5})
+    result = main_config(values={"nested.nested_param": "b", "nested.nested_number": 1.5})
     assert result["nested"]["nested_param"] == "b"
     assert result["nested"]["nested_number"] == 1.5
     assert result["main_param"] == "x"
 
 
-def test_basic_dot_notation_overrides():
+def test_basic_dot_notation_values():
     @config
     def main_config(hp: HP):
         nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test dot notation overrides
-    result = main_config(overrides={"main_param": "y", "nested.nested_param": "b", "nested.nested_number": 1.5})
+    result = main_config(values={"main_param": "y", "nested.nested_param": "b", "nested.nested_number": 1.5})
     assert result["main_param"] == "y"
     assert result["nested"]["nested_param"] == "b"
     assert result["nested"]["nested_number"] == 1.5
 
 
-def test_basic_dict_style_selections():
+def test_basic_dict_style_values():
     @config
     def main_config(hp: HP):
         nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test dictionary style selections
-    result = main_config(selections={"nested": {"nested_param": "b"}}, overrides={"nested": {"nested_number": 1.5}})
+    result = main_config(values={"nested": {"nested_param": "b", "nested_number": 1.5}})
     assert result["nested"]["nested_param"] == "b"
     assert result["nested"]["nested_number"] == 1.5
     assert result["main_param"] == "x"
 
 
-def test_basic_dict_style_overrides():
+def test_basic_dict_style_values():
     @config
     def main_config(hp: HP):
         nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test dictionary style overrides
-    result = main_config(overrides={"main_param": "y", "nested": {"nested_param": "b", "nested_number": 1.5}})
+    result = main_config(values={"main_param": "y", "nested": {"nested_param": "b", "nested_number": 1.5}})
     assert result["main_param"] == "y"
     assert result["nested"]["nested_param"] == "b"
     assert result["nested"]["nested_number"] == 1.5
@@ -138,8 +138,7 @@ def test_three_layer_dot_notation():
 
     # Test selections through all layers
     result = main_config(
-        selections={"middle.middle_param": "mid2", "middle.deep.deep_param": "deep2"},
-        overrides={"middle.deep.deep_number": 2.5},
+        values={"middle.middle_param": "mid2", "middle.deep.deep_param": "deep2", "middle.deep.deep_number": 2.5},
     )
     assert result["middle"]["middle_param"] == "mid2"
     assert result["middle"]["deep"]["deep_param"] == "deep2"
@@ -154,8 +153,7 @@ def test_three_layer_dict_style():
 
     # Test dictionary style through all layers
     result = main_config(
-        selections={"middle": {"middle_param": "mid2", "deep": {"deep_param": "deep2"}}},
-        overrides={"middle": {"deep": {"deep_number": 2.5}}},
+        values={"middle": {"middle_param": "mid2", "deep": {"deep_param": "deep2", "deep_number": 2.5}}},
     )
     assert result["middle"]["middle_param"] == "mid2"
     assert result["middle"]["deep"]["deep_param"] == "deep2"
@@ -169,8 +167,7 @@ def test_inner_configurations():
             "tests/helper_configs/nested_config.py",
             name="nested",
             final_vars=["nested_param", "nested_number"],
-            selections={"nested_param": "b"},
-            overrides={"nested_number": 1.5},
+            values={"nested_param": "b", "nested_number": 1.5},
         )
         main_param = hp.select(["x", "y"], default="x")
 
@@ -180,11 +177,11 @@ def test_inner_configurations():
     assert result["nested"]["nested_number"] == 1.5
 
     # Test that outer selections override inner selections
-    result = main_config(selections={"nested.nested_param": "a"})
+    result = main_config(values={"nested.nested_param": "a"})
     assert result["nested"]["nested_param"] == "a"
 
     # Test that outer overrides override inner overrides
-    result = main_config(overrides={"nested.nested_number": 2.0})
+    result = main_config(values={"nested.nested_number": 2.0})
     assert result["nested"]["nested_number"] == 2.0
 
     # Test that outer final_vars override inner final_vars
@@ -200,8 +197,7 @@ def test_inner_configurations_dict_style():
             "tests/helper_configs/nested_config.py",
             name="nested",
             final_vars=["nested_param", "nested_number"],
-            selections={"nested_param": "b"},
-            overrides={"nested_number": 1.5},
+            values={"nested_param": "b", "nested_number": 1.5},
         )
         main_param = hp.select(["x", "y"], default="x")
 
@@ -211,11 +207,11 @@ def test_inner_configurations_dict_style():
     assert result["nested"]["nested_number"] == 1.5
 
     # Test that outer dict selections override inner selections
-    result = main_config(selections={"nested": {"nested_param": "a"}})
+    result = main_config(values={"nested": {"nested_param": "a"}})
     assert result["nested"]["nested_param"] == "a"
 
     # Test that outer dict overrides override inner overrides
-    result = main_config(overrides={"nested": {"nested_number": 2.0}})
+    result = main_config(values={"nested": {"nested_number": 2.0}})
     assert result["nested"]["nested_number"] == 2.0
 
 

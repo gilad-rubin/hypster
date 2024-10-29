@@ -44,23 +44,23 @@ def test_int_input_invalid_default_string():
         config_func()
 
 
-def test_int_input_with_override():
+def test_int_input_with_values():
     @config
     def config_func(hp: HP):
         value = hp.int_input(default=42, name="param")
 
-    result = config_func(overrides={"param": 100})
+    result = config_func(values={"param": 100})
     assert result["value"] == 100
     assert isinstance(result["value"], int)
 
 
-def test_int_input_invalid_override():
+def test_int_input_invalid_values():
     @config
     def config_func(hp: HP):
         value = hp.int_input(default=42, name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": 42.5})  # Float not allowed
+        config_func(values={"param": 42.5})  # Float not allowed
 
 
 def test_multi_int_with_default():
@@ -92,31 +92,31 @@ def test_multi_int_invalid_default():
         config_func()
 
 
-def test_multi_int_with_override():
+def test_multi_int_with_values():
     @config
     def config_func(hp: HP):
         values = hp.multi_int(default=[1, 2], name="param")
 
-    result = config_func(overrides={"param": [3, 4]})
+    result = config_func(values={"param": [3, 4]})
     assert result["values"] == [3, 4]
 
 
-def test_multi_int_invalid_override():
+def test_multi_int_invalid_values():
     @config
     def config_func(hp: HP):
         values = hp.multi_int(default=[1, 2], name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": [3, 4.5]})  # Not all integers
+        config_func(values={"param": [3, 4.5]})  # Not all integers
 
 
-def test_multi_int_invalid_override_type():
+def test_multi_int_invalid_values_type():
     @config
     def config_func(hp: HP):
         values = hp.multi_int(default=[1, 2], name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": 3})  # Not a list
+        config_func(values={"param": 3})  # Not a list
 
 
 # Min/Max validation tests for int_input
@@ -167,22 +167,22 @@ def test_int_input_default_above_max():
         config_func()
 
 
-def test_int_input_override_below_min():
+def test_int_input_values_below_min():
     @config
     def config_func(hp: HP):
         value = hp.int_input(default=5, min=0, name="param")
 
     with pytest.raises(ValueError):
-        config_func(overrides={"param": -1})
+        config_func(values={"param": -1})
 
 
-def test_int_input_override_above_max():
+def test_int_input_values_above_max():
     @config
     def config_func(hp: HP):
         value = hp.int_input(default=5, max=10, name="param")
 
     with pytest.raises(ValueError):
-        config_func(overrides={"param": 11})
+        config_func(values={"param": 11})
 
 
 # Min/Max validation tests for multi_int
@@ -233,19 +233,19 @@ def test_multi_int_default_above_max():
         config_func()
 
 
-def test_multi_int_override_below_min():
+def test_multi_int_values_below_min():
     @config
     def config_func(hp: HP):
         values = hp.multi_int(default=[5, 6], min=0, name="param")
 
     with pytest.raises(ValueError):
-        config_func(overrides={"param": [5, -1]})
+        config_func(values={"param": [5, -1]})
 
 
-def test_multi_int_override_above_max():
+def test_multi_int_values_above_max():
     @config
     def config_func(hp: HP):
         values = hp.multi_int(default=[5, 6], max=10, name="param")
 
     with pytest.raises(ValueError):
-        config_func(overrides={"param": [5, 11]})
+        config_func(values={"param": [5, 11]})

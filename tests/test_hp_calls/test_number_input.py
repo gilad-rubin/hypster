@@ -33,22 +33,22 @@ def test_number_input_invalid_default():
         config_func()
 
 
-def test_number_input_with_override():
+def test_number_input_with_values():
     @config
     def config_func(hp: HP):
         value = hp.number_input(default=0.5, name="param")
 
-    result = config_func(overrides={"param": 1.5})
+    result = config_func(values={"param": 1.5})
     assert result["value"] == 1.5
 
 
-def test_number_input_invalid_override():
+def test_number_input_invalid_values():
     @config
     def config_func(hp: HP):
         value = hp.number_input(default=0.5, name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": "not a number"})
+        config_func(values={"param": "not a number"})
 
 
 # Multi Number Tests
@@ -80,31 +80,31 @@ def test_multi_number_invalid_default():
         config_func()
 
 
-def test_multi_number_with_override():
+def test_multi_number_with_values():
     @config
     def config_func(hp: HP):
         values = hp.multi_number(default=[1.0, 2.0], name="param")
 
-    result = config_func(overrides={"param": [3.0, 4.0]})
+    result = config_func(values={"param": [3.0, 4.0]})
     assert result["values"] == [3.0, 4.0]
 
 
-def test_multi_number_invalid_override_type():
+def test_multi_number_invalid_values_type():
     @config
     def config_func(hp: HP):
         values = hp.multi_number(default=[1.0, 2.0], name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": 3.0})  # Not a list
+        config_func(values={"param": 3.0})  # Not a list
 
 
-def test_multi_number_invalid_override():
+def test_multi_number_invalid_values():
     @config
     def config_func(hp: HP):
         values = hp.multi_number(default=[1.0, 2.0], name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": ["a", "b"]})  # Not numbers
+        config_func(values={"param": ["a", "b"]})  # Not numbers
 
 
 # Min/Max validation tests for number_input
@@ -155,22 +155,22 @@ def test_number_input_default_above_max():
         config_func()
 
 
-def test_number_input_override_below_min():
+def test_number_input_values_below_min():
     @config
     def config_func(hp: HP):
         value = hp.number_input(default=0.5, min=0.0, name="param")
 
     with pytest.raises(ValueError):
-        config_func(overrides={"param": -0.1})
+        config_func(values={"param": -0.1})
 
 
-def test_number_input_override_above_max():
+def test_number_input_values_above_max():
     @config
     def config_func(hp: HP):
         value = hp.number_input(default=0.5, max=1.0, name="param")
 
     with pytest.raises(ValueError):
-        config_func(overrides={"param": 1.1})
+        config_func(values={"param": 1.1})
 
 
 # Min/Max validation tests for multi_number
@@ -221,19 +221,19 @@ def test_multi_number_default_above_max():
         config_func()
 
 
-def test_multi_number_override_below_min():
+def test_multi_number_values_below_min():
     @config
     def config_func(hp: HP):
         values = hp.multi_number(default=[0.5, 0.6], min=0.0, name="param")
 
     with pytest.raises(ValueError):
-        config_func(overrides={"param": [0.5, -0.1]})
+        config_func(values={"param": [0.5, -0.1]})
 
 
-def test_multi_number_override_above_max():
+def test_multi_number_values_above_max():
     @config
     def config_func(hp: HP):
         values = hp.multi_number(default=[0.5, 0.6], max=1.0, name="param")
 
     with pytest.raises(ValueError):
-        config_func(overrides={"param": [0.5, 1.1]})
+        config_func(values={"param": [0.5, 1.1]})

@@ -15,12 +15,12 @@ def test_variable_naming():
     assert result["var2"] == 10
 
     # Test with selections
-    result = config_func(selections={"var1": "b"})
+    result = config_func(values={"var1": "b"})
     assert result["var1"] == "b"
     assert result["var2"] == 10
 
     # Test with overrides
-    result = config_func(overrides={"var2": 20})
+    result = config_func(values={"var2": 20})
     assert result["var1"] == "a"
     assert result["var2"] == 20
 
@@ -39,12 +39,12 @@ def test_dict_naming():
     assert result["config"]["learning_rate"] == 0.001
 
     # Test with selections
-    result = config_func(selections={"config.model_type": "rnn"})
+    result = config_func(values={"config.model_type": "rnn"})
     assert result["config"]["model_type"] == "rnn"
     assert result["config"]["learning_rate"] == 0.001
 
     # Test with overrides
-    result = config_func(overrides={"config.learning_rate": 0.01})
+    result = config_func(values={"config.learning_rate": 0.01})
     assert result["config"]["model_type"] == "cnn"
     assert result["config"]["learning_rate"] == 0.01
 
@@ -65,12 +65,12 @@ def test_nested_naming():
     assert result["outer"]["inner"]["value"] == 5
 
     # Test with selections
-    result = config_func(selections={"outer.inner.deep": "y"})
+    result = config_func(values={"outer.inner.deep": "y"})
     assert result["outer"]["inner"]["deep"] == "y"
     assert result["outer"]["inner"]["value"] == 5
 
     # Test with overrides
-    result = config_func(overrides={"outer.inner.value": 10})
+    result = config_func(values={"outer.inner.value": 10})
     assert result["outer"]["inner"]["deep"] == "x"
     assert result["outer"]["inner"]["value"] == 10
 
@@ -94,12 +94,12 @@ def test_class_naming():
     assert result["model"].learning_rate == 0.001
 
     # Test with selections
-    result = config_func(selections={"model.model_type": "rnn"})
+    result = config_func(values={"model.model_type": "rnn"})
     assert result["model"].model_type == "rnn"
     assert result["model"].learning_rate == 0.001
 
     # Test with overrides
-    result = config_func(overrides={"model.learning_rate": 0.01})
+    result = config_func(values={"model.learning_rate": 0.01})
     assert result["model"].model_type == "cnn"
     assert result["model"].learning_rate == 0.01
 
@@ -121,12 +121,12 @@ def test_function_naming():
     assert result["result"][1] == 10
 
     # Test with selections
-    result = config_func(selections={"result.param1": "b"})
+    result = config_func(values={"result.param1": "b"})
     assert result["result"][0] == "b"
     assert result["result"][1] == 10
 
     # Test with overrides
-    result = config_func(overrides={"result.param2": 20})
+    result = config_func(values={"result.param2": 20})
     assert result["result"][0] == "a"
     assert result["result"][1] == 20
 
@@ -149,12 +149,10 @@ def test_disable_automatic_naming_with_explicit_names():
     assert result["model"].model_type == "cnn"
     assert result["model"].learning_rate == 0.001
 
-    # Test with selections
-    result = class_kwargs_naming(selections={"model_type": "rnn", "param": "option2"})
+    result = class_kwargs_naming(values={"model_type": "rnn", "param": "option2"})
     assert result["model"].model_type == "rnn"
 
-    # Test with overrides
-    result = class_kwargs_naming(overrides={"learning_rate": 0.01})
+    result = class_kwargs_naming(values={"learning_rate": 0.01})
     assert result["model"].learning_rate == 0.01
 
 
@@ -173,5 +171,5 @@ def test_non_constant_name():
         var = "a"
         a = hp.select(["a", "b"], name=f"hey_{var}")
 
-    results = my_config(selections={"hey_a": "a"})
+    results = my_config(values={"hey_a": "a"})
     assert results["a"] == "a"

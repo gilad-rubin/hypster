@@ -18,21 +18,21 @@ def test_defaults_selections_overrides():
     assert result["epochs"] == 10
 
     # Test selections
-    result = config_func(selections={"model": "rnn"})
+    result = config_func(values={"model": "rnn"})
     assert result["model"] == "rnn"
     assert result["lr"] == 0.001
 
     # Test overrides
-    result = config_func(overrides={"model": "transformer", "lr": 0.01})
+    result = config_func(values={"model": "transformer", "lr": 0.01})
     assert result["model"] == "transformer"
     assert result["lr"] == 0.01
 
     # Test precedence: overrides > selections > defaults
-    result = config_func(selections={"model": "rnn"}, overrides={"model": "transformer"})
-    assert result["model"] == "transformer"
+    result = config_func(values={"model": "rnn"})
+    assert result["model"] == "rnn"
 
     # Test that overrides returns the value of the selection if present in the dictionary
-    result = config_func(overrides={"model": "rnn"})
+    result = config_func(values={"model": "rnn"})
     assert result["model"] == "rnn"
 
 
@@ -144,20 +144,20 @@ def test_pythonic_api():
             layer_sizes.append(hp.select([32, 64, 128], default=64, name=f"layer_{i}_size"))
 
     # Test defaults
-    result = config_func(selections={"model": "resnet"})
+    result = config_func(values={"model": "resnet"})
     assert result["dataset_size"] == "medium"
     assert result["model"] in ["resnet", "lstm"]
     assert len(result["layer_sizes"]) == 5
     assert all(size == 64 for size in result["layer_sizes"])
 
     # Test with different selections
-    result = config_func(selections={"dataset_size": "large", "num_layers": 3})
+    result = config_func(values={"dataset_size": "large", "num_layers": 3})
     assert result["dataset_size"] == "large"
     assert result["model"] in ["transformer", "large_cnn"]
     assert len(result["layer_sizes"]) == 3
 
     # Test overrides for loop-generated values
-    result = config_func(overrides={"layer_0_size": 32, "layer_1_size": 128})
+    result = config_func(values={"layer_0_size": 32, "layer_1_size": 128})
     assert result["layer_sizes"][0] == 32
     assert result["layer_sizes"][1] == 128
 
@@ -197,22 +197,22 @@ def test_propagation():
     assert result["nested"]["nested_param"] == "a"
 
     # Test selections for nested config
-    result = main_config(selections={"nested.nested_param": "b"})
+    result = main_config(values={"nested.nested_param": "b"})
     assert result["main_param"] == "x"
     assert result["nested"]["nested_param"] == "b"
 
     # Test overrides for both main and nested configs
-    result = main_config(overrides={"main_param": "y", "nested.nested_param": "b"})
+    result = main_config(values={"main_param": "y", "nested.nested_param": "b"})
     assert result["main_param"] == "y"
     assert result["nested"]["nested_param"] == "b"
 
     # Test selections for nested config
-    result = main_config(selections={"nested": {"nested_param": "b"}})
+    result = main_config(values={"nested": {"nested_param": "b"}})
     assert result["main_param"] == "x"
     assert result["nested"]["nested_param"] == "b"
 
     # Test overrides for both main and nested configs
-    result = main_config(overrides={"main_param": "y", "nested": {"nested_param": "b"}})
+    result = main_config(values={"main_param": "y", "nested": {"nested_param": "b"}})
     assert result["main_param"] == "y"
     assert result["nested"]["nested_param"] == "b"
 
@@ -229,7 +229,7 @@ def test_propagation():
         nested = hp.propagate(
             "tests/helper_configs/nested_config.py",
             final_vars=["nested_param"],
-            selections={"nested_param": "b"},
+            values={"nested_param": "b"},
         )
 
         main_param = hp.select(["x", "y"], default="x")
@@ -240,27 +240,27 @@ def test_propagation():
     assert result["nested"]["nested_param"] == "b"
 
     # Test selections for nested config
-    result = main_config(selections={"nested.nested_param": "b"})
+    result = main_config(values={"nested.nested_param": "b"})
     assert result["main_param"] == "x"
     assert result["nested"]["nested_param"] == "b"
 
     # Test overrides for both main and nested configs
-    result = main_config(overrides={"main_param": "y", "nested.nested_param": "b"})
+    result = main_config(values={"main_param": "y", "nested.nested_param": "b"})
     assert result["main_param"] == "y"
     assert result["nested"]["nested_param"] == "b"
 
     # Test selections for nested config
-    result = main_config(selections={"nested": {"nested_param": "b"}})
+    result = main_config(values={"nested": {"nested_param": "b"}})
     assert result["main_param"] == "x"
     assert result["nested"]["nested_param"] == "b"
 
     # Test overrides for both main and nested configs
-    result = main_config(overrides={"main_param": "y", "nested": {"nested_param": "b"}})
+    result = main_config(values={"main_param": "y", "nested": {"nested_param": "b"}})
     assert result["main_param"] == "y"
     assert result["nested"]["nested_param"] == "b"
 
 
-def test_multi_select_defaults_overrides_selections():
+def test_multi_select_defaults_values():
     @config
     def config_func(hp: HP):
         options = hp.multi_select(["option1", "option2", "option3"], default=["option1", "option2"])
@@ -270,20 +270,16 @@ def test_multi_select_defaults_overrides_selections():
     assert result["options"] == ["option1", "option2"]
 
     # Test selections
-    result = config_func(selections={"options": ["option2", "option3"]})
+    result = config_func(values={"options": ["option2", "option3"]})
     assert result["options"] == ["option2", "option3"]
 
     # Test overrides
-    result = config_func(overrides={"options": ["option1", "option3"]})
+    result = config_func(values={"options": ["option1", "option3"]})
     assert result["options"] == ["option1", "option3"]
 
     # Test precedence: overrides > selections > defaults
-    result = config_func(selections={"options": ["option2"]}, overrides={"options": ["option3"]})
-    assert result["options"] == ["option3"]
-
-    # Test invalid selection
-    with pytest.raises(ValueError):
-        config_func(selections={"options": ["invalid_option"]})
+    result = config_func(values={"options": ["option2"]})
+    assert result["options"] == ["option2"]
 
 
 def test_multi_select_dict_defaults_overrides_selections():
@@ -303,20 +299,16 @@ def test_multi_select_dict_defaults_overrides_selections():
     assert result["options"] == [1, 2]
 
     # Test selections
-    result = config_func(selections={"options": ["option2"]})
+    result = config_func(values={"options": ["option2"]})
     assert result["options"] == [2]
 
     # Test overrides
-    result = config_func(overrides={"options": ["option1"]})
+    result = config_func(values={"options": ["option1"]})
     assert result["options"] == [1]
 
     # Test precedence: overrides > selections > defaults
-    result = config_func(selections={"options": ["option2"]}, overrides={"options": ["option1"]})
-    assert result["options"] == [1]
-
-    # Test invalid selection
-    with pytest.raises(ValueError):
-        config_func(selections={"options": ["invalid_option"]})
+    result = config_func(values={"options": ["option2"]})
+    assert result["options"] == [2]
 
 
 def test_multi_text_defaults_overrides_selections():
@@ -329,15 +321,15 @@ def test_multi_text_defaults_overrides_selections():
     assert result["texts"] == ["default1", "default2"]
 
     # Test overrides
-    result = config_func(overrides={"texts": ["override1", "override2"]})
+    result = config_func(values={"texts": ["override1", "override2"]})
     assert result["texts"] == ["override1", "override2"]
 
     # Test partial overrides
-    result = config_func(overrides={"texts": ["override1"]})
+    result = config_func(values={"texts": ["override1"]})
     assert result["texts"] == ["override1"]
 
     # Test empty overrides
-    result = config_func(overrides={"texts": []})
+    result = config_func(values={"texts": []})
     assert result["texts"] == []
 
 
@@ -351,15 +343,15 @@ def test_multi_number_defaults_overrides_selections():
     assert result["numbers"] == [1, 2, 3]
 
     # Test overrides
-    result = config_func(overrides={"numbers": [4, 5, 6]})
+    result = config_func(values={"numbers": [4, 5, 6]})
     assert result["numbers"] == [4, 5, 6]
 
     # Test partial overrides
-    result = config_func(overrides={"numbers": [7]})
+    result = config_func(values={"numbers": [7]})
     assert result["numbers"] == [7]
 
     # Test empty overrides
-    result = config_func(overrides={"numbers": []})
+    result = config_func(values={"numbers": []})
     assert result["numbers"] == []
 
 
