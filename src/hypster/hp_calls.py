@@ -330,16 +330,16 @@ class PropagateCall(HPCall):
         original_overrides: Dict[str, Any] = {},
     ) -> Dict[str, Any]:
         """Execute nested configuration with proper scope management."""
-        if len(final_vars) > 0:
-            nested_final_vars = final_vars
-        else:
+        if len(original_final_vars) > 0:
             nested_final_vars = self._process_final_vars(original_final_vars)
+        else:
+            nested_final_vars = final_vars
 
-        nested_selections = self._extract_nested_dict(original_selections)
-        nested_selections.update(selections)
+        nested_selections = selections.copy()
+        nested_selections.update(self._extract_nested_dict(original_selections))
 
-        nested_overrides = self._extract_nested_dict(original_overrides)
-        nested_overrides.update(overrides)
+        nested_overrides = overrides.copy()
+        nested_overrides.update(self._extract_nested_dict(original_overrides))
 
         return config_func(final_vars=nested_final_vars, selections=nested_selections, overrides=nested_overrides)
 
