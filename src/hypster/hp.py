@@ -228,6 +228,6 @@ class HP:
             values=values,
             original_values=self.values,
         )
-        record = NestedDBRecord(config_func.db)
+        record = NestedDBRecord(name=name, db=config_func.db)
         self.db.add_record(record)
         return result
