@@ -24,8 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 class HP:
-    def __init__(self, final_vars: List[str], selections: Dict[str, Any], overrides: Dict[str, Any]):
+    def __init__(
+        self, final_vars: List[str], exclude_vars: List[str], selections: Dict[str, Any], overrides: Dict[str, Any]
+    ):
         self.final_vars = final_vars
+        self.exclude_vars = exclude_vars
         self.selections = selections
         self.overrides = overrides
         self.name_prefix = None
@@ -135,6 +138,7 @@ class HP:
         *,
         name: Optional[str] = None,
         final_vars: List[str] = [],
+        exclude_vars: List[str] = [],
         selections: Dict[str, Any] = {},
         overrides: Dict[str, Any] = {},
     ) -> Dict[str, Any]:
@@ -148,6 +152,8 @@ class HP:
             config_func,
             final_vars=final_vars,
             original_final_vars=self.final_vars,
+            exclude_vars=exclude_vars,
+            original_exclude_vars=self.exclude_vars,
             selections=selections,
             original_selections=self.selections,
             overrides=overrides,

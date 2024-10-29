@@ -324,6 +324,8 @@ class PropagateCall(HPCall):
         config_func: Callable,
         final_vars: List[str] = [],
         original_final_vars: List[str] = [],
+        exclude_vars: List[str] = [],
+        original_exclude_vars: List[str] = [],
         selections: Dict[str, Any] = {},
         original_selections: Dict[str, Any] = {},
         overrides: Dict[str, Any] = {},
@@ -334,13 +336,23 @@ class PropagateCall(HPCall):
         else:
             nested_final_vars = final_vars
 
+        if len(original_exclude_vars) > 0:
+            nested_exclude_vars = self._process_final_vars(original_exclude_vars)
+        else:
+            nested_exclude_vars = exclude_vars
+
         nested_selections = selections.copy()
         nested_selections.update(self._extract_nested_dict(original_selections))
 
         nested_overrides = overrides.copy()
         nested_overrides.update(self._extract_nested_dict(original_overrides))
 
-        return config_func(final_vars=nested_final_vars, selections=nested_selections, overrides=nested_overrides)
+        return config_func(
+            final_vars=nested_final_vars,
+            exclude_vars=nested_exclude_vars,
+            selections=nested_selections,
+            overrides=nested_overrides,
+        )
 
     def _extract_nested_dict(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Extract nested configuration using both dot notation and direct dict values."""
