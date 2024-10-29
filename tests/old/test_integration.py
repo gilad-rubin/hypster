@@ -179,11 +179,6 @@ def test_save_load_complex_module():
 
 
 def test_propagation():
-    import logging
-
-    logger = logging.getLogger("hypster")
-    logger.setLevel(logging.DEBUG)
-
     @config
     def nested_config(hp: HP):
         nested_param = hp.select(["a", "b"], default="a")
@@ -192,10 +187,7 @@ def test_propagation():
 
     @config
     def main_config(hp: HP):
-        import hypster
-
-        nested_config = hypster.load("tests/helper_configs/nested_config.py")
-        nested = hp.propagate(nested_config)
+        nested = hp.propagate("tests/helper_configs/nested_config.py")
 
         main_param = hp.select(["x", "y"], default="x")
 
@@ -211,6 +203,59 @@ def test_propagation():
 
     # Test overrides for both main and nested configs
     result = main_config(overrides={"main_param": "y", "nested.nested_param": "b"})
+    assert result["main_param"] == "y"
+    assert result["nested"]["nested_param"] == "b"
+
+    # Test selections for nested config
+    result = main_config(selections={"nested": {"nested_param": "b"}})
+    assert result["main_param"] == "x"
+    assert result["nested"]["nested_param"] == "b"
+
+    # Test overrides for both main and nested configs
+    result = main_config(overrides={"main_param": "y", "nested": {"nested_param": "b"}})
+    assert result["main_param"] == "y"
+    assert result["nested"]["nested_param"] == "b"
+
+
+def test_propagation():
+    @config
+    def nested_config(hp: HP):
+        nested_param = hp.select(["a", "b"], default="a")
+
+    hypster.save(nested_config, "tests/helper_configs/nested_config.py")
+
+    @config
+    def main_config(hp: HP):
+        nested = hp.propagate(
+            "tests/helper_configs/nested_config.py",
+            final_vars=["nested_param"],
+            selections={"nested_param": "b"},
+        )
+
+        main_param = hp.select(["x", "y"], default="x")
+
+    # Test defaults
+    result = main_config()
+    assert result["main_param"] == "x"
+    assert result["nested"]["nested_param"] == "b"
+
+    # Test selections for nested config
+    result = main_config(selections={"nested.nested_param": "b"})
+    assert result["main_param"] == "x"
+    assert result["nested"]["nested_param"] == "b"
+
+    # Test overrides for both main and nested configs
+    result = main_config(overrides={"main_param": "y", "nested.nested_param": "b"})
+    assert result["main_param"] == "y"
+    assert result["nested"]["nested_param"] == "b"
+
+    # Test selections for nested config
+    result = main_config(selections={"nested": {"nested_param": "b"}})
+    assert result["main_param"] == "x"
+    assert result["nested"]["nested_param"] == "b"
+
+    # Test overrides for both main and nested configs
+    result = main_config(overrides={"main_param": "y", "nested": {"nested_param": "b"}})
     assert result["main_param"] == "y"
     assert result["nested"]["nested_param"] == "b"
 
