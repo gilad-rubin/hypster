@@ -99,80 +99,24 @@ def test_multi_select_empty_default_dict():
     assert result["values"] == []
 
 
-# Selection and override behavior with list options
-def test_multi_select_with_selection_list():
+# Selection behavior with list options
+def test_multi_select_with_list():
     @config
     def config_func(hp: HP):
         values = hp.multi_select(["a", "b", "c"], default=["a"], name="param")
 
-    result = config_func(selections={"param": ["b", "c"]})
+    result = config_func(values={"param": ["b", "c"]})
     assert result["values"] == ["b", "c"]
 
 
-def test_multi_select_with_override_list():
-    @config
-    def config_func(hp: HP):
-        values = hp.multi_select(["a", "b", "c"], default=["a"], name="param")
-
-    result = config_func(overrides={"param": ["c"]})
-    assert result["values"] == ["c"]
-
-
-# Selection and override behavior with dict options
-def test_multi_select_with_selection_dict():
+# Selection behavior with dict options
+def test_multi_select_with_dict():
     @config
     def config_func(hp: HP):
         values = hp.multi_select({"k1": "v1", "k2": "v2", "k3": "v3"}, default=["k1"], name="param")
 
-    result = config_func(selections={"param": ["k2", "k3"]})
+    result = config_func(values={"param": ["k2", "k3"]})
     assert result["values"] == ["v2", "v3"]
-
-
-def test_multi_select_with_override_dict():
-    @config
-    def config_func(hp: HP):
-        values = hp.multi_select({"k1": "v1", "k2": "v2", "k3": "v3"}, default=["k1"], name="param")
-
-    result = config_func(overrides={"param": ["k2", "k3"]})
-    assert result["values"] == ["v2", "v3"]
-
-
-# Override precedence tests
-def test_multi_select_override_precedence_list():
-    @config
-    def config_func(hp: HP):
-        values = hp.multi_select(["a", "b", "c"], default=["a"], name="param")
-
-    # Test with valid options
-    result = config_func(selections={"param": ["b"]}, overrides={"param": ["c"]})
-    assert result["values"] == ["c"]
-
-    # Test with override value not in options (should still work)
-    result = config_func(selections={"param": ["b"]}, overrides={"param": ["d", "e"]})
-    assert result["values"] == ["d", "e"]
-
-
-def test_multi_select_override_precedence_dict():
-    @config
-    def config_func(hp: HP):
-        values = hp.multi_select({"k1": "v1", "k2": "v2", "k3": "v3"}, default=["k1"], name="param")
-
-    # Test with valid keys
-    result = config_func(selections={"param": ["k1"]}, overrides={"param": ["k2", "k3"]})
-    assert result["values"] == ["v2", "v3"]
-
-    # Test with override keys not in options (should still work)
-    result = config_func(selections={"param": ["k1"]}, overrides={"param": ["k4", "k5"]})
-    assert result["values"] == ["k4", "k5"]
-
-
-def test_multi_select_without_selection_or_override():
-    @config
-    def config_func(hp: HP):
-        values = hp.multi_select(["a", "b", "c"], default=["a", "b"], name="param")
-
-    result = config_func()
-    assert result["values"] == ["a", "b"]
 
 
 def test_multi_select_invalid_selection_type():
@@ -180,11 +124,25 @@ def test_multi_select_invalid_selection_type():
     def config_func(hp: HP):
         values = hp.multi_select({"k1": "v1", "k2": "v2"}, default=["k1"], name="param")
 
-    # Test with string instead of list
     with pytest.raises(TypeError):
-        config_func(selections={"param": "k1"})  # Should be ["k1"]
+        config_func(values={"param": "k1"})  # Should be ["k1"]
 
 
+def test_multi_select_with_options_only():
+    @config
+    def config_func(hp: HP):
+        values = hp.multi_select(["a", "b", "c"], default=["a"], name="param", options_only=True)
+
+    # Should work with valid values
+    result = config_func(values={"param": ["b", "c"]})
+    assert result["values"] == ["b", "c"]
+
+    # Should fail with invalid values
+    with pytest.raises(ValueError):
+        config_func(values={"param": ["b", "e"]})
+
+
+# Keep existing type validation tests
 def test_multi_select_invalid_dict_key_types():
     with pytest.raises(ValueError):
 
@@ -215,35 +173,3 @@ def test_multi_select_missing_default():
             hp.multi_select(["a", "b"], name="param")
 
         missing_default()
-
-
-def test_multi_select_with_disable_overrides():
-    @config
-    def config_func(hp: HP):
-        values = hp.multi_select(["a", "b", "c"], default=["a"], name="param", disable_overrides=True)
-
-    # Should work with selections
-    result = config_func(selections={"param": ["b", "c"]})
-    assert result["values"] == ["b", "c"]
-
-    # Should fail with overrides
-    with pytest.raises(ValueError, match="Overrides are disabled for 'param'"):
-        config_func(overrides={"param": ["c"]})
-
-
-def test_multi_select_rejects_non_list_override():
-    @config
-    def config_func(hp: HP):
-        values = hp.multi_select(["a", "b", "c"], default=["a"], name="param")
-
-    with pytest.raises(TypeError, match="Override for 'param' must be a list"):
-        config_func(overrides={"param": "b"})
-
-
-def test_multi_select_rejects_non_list_selection():
-    @config
-    def config_func(hp: HP):
-        values = hp.multi_select(["a", "b", "c"], default=["a"], name="param")
-
-    with pytest.raises(TypeError, match="Selection for 'param' must be a list"):
-        config_func(selections={"param": "b"})
