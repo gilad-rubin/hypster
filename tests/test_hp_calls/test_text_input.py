@@ -33,22 +33,22 @@ def test_text_input_invalid_default():
         config_func()
 
 
-def test_text_input_with_override():
+def test_text_input_with_values():
     @config
     def config_func(hp: HP):
         value = hp.text_input(default="hello", name="param")
 
-    result = config_func(overrides={"param": "world"})
+    result = config_func(values={"param": "world"})
     assert result["value"] == "world"
 
 
-def test_text_input_invalid_override():
+def test_text_input_invalid_values():
     @config
     def config_func(hp: HP):
         value = hp.text_input(default="hello", name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": 123})  # Not a string
+        config_func(values={"param": 123})  # Not a string
 
 
 # Multi Text Tests
@@ -80,31 +80,31 @@ def test_multi_text_invalid_default():
         config_func()
 
 
-def test_multi_text_with_override():
+def test_multi_text_with_values():
     @config
     def config_func(hp: HP):
         values = hp.multi_text(default=["a", "b"], name="param")
 
-    result = config_func(overrides={"param": ["c", "d"]})
+    result = config_func(values={"param": ["c", "d"]})
     assert result["values"] == ["c", "d"]
 
 
-def test_multi_text_invalid_override():
+def test_multi_text_invalid_values():
     @config
     def config_func(hp: HP):
         values = hp.multi_text(default=["a", "b"], name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": [1, 2]})  # Not strings
+        config_func(values={"param": [1, 2]})  # Not strings
 
 
-def test_multi_text_invalid_override_type():
+def test_multi_text_invalid_values_type():
     @config
     def config_func(hp: HP):
         values = hp.multi_text(default=["a", "b"], name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": "c"})  # Not a list
+        config_func(values={"param": "c"})  # Not a list
 
 
 if __name__ == "__main__":

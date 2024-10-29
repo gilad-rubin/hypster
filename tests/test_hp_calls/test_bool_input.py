@@ -34,23 +34,23 @@ def test_bool_input_invalid_default():
         config_func()
 
 
-def test_bool_input_with_override():
+def test_bool_input_with_values():
     @config
     def config_func(hp: HP):
         value = hp.bool_input(default=True, name="param")
 
-    result = config_func(overrides={"param": False})
+    result = config_func(values={"param": False})
     assert result["value"] is False
     assert isinstance(result["value"], bool)
 
 
-def test_bool_input_invalid_override():
+def test_bool_input_invalid_values():
     @config
     def config_func(hp: HP):
         value = hp.bool_input(default=True, name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": "true"})  # Not a boolean
+        config_func(values={"param": "true"})  # Not a boolean
 
 
 # Multi Bool Tests
@@ -83,31 +83,31 @@ def test_multi_bool_invalid_default():
         config_func()
 
 
-def test_multi_bool_with_override():
+def test_multi_bool_with_values():
     @config
     def config_func(hp: HP):
         values = hp.multi_bool(default=[True, True], name="param")
 
-    result = config_func(overrides={"param": [False, False]})
+    result = config_func(values={"param": [False, False]})
     assert result["values"] == [False, False]
 
 
-def test_multi_bool_invalid_override():
+def test_multi_bool_invalid_values():
     @config
     def config_func(hp: HP):
         values = hp.multi_bool(default=[True, False], name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": [True, "false"]})  # Not all booleans
+        config_func(values={"param": [True, "false"]})  # Not all booleans
 
 
-def test_multi_bool_invalid_override_type():
+def test_multi_bool_invalid_values_type():
     @config
     def config_func(hp: HP):
         values = hp.multi_bool(default=[True, False], name="param")
 
     with pytest.raises(TypeError):
-        config_func(overrides={"param": True})  # Not a list
+        config_func(values={"param": True})  # Not a list
 
 
 if __name__ == "__main__":
