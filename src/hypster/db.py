@@ -7,8 +7,8 @@ from typing import Dict
 
 @dataclass
 class NumericOptions:
-    min_val: float | int | None
-    max_val: float | int | None
+    min: float | int | None
+    max: float | int | None
     allow_int: bool = True
     allow_float: bool = True
 
@@ -24,6 +24,7 @@ class ParameterRecord:
 
 @dataclass
 class NestedDBRecord:
+    name: str
     db: "DatabaseInterface"
 
 
