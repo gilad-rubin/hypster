@@ -49,6 +49,7 @@ class Hypster:
     def __call__(
         self,
         final_vars: Optional[List[str]] = None,
+        exclude_vars: Optional[List[str]] = None,
         selections: Optional[Dict[str, Any]] = None,
         overrides: Optional[Dict[str, Any]] = None,
     ) -> HypsterReturn:
@@ -57,13 +58,14 @@ class Hypster:
 
         Args:
             final_vars (Optional[List[str]], optional): List of variables to include in the final result.
+            exclude_vars (Optional[List[str]], optional): List of variables to exclude from the final result.
             selections (Optional[Dict[str, Any]], optional): Predefined selections for hyperparameters.
             overrides (Optional[Dict[str, Any]], optional): Overrides for hyperparameters.
 
         Returns:
             Dict[str, Any]: The execution result.
         """
-        hp = HP(final_vars or [], selections or {}, overrides or {})
+        hp = HP(final_vars or [], exclude_vars or [], selections or {}, overrides or {})
         result = self._execute_function(hp, self.modified_source)
         self.snapshot_history.append(hp.snapshot)
         return result
@@ -91,15 +93,18 @@ class Hypster:
         exec(function_body, exec_namespace)
 
         # Process and filter the results
-        return self._process_results(exec_namespace, hp.final_vars)
+        return self._process_results(exec_namespace, hp.final_vars, hp.exclude_vars)
 
-    def _process_results(self, namespace: Dict[str, Any], final_vars: List[str]) -> Dict[str, Any]:
+    def _process_results(
+        self, namespace: Dict[str, Any], final_vars: List[str], exclude_vars: List[str]
+    ) -> Dict[str, Any]:
         """
         Process and filter the execution results.
 
         Args:
             namespace (Dict[str, Any]): The namespace after execution.
             final_vars (List[str]): List of variables to include in the final result.
+            exclude_vars (List[str]): List of variables to exclude from the final result.
 
         Returns:
             Dict[str, Any]: The processed and filtered results.
@@ -125,6 +130,10 @@ class Hypster:
                     f"{', '.join(non_existent_vars)}"
                 )
             final_result = {k: filtered_locals[k] for k in final_vars}
+
+        # Apply exclude_vars after final_vars filtering
+        if exclude_vars:
+            final_result = {k: v for k, v in final_result.items() if k not in exclude_vars}
 
         logger.debug("Captured locals: %s", filtered_locals)
         logger.debug("Final result after filtering: %s", final_result)
