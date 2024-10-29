@@ -27,6 +27,13 @@ deep_nested_config.save("tests/helper_configs/deep_nested_config.py")
 middle_config.save("tests/helper_configs/middle_config.py")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def setup_config_files():
+    nested_config.save("tests/helper_configs/nested_config.py")
+    deep_nested_config.save("tests/helper_configs/deep_nested_config.py")
+    middle_config.save("tests/helper_configs/middle_config.py")
+
+
 # Basic Two-Layer Propagation Tests
 def test_basic_two_layer_defaults():
     @config
