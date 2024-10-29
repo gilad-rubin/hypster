@@ -27,7 +27,7 @@ class HPCall(ABC):
         return "".join(result)
 
     @abstractmethod
-    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
+    def execute(self, values: Dict[str, Any]) -> Any:
         pass
 
 
@@ -53,11 +53,11 @@ def validate_items(name: str, items: List[ValidKeyType]):
 
 
 class SelectCall(HPCall):
-    def __init__(self, name: str, options: OptionsType, default: Any = None, disable_overrides: bool = False):
+    def __init__(self, name: str, options: OptionsType, default: Any = None, options_only: bool = False):
         super().__init__(name, default)
-        self.disable_overrides = disable_overrides
         self.options = validate_and_process_options(name, options)
         self.validate_default(default)
+        self.options_only = options_only
 
     def validate_default(self, default: ValidKeyType):
         if default is None:
@@ -65,82 +65,76 @@ class SelectCall(HPCall):
         if isinstance(default, list):
             raise ValueError(f"Default for '{self.name}' must not be a list.")
         if default not in self.options:
-            raise ValueError(f"Default value '{default}' for '{self.name}' must be one of the options.")
+            raise ValueError(
+                f"Default value '{default}' for '{self.name}' must be one of the options: {list(self.options.keys())}"
+            )
 
-    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
-        if self.disable_overrides and self.name in overrides:
-            raise ValueError(f"Overrides are disabled for '{self.name}'.")
+    def execute(self, values: Dict[str, Any]) -> Dict[ValidKeyType, Any]:
+        if self.name in values:
+            value = values[self.name]
 
-        if self.name in overrides:
-            override_value = overrides[self.name]
-
-            # this handles the case where the override is a list and one or more values\
-            # are in the options keys - this is probably a mistake, since we're using hp.select()
-            # which expects a single value
-            if isinstance(override_value, list) and any(v in self.options for v in override_value):
-                raise ValueError(
-                    f"Override values {override_value} for '{self.name}' are not all valid options."
-                )  # TODO: improve message and comment
-
-            return self.options.get(override_value, override_value)
-
-        if self.name in selections:
-            selected_value = selections[self.name]
-            if isinstance(selected_value, list):
-                raise TypeError(f"Selection for '{self.name}' must not be a list.")
-            if selected_value not in self.options:
-                raise ValueError(
-                    f"Invalid selection '{selected_value}' for parameter '{self.name}'. "
-                    f"Not in options: {list(self.options.keys())}"
+            if isinstance(value, list):
+                raise TypeError(
+                    f"Value {value} for '{self.name}' appears to be a list, but this is a single-select parameter."
                 )
-            return self.options.get(selected_value, selected_value)
+
+            if value not in self.options:
+                if self.options_only:
+                    raise ValueError(
+                        f"Value '{value}' for '{self.name}' must be one of the options: {list(self.options.keys())}. "
+                        f"You can set options_only=False to allow any value."
+                    )
+                else:
+                    return value
+
+            return self.options[value]
+
         elif self.default:
             return self.options.get(self.default)
         else:
-            raise ValueError(f"No overrides, selections or default provided for '{self.name}'.")
+            raise ValueError(f"No value or default provided for '{self.name}'.")
 
 
 class MultiSelectCall(HPCall):
-    def __init__(self, name: str, options: OptionsType, default=None, disable_overrides=False):
+    def __init__(self, name: str, options: OptionsType, default=None, options_only: bool = False):
         super().__init__(name, default)
-        self.disable_overrides = disable_overrides
         self.options = validate_and_process_options(name, options)
         self.validate_default(default)
+        self.options_only = options_only
 
     def validate_default(self, default: List[ValidKeyType]):
         if not isinstance(default, list):
             raise ValueError(f"Default for '{self.name}' must be a list.")
         invalid_defaults = [d for d in default if d not in self.options]
         if invalid_defaults:
-            raise ValueError(f"Default values {invalid_defaults} for '{self.name}' must be one of the options.")
+            raise ValueError(
+                f"Default values {invalid_defaults} for '{self.name}' must be one of the options: "
+                f"{list(self.options.keys())}."
+            )
 
-    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> List[Any]:
-        if self.disable_overrides and self.name in overrides:
-            raise ValueError(f"Overrides are disabled for '{self.name}'.")
-
-        if self.name in overrides:
-            override_values = overrides[self.name]
-            if not isinstance(override_values, list):
-                raise TypeError(f"Override for '{self.name}' must be a list.")
-            return [self.options.get(v, v) for v in override_values]
-
-        elif self.name in selections:
-            selected_values = selections[self.name]
+    def execute(self, values: Dict[str, Any]) -> Dict[ValidKeyType, Any]:
+        if self.name in values:
+            selected_values = values[self.name]
             if not isinstance(selected_values, list):
-                raise TypeError(f"Selection for '{self.name}' must be a list.")
+                raise TypeError(f"Value for '{self.name}' must be a list.")
 
-            invalid_selections = [v for v in selected_values if v not in self.options]
-            if invalid_selections:
-                raise ValueError(
-                    f"Selection values {invalid_selections} for parameter '{self.name}'. "
-                    f"Not in options: {list(self.options.keys())}."
-                )
+            results = []
+            for v in selected_values:
+                if v in self.options:
+                    results.append(self.options[v])
+                elif self.options_only:
+                    raise ValueError(
+                        f"Value '{v}' for '{self.name}' must be one of the options: {list(self.options.keys())}. "
+                        f"You can set options_only=False to allow any value."
+                    )
+                else:
+                    results.append(v)
+            return results
 
-            return [self.options.get(v) for v in selected_values]
         elif self.default is not None:
             return [self.options.get(d) for d in self.default]
         else:
-            raise ValueError(f"No overrides, selections or default provided for '{self.name}'.")
+            raise ValueError(f"No value or default provided for '{self.name}'.")
 
 
 class SingleValueCall(HPCall):
@@ -153,20 +147,15 @@ class SingleValueCall(HPCall):
             type_name = self._get_type_name(expected_type)
             raise TypeError(f"Default value for '{name}' must be of type {type_name}")
 
-    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
-        if self.name in selections:
-            raise ValueError(
-                f"Selections are not supported for hp.{self._get_call_type()}() with name: '{self.name}'. "
-                f"Please use overrides instead."
-            )
-        if self.name in overrides:
-            override_value = overrides[self.name]
-            if isinstance(override_value, list):
-                raise TypeError(f"Override for hp.{self._get_call_type()}() '{self.name}' must not be a list")
-            if not isinstance(override_value, self.expected_type):
+    def execute(self, values: Dict[str, Any]) -> Any:
+        if self.name in values:
+            value = values[self.name]
+            if isinstance(value, list):
+                raise TypeError(f"Value for '{self.name}' must not be a list")
+            if not isinstance(value, self.expected_type):
                 type_name = self._get_type_name(self.expected_type)
-                raise TypeError(f"Override for hp.{self._get_call_type()}() '{self.name}' must be of type {type_name}")
-            return override_value
+                raise TypeError(f"Value for '{self.name}' must be of type {type_name}")
+            return value
         return self.default
 
     @staticmethod
@@ -186,22 +175,16 @@ class MultiValueCall(HPCall):
             type_name = self._get_type_name(expected_type)
             raise TypeError(f"Default value for '{name}' must be a list of {type_name}")
 
-    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> List[Any]:
-        if self.name in selections:
-            raise ValueError(
-                f"Selections are not supported for hp.{self._get_call_type()}() with name: '{self.name}'. "
-                f"Please use overrides instead."
-            )
-        if self.name in overrides:
-            override_values = overrides[self.name]
-            if not isinstance(override_values, list):
-                raise TypeError(f"Override for hp.{self._get_call_type()}() '{self.name}' must be a list")
-            if not all(isinstance(x, self.expected_type) for x in override_values):
+    def execute(self, values: Dict[str, Any]) -> List[Any]:
+        if self.name in values:
+            selected_values = values[self.name]
+            if not isinstance(selected_values, list):
+                raise TypeError(f"Value for '{self.name}' must be a list")
+            if not all(isinstance(x, self.expected_type) for x in selected_values):
                 type_name = self._get_type_name(self.expected_type)
-                raise TypeError(
-                    f"All override values for hp.{self._get_call_type()}() '{self.name}' must be of type {type_name}"
-                )
-            return override_values
+                raise TypeError(f"All values for '{self.name}' must be of type {type_name}")
+
+            return selected_values
         return self.default
 
     @staticmethod
@@ -268,8 +251,8 @@ class NumberInputCall(NumericValidationMixin, SingleValueCall):
         super().__init__(name=name, default=default, expected_type=(int, float), min_val=min, max_val=max)
         self.validate_value(default)
 
-    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
-        value = super().execute(selections, overrides)
+    def execute(self, values: Dict[str, Any]) -> Any:
+        value = super().execute(values)
         self.validate_value(value)
         return value
 
@@ -285,8 +268,8 @@ class MultiNumberCall(NumericValidationMixin, MultiValueCall):
         super().__init__(name=name, default=default, expected_type=(int, float), min_val=min, max_val=max)
         self.validate_value(default)
 
-    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> List[Any]:
-        values = super().execute(selections, overrides)
+    def execute(self, values: Dict[str, Any]) -> List[Any]:
+        values = super().execute(values)
         self.validate_value(values)
         return values
 
@@ -296,8 +279,8 @@ class IntInputCall(NumericValidationMixin, SingleValueCall):
         super().__init__(name=name, default=default, expected_type=int, min_val=min, max_val=max)
         self.validate_value(default)
 
-    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
-        value = super().execute(selections, overrides)
+    def execute(self, values: Dict[str, Any]) -> Any:
+        value = super().execute(values)
         self.validate_value(value)
         return value
 
@@ -307,8 +290,8 @@ class MultiIntCall(NumericValidationMixin, MultiValueCall):
         super().__init__(name=name, default=default, expected_type=int, min_val=min, max_val=max)
         self.validate_value(default)
 
-    def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> List[Any]:
-        values = super().execute(selections, overrides)
+    def execute(self, values: Dict[str, Any]) -> List[Any]:
+        values = super().execute(values)
         self.validate_value(values)
         return values
 
@@ -326,10 +309,8 @@ class PropagateCall(HPCall):
         original_final_vars: List[str] = [],
         exclude_vars: List[str] = [],
         original_exclude_vars: List[str] = [],
-        selections: Dict[str, Any] = {},
-        original_selections: Dict[str, Any] = {},
-        overrides: Dict[str, Any] = {},
-        original_overrides: Dict[str, Any] = {},
+        values: Dict[str, Any] = {},
+        original_values: Dict[str, Any] = {},
     ) -> Dict[str, Any]:
         if len(original_final_vars) > 0:
             nested_final_vars = self._process_final_vars(original_final_vars)
@@ -341,17 +322,13 @@ class PropagateCall(HPCall):
         else:
             nested_exclude_vars = exclude_vars
 
-        nested_selections = selections.copy()
-        nested_selections.update(self._extract_nested_dict(original_selections))
-
-        nested_overrides = overrides.copy()
-        nested_overrides.update(self._extract_nested_dict(original_overrides))
+        nested_values = values.copy()
+        nested_values.update(self._extract_nested_dict(original_values))
 
         return config_func(
             final_vars=nested_final_vars,
             exclude_vars=nested_exclude_vars,
-            selections=nested_selections,
-            overrides=nested_overrides,
+            values=nested_values,
         )
 
     def _extract_nested_dict(self, config: Dict[str, Any]) -> Dict[str, Any]:

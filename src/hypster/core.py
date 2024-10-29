@@ -10,6 +10,7 @@ from .ast_analyzer import (
     find_referenced_vars,
     inject_names_to_source_code,
 )
+from .db import InMemoryDatabase
 from .hp import HP
 from .utils import find_hp_function_body_and_name, remove_function_signature
 
@@ -34,6 +35,7 @@ class Hypster:
         self.name = name
         self.source_code = source_code
         self.namespace = namespace
+        self.db = InMemoryDatabase()
         self.hp_calls = collect_hp_calls(self.source_code)
 
         self.modified_source = (
@@ -50,8 +52,7 @@ class Hypster:
         self,
         final_vars: Optional[List[str]] = None,
         exclude_vars: Optional[List[str]] = None,
-        selections: Optional[Dict[str, Any]] = None,
-        overrides: Optional[Dict[str, Any]] = None,
+        values: Optional[Dict[str, Any]] = None,
     ) -> HypsterReturn:
         """
         Execute the Hypster instance with given parameters.
@@ -59,15 +60,13 @@ class Hypster:
         Args:
             final_vars (Optional[List[str]], optional): List of variables to include in the final result.
             exclude_vars (Optional[List[str]], optional): List of variables to exclude from the final result.
-            selections (Optional[Dict[str, Any]], optional): Predefined selections for hyperparameters.
-            overrides (Optional[Dict[str, Any]], optional): Overrides for hyperparameters.
+            values (Optional[Dict[str, Any]], optional): Values for hyperparameters.
 
         Returns:
             Dict[str, Any]: The execution result.
         """
-        hp = HP(final_vars or [], exclude_vars or [], selections or {}, overrides or {})
+        hp = HP(final_vars or [], exclude_vars or [], values or {}, db=self.db)
         result = self._execute_function(hp, self.modified_source)
-        self.snapshot_history.append(hp.snapshot)
         return result
 
     def _execute_function(self, hp: HP, modified_source: str) -> Dict[str, Any]:
@@ -154,35 +153,6 @@ class Hypster:
         if path is None:
             path = f"{self.name}.py"
         save(self, path)
-
-    def get_combinations(self):
-        if self.combinations:
-            return self.combinations
-
-        hp = HP([], {}, {}, explore_mode=True)
-        combinations = []
-
-        while True:
-            self._execute_function(hp, self.modified_source)
-            combinations.append(hp.current_combination.copy())
-            if not hp.get_next_combination(combinations):
-                break
-        self.combinations = combinations
-        self.defaults = hp.defaults  # TODO: improve this
-        return combinations
-
-    def get_defaults(self):
-        if not self.combinations:
-            self.get_combinations()
-        return self.defaults
-
-    def get_snapshot_history(self):
-        return self.snapshot_history
-
-    def get_last_snapshot(self):
-        if not self.snapshot_history:
-            return {}
-        return self.snapshot_history[-1]
 
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):
