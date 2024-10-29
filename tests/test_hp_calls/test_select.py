@@ -81,74 +81,25 @@ def test_select_invalid_default_not_in_options_dict():
         config_func()
 
 
-# Selection and override behavior with list options
-def test_select_with_selection_list():
+def test_select_with_list():
     @config
     def config_func(hp: HP):
         value = hp.select(["a", "b", "c"], default="a", name="param")
 
-    result = config_func(selections={"param": "b"})
+    result = config_func(values={"param": "b"})
     assert result["value"] == "b"
 
 
-def test_select_with_override_list():
-    @config
-    def config_func(hp: HP):
-        value = hp.select(["a", "b", "c"], default="a", name="param")
-
-    result = config_func(overrides={"param": "c"})
-    assert result["value"] == "c"
-
-
-# Selection and override behavior with dict options
-def test_select_with_selection_dict():
+def test_select_with_dict():
     @config
     def config_func(hp: HP):
         value = hp.select({"k1": "v1", "k2": "v2"}, default="k1", name="param")
 
-    result = config_func(selections={"param": "k2"})
+    result = config_func(values={"param": "k2"})
     assert result["value"] == "v2"
 
 
-def test_select_with_override_dict():
-    @config
-    def config_func(hp: HP):
-        value = hp.select({"k1": "v1", "k2": "v2"}, default="k1", name="param")
-
-    result = config_func(overrides={"param": "k2"})
-    assert result["value"] == "v2"
-
-
-# Override precedence tests
-def test_select_override_precedence_list():
-    @config
-    def config_func(hp: HP):
-        value = hp.select(["a", "b", "c"], default="a", name="param")
-
-    # Test with valid options
-    result = config_func(selections={"param": "b"}, overrides={"param": "c"})
-    assert result["value"] == "c"
-
-    # Test with override value not in options (should still work)
-    result = config_func(selections={"param": "b"}, overrides={"param": "d"})
-    assert result["value"] == "d"
-
-
-def test_select_override_precedence_dict():
-    @config
-    def config_func(hp: HP):
-        value = hp.select({"k1": "v1", "k2": "v2"}, default="k1", name="param")
-
-    # Test with valid keys
-    result = config_func(selections={"param": "k1"}, overrides={"param": "k2"})
-    assert result["value"] == "v2"
-
-    # Test with override key not in options (should still work)
-    result = config_func(selections={"param": "k1"}, overrides={"param": "k3"})
-    assert result["value"] == "k3"
-
-
-def test_select_without_selection_or_override():
+def test_select_without_values():
     @config
     def config_func(hp: HP):
         value = hp.select(["a", "b", "c"], default="a", name="param")
@@ -157,7 +108,7 @@ def test_select_without_selection_or_override():
     assert result["value"] == "a"
 
 
-def test_select_invalid_dict_key_types():
+def test_invalid_dict_key_types():
     with pytest.raises(ValueError):
 
         @config
@@ -167,7 +118,7 @@ def test_select_invalid_dict_key_types():
         invalid_dict_keys()
 
 
-def test_select_invalid_list_value_types():
+def test_invalid_list_value_types():
     with pytest.raises(ValueError):
 
         @config
@@ -187,18 +138,18 @@ def test_select_missing_default():
         missing_default()
 
 
-def test_select_with_disable_overrides():
+def test_select_with_options_only():
     @config
     def config_func(hp: HP):
-        value = hp.select(["a", "b", "c"], default="a", name="param", disable_overrides=True)
+        value = hp.select(["a", "b", "c"], default="a", name="param", options_only=True)
 
-    # Should work with selections
-    result = config_func(selections={"param": "b"})
+    # Should work with values
+    result = config_func(values={"param": "b"})
     assert result["value"] == "b"
 
-    # Should fail with overrides
-    with pytest.raises(ValueError, match="Overrides are disabled for 'param'"):
-        config_func(overrides={"param": "c"})
+    # Should fail with values
+    with pytest.raises(ValueError):
+        config_func(values={"param": "d"})
 
 
 def test_select_rejects_list_selection():
@@ -206,14 +157,5 @@ def test_select_rejects_list_selection():
     def config_func(hp: HP):
         value = hp.select(["a", "b", "c"], default="a", name="param")
 
-    with pytest.raises(TypeError, match="Selection for 'param' must not be a list"):
-        config_func(selections={"param": ["b"]})
-
-
-def test_select_rejects_list_override_with_valid_options():
-    @config
-    def config_func(hp: HP):
-        value = hp.select(["a", "b", "c"], default="a", name="param")
-
-    with pytest.raises(ValueError, match="Override values \\['b', 'c'\\] for 'param' are not all valid options"):
-        config_func(overrides={"param": ["b", "c"]})
+    with pytest.raises(TypeError):
+        config_func(values={"param": ["b"]})
