@@ -16,6 +16,16 @@ class HPCall(ABC):
         self.name = name
         self.default = default
 
+    def _get_call_type(self) -> str:
+        """Convert class name to call type format (e.g., MultiBoolCall -> multi_bool)."""
+        name = self.__class__.__name__.replace("Call", "")
+        result = []
+        for i, char in enumerate(name):
+            if i > 0 and char.isupper():
+                result.append("_")
+            result.append(char.lower())
+        return "".join(result)
+
     @abstractmethod
     def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
         pass
@@ -145,14 +155,17 @@ class SingleValueCall(HPCall):
 
     def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> Any:
         if self.name in selections:
-            raise ValueError(f"Selections are not supported for '{self.name}'.")
+            raise ValueError(
+                f"Selections are not supported for hp.{self._get_call_type()}() with name: '{self.name}'. "
+                f"Please use overrides instead."
+            )
         if self.name in overrides:
             override_value = overrides[self.name]
             if isinstance(override_value, list):
-                raise TypeError(f"Override for '{self.name}' must not be a list")
+                raise TypeError(f"Override for hp.{self._get_call_type()}() '{self.name}' must not be a list")
             if not isinstance(override_value, self.expected_type):
                 type_name = self._get_type_name(self.expected_type)
-                raise TypeError(f"Override for '{self.name}' must be of type {type_name}")
+                raise TypeError(f"Override for hp.{self._get_call_type()}() '{self.name}' must be of type {type_name}")
             return override_value
         return self.default
 
@@ -175,14 +188,19 @@ class MultiValueCall(HPCall):
 
     def execute(self, selections: Dict[str, Any], overrides: Dict[str, Any]) -> List[Any]:
         if self.name in selections:
-            raise ValueError(f"Selections are not supported for '{self.name}'.")
+            raise ValueError(
+                f"Selections are not supported for hp.{self._get_call_type()}() with name: '{self.name}'. "
+                f"Please use overrides instead."
+            )
         if self.name in overrides:
             override_values = overrides[self.name]
             if not isinstance(override_values, list):
-                raise TypeError(f"Override for '{self.name}' must be a list")
+                raise TypeError(f"Override for hp.{self._get_call_type()}() '{self.name}' must be a list")
             if not all(isinstance(x, self.expected_type) for x in override_values):
                 type_name = self._get_type_name(self.expected_type)
-                raise TypeError(f"All override values for '{self.name}' must be of type {type_name}")
+                raise TypeError(
+                    f"All override values for hp.{self._get_call_type()}() '{self.name}' must be of type {type_name}"
+                )
             return override_values
         return self.default
 
