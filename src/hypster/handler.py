@@ -1,309 +1,393 @@
 import logging
 from abc import ABC, abstractmethod
-from collections import OrderedDict
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import ipywidgets as widgets
-from IPython.display import HTML, display
+from IPython.display import display
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger("hypster.interactive")
 
 
-@dataclass
-class ParameterState:
-    """Represents the current state and options of a parameter."""
+class Component(ABC):
+    """Base component interface."""
 
-    name: str
-    current_value: Any
-    available_options: Set[Any]
+    def __init__(self, id: str, label: str, value: Any):
+        self.id = id
+        self.label = label
+        self.value = value
+
+    def get_state(self) -> dict:
+        """Get component's current state as a dictionary."""
+        return {key: value for key, value in self.__dict__.items() if not key.startswith("_")}
+
+    def update(self, **kwargs) -> None:
+        """Update component attributes."""
+        state_changed = False
+        for key, value in kwargs.items():
+            if hasattr(self, key) and getattr(self, key) != value:
+                setattr(self, key, value)
+                state_changed = True
+        return state_changed
+
+    def equals(self, other: "Component") -> bool:
+        """Compare components' states."""
+        if not isinstance(other, self.__class__):
+            return False
+        return self.get_state() == other.get_state()
+
+
+class SelectComponent(Component):
+    """Selection from a list of options."""
+
+    def __init__(self, id: str, label: str, value: Any, options: List[Any]):
+        super().__init__(id, label, value)
+        self.options = options
+
+
+class NumericComponent(Component):
+    """Base for numeric inputs."""
+
+    def __init__(
+        self,
+        id: str,
+        label: str,
+        value: Union[int, float],
+        min_value: Optional[Union[int, float]] = None,
+        max_value: Optional[Union[int, float]] = None,
+        step: Union[int, float] = 1,
+    ):
+        super().__init__(id, label, value)
+        self.min_value = min_value
+        self.max_value = max_value
+        self.step = step
+        self._validate_type()
+
+    def _validate_type(self):
+        expected_type = int if isinstance(self.step, int) else float
+        if not isinstance(self.value, expected_type):
+            raise TypeError(f"Value must be of type {expected_type}")
+
+    def update(self, **kwargs) -> None:
+        """Update component attributes and validate type."""
+        state_changed = super().update(**kwargs)
+        if state_changed:
+            self._validate_type()
+        return state_changed
+
+
+class UIComponent(ABC):
+    """Base UI component interface."""
+
+    def __init__(self, component: Component):
+        self.component = component
+        self.widget = self._create_widget()
+
+    @abstractmethod
+    def _create_widget(self) -> Any:
+        """Create the widget."""
+        pass
+
+    @abstractmethod
+    def render(self) -> Any:
+        """Render the component."""
+        pass
+
+    def update(self, new_component: Component) -> None:
+        """Update component with new state."""
+        # Store old state before updating
+        old_state = self.component.get_state()
+        new_state = new_component.get_state()
+
+        logger.debug(f"Comparing states for {self.component.id}:")
+        logger.debug(f"Old state: {old_state}")
+        logger.debug(f"New state: {new_state}")
+        if old_state != new_state:
+            logger.debug(f"Component {new_component.id} state changed, updating widget")
+            self.component = new_component
+            self._update_widget()
+        else:
+            logger.debug(f"Component {new_component.id} state unchanged, skipping widget update")
+
+    @abstractmethod
+    def _update_widget(self) -> None:
+        """Update widget with current component state."""
+        pass
+
+
+class IPySelectComponent(UIComponent):
+    def __init__(self, component: SelectComponent, on_change: Callable):
+        self.on_change = on_change
+        super().__init__(component)
+
+    def _create_widget(self) -> widgets.Widget:
+        logger.debug(f"Creating select widget for {self.component.id}")
+        widget = widgets.Dropdown(
+            options=self.component.options,
+            value=self.component.value,
+            description=self.component.label,
+            style={"description_width": "initial"},
+        )
+        widget.observe(lambda change: self.on_change(self.component.id, change["new"]), names="value")
+        return widget
+
+    def render(self) -> widgets.Widget:
+        return self.widget
+
+    def _update_widget(self) -> None:
+        logger.debug(f"Updating select widget {self.component.id}")
+        # First update options, then value to ensure value is valid
+        self.widget.options = self.component.options
+        self.widget.value = self.component.value
+        self.widget.description = self.component.label
+
+
+class IPyNumericComponent(UIComponent):
+    def __init__(self, component: NumericComponent, on_change: Callable):
+        self.on_change = on_change
+        super().__init__(component)
+
+    def _create_widget(self) -> widgets.Widget:
+        logger.debug(f"Creating numeric widget for {self.component.id}")
+        widget_cls = widgets.IntSlider if isinstance(self.component.step, int) else widgets.FloatSlider
+        widget = widget_cls(
+            value=self.component.value,
+            min=self.component.min_value or -100,
+            max=self.component.max_value or 100,
+            step=self.component.step,
+            description=self.component.label,
+            style={"description_width": "initial"},
+            continuous_update=False,
+        )
+        widget.observe(lambda change: self.on_change(self.component.id, change["new"]), names="value")
+        return widget
+
+    def render(self) -> widgets.Widget:
+        return self.widget
+
+    def _update_widget(self) -> None:
+        logger.debug(f"Updating numeric widget {self.component.id} with:")
+        logger.debug(f"  value: {self.component.value}")
+        logger.debug(f"  min: {self.component.min_value}")
+        logger.debug(f"  max: {self.component.max_value}")
+
+        min_value = self.component.value - 100 if self.component.min_value is None else self.component.min_value
+        max_value = self.component.value + 100 if self.component.max_value is None else self.component.max_value
+
+        self.widget.value = self.component.value
+
+        self.widget.min = min_value
+        self.widget.max = max_value
+        self.widget.step = self.component.step
+
+        self.widget.description = self.component.label
 
 
 class SelectionHandler:
-    """Handles parameter selections and manages their states."""
+    """Manages component state and updates."""
 
-    def __init__(self, config_func: Callable) -> None:
+    def __init__(self, config_func: Callable):
         self.config_func = config_func
-        self.selected_params: OrderedDict[str, Any] = OrderedDict()
-        self.current_options: OrderedDict[str, Set[Any]] = OrderedDict()
-        self.parameter_history: list[OrderedDict[str, Any]] = []
-        logger.info("Initialized SelectionHandler")
+        self.components: Dict[str, Component] = {}
+        self._component_order: List[str] = []  # Track order of components
+        logger.debug("Initializing SelectionHandler")
+        self._initialize_components()
 
-    def update_param(self, param_name: str, value: Any) -> None:
-        """
-        Update a parameter value and recalculate dependent parameters.
-
-        Args:
-            param_name (str): The name of the parameter to update.
-            value (Any): The new value for the parameter.
-        """
-        logger.info(f"Updating parameter '{param_name}' to '{value}'")
-        logger.debug(f"Current state before update: {dict(self.selected_params)}")
-
-        # Store current state in history
-        old_state = self.selected_params.copy()
-        self.parameter_history.append(old_state)
-
-        # Update the parameter
-        self.selected_params[param_name] = value
-
-        # Rerun config to update dependent parameters
-        self._run_config()
-
-    def _run_config(self) -> None:
-        """Run configuration to determine current parameter states."""
-        logger.info("Running configuration")
-        logger.debug(f"Current selected params: {dict(self.selected_params)}")
-
-        # Store current selections
-        current_selections = self.selected_params.copy()
-        logger.debug(f"Stored current selections: {dict(current_selections)}")
-
-        # Get the last known values for each parameter
-        last_known_values = {}
-        for param_name in current_selections:
-            for run_id in reversed(self.config_func.db.get_run_ids()):
-                record = self.config_func.db.get_latest_record(param_name, run_id)
-                if record is not None:
-                    last_known_values[param_name] = record.value
-                    break
-
-        # Clear current state
-        self.selected_params.clear()
-        self.current_options.clear()
-        logger.debug("Cleared current state")
-
-        # Restore the selections, preferring current values over last known values
-        self.selected_params.update(last_known_values)
-        self.selected_params.update(current_selections)
-        logger.debug(f"Restored selections: {dict(self.selected_params)}")
-
-        # Run the configuration
-        try:
-            self.config_func(values=self.selected_params)
-            logger.debug("Configuration function executed successfully")
-        except Exception as e:
-            logger.error(f"Error running config: {str(e)}", exc_info=True)
-            return
-
-        # Get the latest configuration state
+    def _initialize_components(self) -> None:
+        logger.debug("Running initial config")
+        self.config_func()
         latest_run_id = self.config_func.db.get_run_ids()[-1]
         latest_records = self.config_func.db.get_records(latest_run_id)
-        logger.debug(f"Latest records from DB: {latest_records}")
 
-        # Update state based on configuration results, maintaining order from records
-        for record in latest_records.values():
+        logger.debug(f"Initial records: {latest_records}")
+        self.components.clear()
+        self._component_order = list(latest_records.keys())  # Preserve order from OrderedDict
+
+        for name, record in latest_records.items():
+            logger.debug(f"Creating component for {name}: {record}")
             if record.parameter_type == "select":
-                self.current_options[record.name] = set(record.options)
-                # Only update value if not already set
-                if record.name not in self.selected_params:
-                    self.selected_params[record.name] = record.value
-                logger.debug(f"Updated parameter '{record.name}':")
-                logger.debug(f"  Options: {self.current_options[record.name]}")
-                logger.debug(f"  Selected value: {self.selected_params[record.name]}")
+                self.components[name] = SelectComponent(id=name, label=name, value=record.value, options=record.options)
+            elif record.parameter_type == "int":
+                self.components[name] = NumericComponent(
+                    id=name,
+                    label=name,
+                    value=record.value,
+                    min_value=record.options.min if record.options else None,
+                    max_value=record.options.max if record.options else None,
+                    step=1,
+                )
 
-        logger.info("Configuration run completed")
-        logger.debug(f"Final state - Options: {dict(self.current_options)}")
-        logger.debug(f"Final state - Selected: {dict(self.selected_params)}")
+    def update_component(self, component_id: str, **kwargs) -> None:
+        logger.debug(f"Updating component {component_id} with {kwargs}")
+        if component_id in self.components:
+            self.components[component_id].update(**kwargs)
 
-    def get_current_parameters(self) -> Dict[str, ParameterState]:
-        """
-        Retrieve the current parameters and their states.
+            # Get values only up to the changed component
+            values = {}
+            for name in self._component_order:
+                if name in self.components:
+                    values[name] = self.components[name].value
+                if name == component_id:
+                    break
 
-        Returns:
-            Dict[str, ParameterState]: A dictionary of parameter names to their states.
-        """
-        return {
-            name: ParameterState(name=name, current_value=value, available_options=options)
-            for name, options in self.current_options.items()
-            for value in [self.selected_params.get(name)]
-        }
+            logger.debug(f"Updating config with values up to {component_id}: {values}")
+            self.config_func(values=values)
+
+            self._refresh_components()
+
+    def _refresh_components(self) -> None:
+        logger.debug("Refreshing components from latest config")
+        latest_run_id = self.config_func.db.get_run_ids()[-1]
+        latest_records = self.config_func.db.get_records(latest_run_id)
+
+        logger.debug(f"Latest records: {latest_records}")
+
+        # Update component order
+        self._component_order = list(latest_records.keys())
+
+        # Keep track of valid component IDs
+        current_component_ids = set(latest_records.keys())
+        existing_component_ids = set(self.components.keys())
+
+        # Remove components that are no longer in the config
+        for component_id in existing_component_ids - current_component_ids:
+            logger.debug(f"Removing component {component_id}")
+            self.components.pop(component_id)
+
+        # Update or create components
+        for name, record in latest_records.items():
+            logger.debug(f"Processing record for {name}: {record}")
+            if name in self.components:
+                # Instead of updating in place, create a new component
+                component = self.components[name]
+
+                if isinstance(component, SelectComponent):
+                    # Instead of updating in place, create a new component
+                    new_value = record.value if record.value in record.options else record.default
+                    new_component = SelectComponent(id=name, label=name, value=new_value, options=record.options)
+                    self.components[name] = new_component
+
+                elif isinstance(component, NumericComponent):
+                    new_min = record.options.min if record.options else None
+                    new_max = record.options.max if record.options else None
+                    current_value = component.value
+
+                    if (new_min is not None and current_value < new_min) or (
+                        new_max is not None and current_value > new_max
+                    ):
+                        logger.debug(
+                            f"Current value {current_value} is outside new bounds {new_min} {new_max}"
+                            f" using default {record.default}"
+                        )
+                        new_value = record.default
+                    else:
+                        new_value = current_value
+
+                    new_component = NumericComponent(
+                        id=name, label=name, value=new_value, min_value=new_min, max_value=new_max, step=1
+                    )
+                    self.components[name] = new_component
+            else:
+                # Create new component
+                logger.debug(f"Creating new component for {name}")
+                if record.parameter_type == "select":
+                    self.components[name] = SelectComponent(
+                        id=name, label=name, value=record.value, options=record.options
+                    )
+                elif record.parameter_type == "int":
+                    self.components[name] = NumericComponent(
+                        id=name,
+                        label=name,
+                        value=record.value,
+                        min_value=record.options.min if record.options else None,
+                        max_value=record.options.max if record.options else None,
+                        step=1,
+                    )
+
+    def get_ordered_components(self) -> List[Component]:
+        """Get components in the order they were defined."""
+        return [self.components[name] for name in self._component_order if name in self.components]
 
 
-class AbstractValueHandler(ABC):
-    @abstractmethod
-    def display_ui(self, parameters: Dict[str, ParameterState]) -> None:
-        """Display the UI components for parameter selection."""
-        pass
-
-    @abstractmethod
-    def get_user_selections(self) -> Dict[str, Any]:
-        """Retrieve the user's selections from the UI."""
-        pass
-
-    @abstractmethod
-    def update_ui(self, updated_parameters: Dict[str, ParameterState]) -> None:
-        """Update the UI based on new parameter options or defaults."""
-        pass
-
-
-class IPyWidgetsUI(AbstractValueHandler):
-    """UI handler using IPyWidgets."""
-
-    def __init__(self, selection_handler: SelectionHandler) -> None:
+class IPyWidgetsUI:
+    def __init__(self, selection_handler: SelectionHandler):
         self.selection_handler = selection_handler
-        self.widgets: Dict[str, widgets.Dropdown] = {}
-        self.output = widgets.Output()
+        self.ui_components: Dict[str, UIComponent] = {}
         self.container = widgets.VBox([])
-        logger.info("Initialized IPyWidgetsUI")
-        self.create_widgets()
+        self.output = widgets.Output()
+        logger.debug("Initialized IPyWidgetsUI")
 
-    def create_widgets(self) -> None:
-        """Create widgets for all current parameters."""
-        logger.info("Creating widgets")
-        parameters = self.selection_handler.get_current_parameters()
-        logger.debug(f"Parameters to create widgets for: {parameters}")
+    def _create_ui_component(self, component: Component) -> UIComponent:
+        logger.debug(f"Creating UI component for {component.id}")
+        if isinstance(component, SelectComponent):
+            return IPySelectComponent(component, self._handle_change)
+        elif isinstance(component, NumericComponent):
+            return IPyNumericComponent(component, self._handle_change)
+        raise ValueError(f"Unsupported component type: {type(component)}")
 
-        for param in parameters.values():
-            logger.debug(f"Creating widget for parameter '{param.name}':")
-            logger.debug(f"  Options: {param.available_options}")
-            logger.debug(f"  Current value: {param.current_value}")
-
-            widget = widgets.Dropdown(
-                options=sorted(param.available_options),
-                value=param.current_value,
-                description=param.name,
-                style={"description_width": "initial"},
-            )
-
-            widget.observe(lambda change, name=param.name: self._handle_change(name, change["new"]), names="value")
-
-            self.widgets[param.name] = widget
-            logger.debug(f"Created widget for '{param.name}'")
-
-        self.container.children = list(self.widgets.values()) + [self.output]
-        logger.info(f"Created {len(self.widgets)} widgets")
-
-    def _handle_change(self, param_name: str, new_value: Any) -> None:
-        """
-        Handle changes in widget values.
-
-        Args:
-            param_name (str): The name of the parameter that changed.
-            new_value (Any): The new value of the parameter.
-        """
-        logger.info(f"Handling change for parameter '{param_name}' to '{new_value}'")
+    def _handle_change(self, component_id: str, new_value: Any):
+        logger.debug(f"Handle change for {component_id}: {new_value}")
         with self.output:
-            try:
-                self.selection_handler.update_param(param_name, new_value)
-                self.update_ui(self.selection_handler.get_current_parameters())
-            except Exception as e:
-                logger.error(f"Error handling change: {str(e)}", exc_info=True)
-                self.output.append_stdout(f"Error: {str(e)}\n")
+            self.selection_handler.update_component(component_id, value=new_value)
+            self._update_display()
 
-    def update_widgets(self) -> None:
-        """Update widgets based on the current state."""
-        logger.info("Updating widgets")
-        parameters = self.selection_handler.get_current_parameters()
-        current_param_names = set(parameters.keys())
-        existing_param_names = set(self.widgets.keys())
+    def _update_display(self):
+        logger.debug("Updating display")
+        widgets_list = []
 
-        # Remove widgets that are no longer needed
-        for param_name in existing_param_names - current_param_names:
-            logger.debug(f"Removing obsolete widget for '{param_name}'")
-            self.widgets.pop(param_name)
+        # Get ordered components from selection handler
+        ordered_components = self.selection_handler.get_ordered_components()
+        current_component_ids = {comp.id for comp in ordered_components}
+        existing_component_ids = set(self.ui_components.keys())
 
-        # Get the order from the latest run
-        latest_run_id = self.selection_handler.config_func.db.get_run_ids()[-1]
-        latest_records = self.selection_handler.config_func.db.get_records(latest_run_id)
-        ordered_params = list(latest_records.keys())
+        # Remove UI components that are no longer in the config
+        for component_id in existing_component_ids - current_component_ids:
+            logger.debug(f"Removing UI component {component_id}")
+            self.ui_components.pop(component_id)
 
-        # Update or create widgets in the order from the database
-        for param_name in ordered_params:
-            if param_name in parameters:
-                param_state = parameters[param_name]
-                if param_name in self.widgets:
-                    self._update_widget_values(self.widgets[param_name], param_state)
-                else:
-                    self._create_widget(param_state)
+        # Update or create UI components in the correct order
+        for component in ordered_components:
+            logger.debug(f"Processing UI component for {component.id}")
+            if component.id not in self.ui_components:
+                logger.debug(f"Creating new UI component for {component.id}")
+                self.ui_components[component.id] = self._create_ui_component(component)
+            else:
+                logger.debug(f"Updating existing UI component for {component.id}")
+                self.ui_components[component.id].update(component)
 
-        # Update the container with widgets in the correct order
-        ordered_widgets = [self.widgets[param_name] for param_name in ordered_params if param_name in self.widgets]
-        self.container.children = ordered_widgets + [self.output]
-        logger.info("Widget update completed")
+            widgets_list.append(self.ui_components[component.id].render())
 
-    def _update_widget_values(self, widget: widgets.Dropdown, param_state: ParameterState) -> None:
-        """Update an existing widget's options and value."""
-        widget.options = sorted(param_state.available_options)
-        if widget.value not in param_state.available_options:
-            widget.value = param_state.current_value
-        logger.debug(f"Updated widget for '{param_state.name}'")
+        logger.debug(f"Final widget list length: {len(widgets_list)}")
+        widgets_list.append(self.output)
+        self.container.children = widgets_list
 
-    def _create_widget(self, param_state: ParameterState) -> None:
-        """Create a new widget for a parameter."""
-        widget = widgets.Dropdown(
-            options=sorted(param_state.available_options),
-            value=param_state.current_value,
-            description=param_state.name,
-            style={"description_width": "initial"},
-        )
-
-        widget.observe(lambda change, name=param_state.name: self._handle_change(name, change["new"]), names="value")
-
-        self.widgets[param_state.name] = widget
-        logger.debug(f"Created new widget for '{param_state.name}'")
-
-    def display_ui(self) -> None:
-        """Display the configuration UI."""
-        # Apply custom CSS for styling
-        css = """
-        <style>
-        .cell-output-ipywidget-background {
-            background-color: transparent !important;
-        }
-        :root {
-            --jp-widgets-color: var(--vscode-editor-foreground);
-            --jp-widgets-font-size: var(--vscode-editor-font-size);
-        }
-        </style>
-        """
-        display(HTML(css))
-
-        # Display the widget container
+    def display(self):
+        logger.debug("Displaying UI")
+        self._update_display()
         display(self.container)
-
-    def get_user_selections(self) -> Dict[str, Any]:
-        """Retrieve the user's selections from the UI."""
-        return {name: widget.value for name, widget in self.widgets.items()}
-
-    def update_ui(self, updated_parameters: Dict[str, ParameterState]) -> None:
-        """
-        Update the UI based on new parameter options or defaults.
-
-        Args:
-            updated_parameters (Dict[str, ParameterState]): The updated parameters.
-        """
-        self.update_widgets()
 
 
 def create_interactive_config(config_func: Callable) -> Tuple[SelectionHandler, IPyWidgetsUI]:
     """
-    Initialize the interactive configuration UI.
+    Create and display an interactive configuration interface.
 
     Args:
-        config_func (Callable): The configuration function to manage parameters.
+        config_func: A configuration function decorated with @config
 
     Returns:
-        Tuple[SelectionHandler, IPyWidgetsUI]: Instances of the handler and UI.
+        Tuple of (SelectionHandler, IPyWidgetsUI) if you need to access them later
     """
-    logger.info("Creating interactive configuration")
-
-    # Create and initialize handler
     handler = SelectionHandler(config_func)
-    logger.info("Created SelectionHandler")
-
-    # Run initial configuration to populate parameters
-    handler._run_config()
-    logger.debug(f"Initial parameters: {handler.get_current_parameters()}")
-
-    # Create and initialize UI
     ui = IPyWidgetsUI(handler)
-    logger.info("Created IPyWidgetsUI")
-
-    # Display the UI
-    ui.display_ui()
-    logger.info("UI displayed")
-
+    ui.display()
     return handler, ui
+
+
+# Simple wrapper if you don't need access to the handler and UI
+def display_interactive_config(config_func: Callable) -> None:
+    """
+    Display an interactive configuration interface.
+
+    Args:
+        config_func: A configuration function decorated with @config
+    """
+    create_interactive_config(config_func)
