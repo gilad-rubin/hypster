@@ -2,8 +2,6 @@ import ast
 import logging
 from typing import Dict, List, Optional, Set
 
-# Configure logging for detailed debug output
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
