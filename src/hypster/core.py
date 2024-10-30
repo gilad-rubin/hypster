@@ -2,6 +2,7 @@ import logging
 import os
 import textwrap
 import types
+import uuid
 from typing import Any, Dict, List, Optional, OrderedDict, Tuple, Union
 
 from .ast_analyzer import (
@@ -10,7 +11,7 @@ from .ast_analyzer import (
     find_referenced_vars,
     inject_names_to_source_code,
 )
-from .db import InMemoryDatabase
+from .db import DatabaseInterface, InMemoryDatabase
 from .hp import HP
 from .utils import find_hp_function_body_and_name, remove_function_signature
 
@@ -65,7 +66,7 @@ class Hypster:
         Returns:
             Dict[str, Any]: The execution result.
         """
-        hp = HP(final_vars or [], exclude_vars or [], values or {}, db=self.db)
+        hp = HP(final_vars or [], exclude_vars or [], values or {}, db=self.db, run_id=uuid.uuid4())
         result = self._execute_function(hp, self.modified_source)
         return result
 
@@ -94,6 +95,29 @@ class Hypster:
         # Process and filter the results
         return self._process_results(exec_namespace, hp.final_vars, hp.exclude_vars)
 
+    def find_nested_vars(self, vars: List[str], db: DatabaseInterface) -> List[str]:
+        """Find variables that reference nested configurations.
+
+        Args:
+            vars: List of variable names to check
+            db: Database containing parameter records
+
+        Returns:
+            List of variable names that reference nested configs
+        """
+        nested_vars = []
+        for var in vars:
+            # Get the top-level variable name before any dot notation
+            prefix = var.split(".")[0] if "." in var else var
+
+            # Check if this variable is a propagated config
+            for record in db.get_records().values():
+                if record.name == prefix and record.parameter_type == "propagate":
+                    nested_vars.append(var)
+                    break
+
+        return nested_vars
+
     def _process_results(
         self, namespace: Dict[str, Any], final_vars: List[str], exclude_vars: List[str]
     ) -> Dict[str, Any]:
@@ -117,6 +141,9 @@ class Hypster:
             for k, v in namespace.items()
             if k != "hp" and not k.startswith("__") and not isinstance(v, (types.ModuleType, types.FunctionType, type))
         }
+
+        nested_vars = self.find_nested_vars(final_vars, self.db)
+        final_vars = [var for var in final_vars if var not in nested_vars]
 
         if not final_vars:
             final_result = {k: v for k, v in filtered_locals.items() if not k.startswith("_")}
