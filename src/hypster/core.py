@@ -54,6 +54,7 @@ class Hypster:
         final_vars: Optional[List[str]] = None,
         exclude_vars: Optional[List[str]] = None,
         values: Optional[Dict[str, Any]] = None,
+        explore_mode: bool = False,
     ) -> HypsterReturn:
         """
         Execute the Hypster instance with given parameters.
@@ -62,11 +63,19 @@ class Hypster:
             final_vars (Optional[List[str]], optional): List of variables to include in the final result.
             exclude_vars (Optional[List[str]], optional): List of variables to exclude from the final result.
             values (Optional[Dict[str, Any]], optional): Values for hyperparameters.
+            explore_mode (bool, optional): Whether to enable interactive/explore mode. Defaults to False.
 
         Returns:
             Dict[str, Any]: The execution result.
         """
-        hp = HP(final_vars or [], exclude_vars or [], values or {}, db=self.db, run_id=uuid.uuid4())
+        hp = HP(
+            final_vars or [],
+            exclude_vars or [],
+            values or {},
+            db=self.db,
+            run_id=uuid.uuid4(),
+            explore_mode=explore_mode,
+        )
         result = self._execute_function(hp, self.modified_source)
         return result
 
@@ -111,7 +120,7 @@ class Hypster:
             prefix = var.split(".")[0] if "." in var else var
 
             # Check if this variable is a propagated config
-            for record in db.get_records().values():
+            for record in db.get_latest_run_records().values():
                 if record.name == prefix and record.parameter_type == "propagate":
                     nested_vars.append(var)
                     break
