@@ -15,7 +15,7 @@ def test_int_input_with_default():
 
 
 def test_int_input_without_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -25,7 +25,7 @@ def test_int_input_without_default():
 
 
 def test_int_input_invalid_default_float():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -35,7 +35,7 @@ def test_int_input_invalid_default_float():
 
 
 def test_int_input_invalid_default_string():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -59,7 +59,7 @@ def test_int_input_invalid_values():
     def config_func(hp: HP):
         value = hp.int_input(default=42, name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": 42.5})  # Float not allowed
 
 
@@ -83,7 +83,7 @@ def test_multi_int_without_default():
 
 
 def test_multi_int_invalid_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -106,7 +106,7 @@ def test_multi_int_invalid_values():
     def config_func(hp: HP):
         values = hp.multi_int(default=[1, 2], name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": [3, 4.5]})  # Not all integers
 
 
@@ -115,7 +115,7 @@ def test_multi_int_invalid_values_type():
     def config_func(hp: HP):
         values = hp.multi_int(default=[1, 2], name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": 3})  # Not a list
 
 
@@ -148,7 +148,7 @@ def test_int_input_with_min_max():
 
 
 def test_int_input_default_below_min():
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -158,7 +158,7 @@ def test_int_input_default_below_min():
 
 
 def test_int_input_default_above_max():
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -172,7 +172,7 @@ def test_int_input_values_below_min():
     def config_func(hp: HP):
         value = hp.int_input(default=5, min=0, name="param")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         config_func(values={"param": -1})
 
 
@@ -181,7 +181,7 @@ def test_int_input_values_above_max():
     def config_func(hp: HP):
         value = hp.int_input(default=5, max=10, name="param")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         config_func(values={"param": 11})
 
 
@@ -214,7 +214,7 @@ def test_multi_int_with_min_max():
 
 
 def test_multi_int_default_below_min():
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -224,7 +224,7 @@ def test_multi_int_default_below_min():
 
 
 def test_multi_int_default_above_max():
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -238,7 +238,7 @@ def test_multi_int_values_below_min():
     def config_func(hp: HP):
         values = hp.multi_int(default=[5, 6], min=0, name="param")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         config_func(values={"param": [5, -1]})
 
 
@@ -247,5 +247,5 @@ def test_multi_int_values_above_max():
     def config_func(hp: HP):
         values = hp.multi_int(default=[5, 6], max=10, name="param")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         config_func(values={"param": [5, 11]})

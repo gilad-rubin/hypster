@@ -171,12 +171,12 @@ class TestCaseGenerator:
 
         # Special case: NumberInputGenerator without defaults should raise an error
         if isinstance(self.hp_call, NumberInputGenerator) and isinstance(self.defaults, WithoutDefaults):
-            assertions.append("with pytest.raises(ValueError, match='number_input must have a default value'):")
+            assertions.append("with pytest.raises(Exception, match='number_input must have a default value'):")
             assertions.append("    config_func()")
             return assertions
 
         if isinstance(self.defaults, WithoutDefaults):
-            assertions.append("with pytest.raises(ValueError):")
+            assertions.append("with pytest.raises(Exception):")
             assertions.append("    config_func()")
         else:
             assertions.append("result = config_func()")

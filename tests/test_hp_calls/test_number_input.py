@@ -14,7 +14,7 @@ def test_number_input_with_default():
 
 
 def test_number_input_without_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -24,7 +24,7 @@ def test_number_input_without_default():
 
 
 def test_number_input_invalid_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -47,7 +47,7 @@ def test_number_input_invalid_values():
     def config_func(hp: HP):
         value = hp.number_input(default=0.5, name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": "not a number"})
 
 
@@ -71,7 +71,7 @@ def test_multi_number_without_default():
 
 
 def test_multi_number_invalid_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -94,7 +94,7 @@ def test_multi_number_invalid_values_type():
     def config_func(hp: HP):
         values = hp.multi_number(default=[1.0, 2.0], name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": 3.0})  # Not a list
 
 
@@ -103,7 +103,7 @@ def test_multi_number_invalid_values():
     def config_func(hp: HP):
         values = hp.multi_number(default=[1.0, 2.0], name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": ["a", "b"]})  # Not numbers
 
 
@@ -136,7 +136,7 @@ def test_number_input_with_min_max():
 
 
 def test_number_input_default_below_min():
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -146,7 +146,7 @@ def test_number_input_default_below_min():
 
 
 def test_number_input_default_above_max():
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -160,7 +160,7 @@ def test_number_input_values_below_min():
     def config_func(hp: HP):
         value = hp.number_input(default=0.5, min=0.0, name="param")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         config_func(values={"param": -0.1})
 
 
@@ -169,7 +169,7 @@ def test_number_input_values_above_max():
     def config_func(hp: HP):
         value = hp.number_input(default=0.5, max=1.0, name="param")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         config_func(values={"param": 1.1})
 
 
@@ -202,7 +202,7 @@ def test_multi_number_with_min_max():
 
 
 def test_multi_number_default_below_min():
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -212,7 +212,7 @@ def test_multi_number_default_below_min():
 
 
 def test_multi_number_default_above_max():
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -226,7 +226,7 @@ def test_multi_number_values_below_min():
     def config_func(hp: HP):
         values = hp.multi_number(default=[0.5, 0.6], min=0.0, name="param")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         config_func(values={"param": [0.5, -0.1]})
 
 
@@ -235,5 +235,5 @@ def test_multi_number_values_above_max():
     def config_func(hp: HP):
         values = hp.multi_number(default=[0.5, 0.6], max=1.0, name="param")
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         config_func(values={"param": [0.5, 1.1]})

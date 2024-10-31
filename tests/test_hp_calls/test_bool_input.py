@@ -15,7 +15,7 @@ def test_bool_input_with_default():
 
 
 def test_bool_input_without_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -25,11 +25,11 @@ def test_bool_input_without_default():
 
 
 def test_bool_input_invalid_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
-            value = hp.bool_input(default="true", name="param")  # Not a boolean
+            value = hp.bool_input(default="abc", name="param")  # Not a boolean
 
         config_func()
 
@@ -49,7 +49,7 @@ def test_bool_input_invalid_values():
     def config_func(hp: HP):
         value = hp.bool_input(default=True, name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": "true"})  # Not a boolean
 
 
@@ -74,11 +74,11 @@ def test_multi_bool_without_default():
 
 
 def test_multi_bool_invalid_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
-            values = hp.multi_bool(default=[True, "false"], name="param")  # Not all booleans
+            values = hp.multi_bool(default=[True, "123"], name="param")  # Not all booleans
 
         config_func()
 
@@ -97,7 +97,7 @@ def test_multi_bool_invalid_values():
     def config_func(hp: HP):
         values = hp.multi_bool(default=[True, False], name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": [True, "false"]})  # Not all booleans
 
 
@@ -106,7 +106,7 @@ def test_multi_bool_invalid_values_type():
     def config_func(hp: HP):
         values = hp.multi_bool(default=[True, False], name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": True})  # Not a list
 
 

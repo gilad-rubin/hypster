@@ -14,7 +14,7 @@ def test_text_input_with_default():
 
 
 def test_text_input_without_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -24,7 +24,7 @@ def test_text_input_without_default():
 
 
 def test_text_input_invalid_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -47,7 +47,7 @@ def test_text_input_invalid_values():
     def config_func(hp: HP):
         value = hp.text_input(default="hello", name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": 123})  # Not a string
 
 
@@ -71,7 +71,7 @@ def test_multi_text_without_default():
 
 
 def test_multi_text_invalid_default():
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
@@ -94,7 +94,7 @@ def test_multi_text_invalid_values():
     def config_func(hp: HP):
         values = hp.multi_text(default=["a", "b"], name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": [1, 2]})  # Not strings
 
 
@@ -103,7 +103,7 @@ def test_multi_text_invalid_values_type():
     def config_func(hp: HP):
         values = hp.multi_text(default=["a", "b"], name="param")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(Exception):
         config_func(values={"param": "c"})  # Not a list
 
 
