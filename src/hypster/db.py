@@ -1,15 +1,17 @@
-from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union
 
-# Define data classes for logging
+
+class ParameterSource(Enum):
+    UI = "ui"
+    USER = "user"  # for programmatic calls
 
 
 @dataclass
 class NumericOptions:
-    min: float | int | None
-    max: float | int | None
-    allow_int: bool = True
+    min: Optional[Union[int, float]] = None
+    max: Optional[Union[int, float]] = None
     allow_float: bool = True
 
 
@@ -17,91 +19,71 @@ class NumericOptions:
 class ParameterRecord:
     name: str
     parameter_type: str
-    default: any
-    value: any
+    default: Any
+    value: Any
     run_id: str
-    options: list | NumericOptions | None = None
+    options: Optional[Any] = None
+    numeric_options: Optional[NumericOptions] = None
+    source: ParameterSource = ParameterSource.USER
+
+
+class DatabaseInterface:
+    def add_record(self, record: ParameterRecord, run_id: str) -> None:
+        pass
+
+    def get_records(self, run_id: str) -> Dict[str, ParameterRecord]:
+        pass
+
+    def get_latest_record(self, param_name: str, source: Optional[ParameterSource] = None) -> Optional[ParameterRecord]:
+        """Get the most recent record for a parameter name, optionally filtered by source."""
+        pass
 
 
 @dataclass
 class NestedDBRecord:
+    """Record type for nested configurations from propagate calls.
+    Stores the nested database and the name prefix for nested parameters."""
+
     name: str
     parameter_type: str
-    db: "DatabaseInterface"
+    db: DatabaseInterface
     run_id: str
-
-
-class DatabaseInterface:
-    """Abstract database interface."""
-
-    def add_record(self, record: ParameterRecord, run_id: str) -> None:
-        """Add a parameter record to the database."""
-        raise NotImplementedError("DatabaseInterface subclasses must implement the add_record method.")
-
-    def get_records(self, run_id: str) -> Dict[str, ParameterRecord]:
-        """Retrieve all records from the database."""
-        raise NotImplementedError("DatabaseInterface subclasses must implement the get_records method.")
-
-    def get_latest_record(self, param_name: str, run_id: str) -> Optional[ParameterRecord]:
-        """Get the most recent record for a parameter."""
-        raise NotImplementedError("DatabaseInterface subclasses must implement the get_latest_record method.")
-
-    def get_run_ids(self) -> List[str]:
-        """Get all run IDs in chronological order."""
-        raise NotImplementedError("DatabaseInterface subclasses must implement the get_run_ids method.")
+    source: ParameterSource
 
 
 class InMemoryDatabase(DatabaseInterface):
-    """In-memory database implementation using ordered dictionaries."""
-
     def __init__(self):
-        # Store runs in order, each run containing ordered parameters
-        self.data_store: OrderedDict[str, OrderedDict[str, ParameterRecord]] = OrderedDict()
-        self.run_ids: List[str] = []
+        self.records: Dict[str, Dict[str, ParameterRecord]] = {}  # run_id -> {param_name -> record}
+        self.run_history: List[str] = []  # Ordered list of run_ids
 
-    def add_record(self, record: ParameterRecord, run_id: str) -> None:
-        """
-        Add a parameter record to the database.
-        Creates a new run if run_id doesn't exist, or adds to existing run.
-        """
-        # Create new run if it doesn't exist
-        if run_id not in self.data_store:
-            self.data_store[run_id] = OrderedDict()
-            self.run_ids.append(run_id)
+    def add_record(self, record: Union[ParameterRecord, NestedDBRecord], run_id: str) -> None:
+        if run_id not in self.records:
+            self.records[run_id] = {}
+            self.run_history.append(run_id)
 
-        # Add/Update parameter record for this run
-        record.run_id = run_id
-        self.data_store[run_id][record.name] = record
+        if isinstance(record, NestedDBRecord):
+            # For nested records, merge the nested db records into the current db
+            nested_records = record.db.get_records(run_id)
+            for nested_name, nested_record in nested_records.items():
+                prefixed_name = f"{record.name}.{nested_name}"
+                self.records[run_id][prefixed_name] = nested_record
+        else:
+            self.records[run_id][record.name] = record
 
-    def get_records(self, run_id: str) -> OrderedDict[str, ParameterRecord]:
-        """Retrieve all records from a specific run."""
-        return self.data_store.get(run_id, OrderedDict())
+    def get_latest_run_records(self) -> Dict[str, Dict[str, ParameterRecord]]:
+        return self.records[self.run_history[-1]]
 
-    def get_latest_record(self, param_name: str, run_id: str) -> Optional[ParameterRecord]:
-        """
-        Get the most recent record for a parameter.
-        If run_id is specified, gets from that run; otherwise searches through all runs
-        in reverse order.
-        """
-        # Get from specific run
-        return self.data_store.get(run_id, OrderedDict()).get(param_name)
+    def get_records(self, run_id: str) -> Dict[str, ParameterRecord]:
+        return self.records.get(run_id, {})
 
+    def get_latest_record_for_param(
+        self, param_name: str, source: Optional[ParameterSource] = None
+    ) -> Optional[ParameterRecord]:
+        """Get the most recent record for a parameter name, optionally filtered by source."""
+        for run_id in reversed(self.run_history):
+            records = self.records.get(run_id, {})
+            if param_name in records:
+                record = records[param_name]
+                if source is None or record.source == source:
+                    return record
         return None
-
-    def get_run_ids(self) -> List[str]:
-        """Get all run IDs in chronological order."""
-        return self.run_ids.copy()
-
-    def get_latest_records(self) -> OrderedDict[str, ParameterRecord]:
-        """Get all records from the most recent run."""
-        if not self.run_ids:
-            return OrderedDict()
-        return self.get_records(self.run_ids[-1])
-
-    def start_new_run(self, run_id: str) -> None:
-        """
-        Start a new run with the given ID.
-        """
-        if run_id not in self.data_store:
-            self.data_store[run_id] = OrderedDict()
-            self.run_ids.append(run_id)
