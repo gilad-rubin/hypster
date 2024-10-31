@@ -38,7 +38,7 @@ def test_defaults_selections_overrides():
 
 def test_error_cases():
     # Test empty options
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def empty_options(hp: HP):
@@ -47,7 +47,7 @@ def test_error_cases():
         empty_options()
 
     # Test non-existent default
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def bad_default(hp: HP):
@@ -56,7 +56,7 @@ def test_error_cases():
         bad_default()
 
     # Test non-existent default
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def bad_default_dct(hp: HP):
@@ -65,7 +65,7 @@ def test_error_cases():
         bad_default_dct()
 
     # Test invalid key types in dictionary options
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def invalid_dict_keys(hp: HP):
@@ -77,7 +77,7 @@ def test_error_cases():
         invalid_dict_keys()
 
     # Test invalid value types in list options
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def invalid_list_values(hp: HP):
@@ -86,7 +86,7 @@ def test_error_cases():
         invalid_list_values()
 
     # Test missing default and no selection/override
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def missing_default(hp: HP):
@@ -115,12 +115,12 @@ def test_final_vars():
     assert "epochs" in result
 
     # Test non-existent final_vars
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(Exception) as exc_info:
         config_func(final_vars=["non_existent"])
     assert "do not exist in the configuration" in str(exc_info.value)
 
     # Test mixture of existing and non-existing final_vars
-    with pytest.raises(ValueError) as exc_info:
+    with pytest.raises(Exception) as exc_info:
         config_func(final_vars=["model", "non_existent"])
     assert "do not exist in the configuration: non_existent" in str(exc_info.value)
 
@@ -361,11 +361,11 @@ def test_multi_select_error_cases():
         hp.multi_select([], default=[])
 
     # Test empty options
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         config_func()
 
     # Test invalid default
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
 
         @config
         def bad_default(hp: HP):

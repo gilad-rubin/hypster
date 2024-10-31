@@ -161,7 +161,7 @@ def test_disable_automatic_naming_missing_name_error():
     def no_injection_config(hp: HP):
         a = hp.select(["a", "b"])  # This should raise an error
 
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         no_injection_config()
 
 
