@@ -11,8 +11,8 @@ from .ast_analyzer import (
     find_referenced_vars,
     inject_names_to_source_code,
 )
-from .db import DatabaseInterface, InMemoryDatabase
 from .hp import HP
+from .run_history import HistoryDatabase, InMemoryHistory
 from .utils import find_hp_function_body_and_name, remove_function_signature
 
 # Correct logging configuration
@@ -36,7 +36,7 @@ class Hypster:
         self.name = name
         self.source_code = source_code
         self.namespace = namespace
-        self.db = InMemoryDatabase()
+        self.db: HistoryDatabase = InMemoryHistory()
         self.hp_calls = collect_hp_calls(self.source_code)
 
         self.modified_source = (
@@ -104,7 +104,7 @@ class Hypster:
         # Process and filter the results
         return self._process_results(exec_namespace, hp.final_vars, hp.exclude_vars)
 
-    def find_nested_vars(self, vars: List[str], db: DatabaseInterface) -> List[str]:
+    def find_nested_vars(self, vars: List[str], db: HistoryDatabase) -> List[str]:
         """Find variables that reference nested configurations.
 
         Args:
