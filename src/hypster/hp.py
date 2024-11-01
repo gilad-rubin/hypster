@@ -23,6 +23,7 @@ from .hp_calls import (
 from .run_history import HistoryDatabase, NestedDBRecord, ParameterRecord, ParameterSource
 
 logger = logging.getLogger(__name__)
+MAX_POTENTIAL_VALUES = 5
 
 
 class HP:
@@ -31,14 +32,14 @@ class HP:
         final_vars: List[str],
         exclude_vars: List[str],
         values: Dict[str, Any],
-        db: HistoryDatabase,
+        run_history: HistoryDatabase,
         run_id: str,
         explore_mode: bool = False,
     ):
         self.final_vars = final_vars
         self.exclude_vars = exclude_vars
         self.values = values
-        self.db = db
+        self.run_history = run_history
         self.run_id = run_id
         self.explore_mode = explore_mode
         self.source = ParameterSource.UI if explore_mode else ParameterSource.USER
@@ -56,7 +57,10 @@ class HP:
 
         potential_values = []
         if self.explore_mode:
-            potential_values = self.db.get_potential_values(call.name)
+            potential_records = self.run_history.get_param_records(call.name)
+            potential_values = [
+                record.value for record in potential_records.values() if record.source == ParameterSource.UI
+            ][:MAX_POTENTIAL_VALUES]
 
         result = call.execute(values=self.values, potential_values=potential_values, explore_mode=self.explore_mode)
 
@@ -78,7 +82,7 @@ class HP:
             run_id=self.run_id,
             source=self.source,
         )
-        self.db.add_record(record)
+        self.run_history.add_record(record)
         return result
 
     def select(
@@ -193,7 +197,7 @@ class HP:
         )
 
         record = NestedDBRecord(
-            name=name, parameter_type="propagate", db=config_func.db, run_id=self.run_id, source=self.source
+            name=name, parameter_type="propagate", db=self.run_history, run_id=self.run_id, source=self.source
         )
-        self.db.add_record(record)
+        self.run_history.add_record(record)
         return result

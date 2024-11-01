@@ -36,7 +36,7 @@ class Hypster:
         self.name = name
         self.source_code = source_code
         self.namespace = namespace
-        self.db: HistoryDatabase = InMemoryHistory()
+        self.run_history: HistoryDatabase = InMemoryHistory()
         self.hp_calls = collect_hp_calls(self.source_code)
 
         self.modified_source = (
@@ -72,7 +72,7 @@ class Hypster:
             final_vars or [],
             exclude_vars or [],
             values or {},
-            db=self.db,
+            run_history=self.run_history,
             run_id=uuid.uuid4(),
             explore_mode=explore_mode,
         )
@@ -104,12 +104,12 @@ class Hypster:
         # Process and filter the results
         return self._process_results(exec_namespace, hp.final_vars, hp.exclude_vars)
 
-    def find_nested_vars(self, vars: List[str], db: HistoryDatabase) -> List[str]:
+    def find_nested_vars(self, vars: List[str], run_history: HistoryDatabase) -> List[str]:
         """Find variables that reference nested configurations.
 
         Args:
             vars: List of variable names to check
-            db: Database containing parameter records
+            run_history: Database containing parameter records
 
         Returns:
             List of variable names that reference nested configs
@@ -120,7 +120,7 @@ class Hypster:
             prefix = var.split(".")[0] if "." in var else var
 
             # Check if this variable is a propagated config
-            for record in db.get_latest_run_records().values():
+            for record in run_history.get_latest_run_records().values():
                 if record.name == prefix and record.parameter_type == "propagate":
                     nested_vars.append(var)
                     break
@@ -151,7 +151,7 @@ class Hypster:
             if k != "hp" and not k.startswith("__") and not isinstance(v, (types.ModuleType, types.FunctionType, type))
         }
 
-        nested_vars = self.find_nested_vars(final_vars, self.db)
+        nested_vars = self.find_nested_vars(final_vars, self.run_history)
         final_vars = [var for var in final_vars if var not in nested_vars]
 
         if not final_vars:
