@@ -73,6 +73,7 @@ class HP:
         record = ParameterRecord(
             name=call.name,
             parameter_type=parameter_type,
+            single_value=call.single_value,
             default=call.default,
             value=value,
             is_reproducible=is_reproducible,
