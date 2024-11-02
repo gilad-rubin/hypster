@@ -19,6 +19,7 @@ class ParameterRecord(BaseModel):
 
     name: str
     parameter_type: str
+    single_value: bool
     default: Optional[Union[ValidKeyType, List[ValidKeyType]]] = None
     value: Union[ValidKeyType, List[ValidKeyType]]
     is_reproducible: Union[bool, List[bool]]
