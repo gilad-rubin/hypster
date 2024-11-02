@@ -58,10 +58,9 @@ class HP:
         potential_values = []
         if self.explore_mode:
             potential_records = self.run_history.get_param_records(call.name)
-            potential_values = [
-                record.value for record in potential_records.values() if record.source == ParameterSource.UI
-            ][:MAX_POTENTIAL_VALUES]
-
+            potential_values = list(
+                reversed([record.value for record in potential_records.values() if record.source == ParameterSource.UI])
+            )[:MAX_POTENTIAL_VALUES]
         result = call.execute(values=self.values, potential_values=potential_values, explore_mode=self.explore_mode)
 
         if parameter_type in ("select", "multi_select"):
