@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
@@ -72,18 +72,24 @@ class InMemoryHistory(HistoryDatabase):
     """In-memory implementation of parameter history storage"""
 
     def __init__(self):
-        self._records: Dict[str, Dict[str, Union[ParameterRecord, NestedDBRecord]]] = defaultdict(dict)
+        self._records: Dict[str, OrderedDict[str, Union[ParameterRecord, NestedDBRecord]]] = defaultdict(OrderedDict)
         self._run_ids: List[str] = []
 
     def add_record(self, record: Union[ParameterRecord, NestedDBRecord]) -> None:
         if record.run_id not in self._run_ids:
             self._run_ids.append(record.run_id)
+        if record.run_id not in self._records:
+            self._records[record.run_id] = OrderedDict()
         self._records[record.run_id][record.name] = record
 
     def get_run_records(
-        self, run_id: str, flattened: bool = False
+        self, run_id: Optional[str] = None, flattened: bool = False
     ) -> Dict[str, Union[ParameterRecord, NestedDBRecord]]:
-        records = self._records.get(run_id, {})
+        if run_id is None:  # get all records
+            records = self._records
+        else:
+            records = self._records.get(run_id, {})
+
         if not flattened:
             return records
         return self._flatten_records(records)
