@@ -29,24 +29,46 @@ class IPySelectComponent(UIComponent):
     def _create_widget(self) -> widgets.Widget:
         logger.debug(f"Creating select widget for {self.component.id}")
         widget_cls = widgets.SelectMultiple if not self.component.single_value else widgets.Dropdown
+        description = self.component.label
+        if not self.component.single_value:
+            description += " (hold ctrl/cmd for multiple choices)"
+
+        # Ensure initial value is a list for multi-select
+        initial_value = (
+            list(self.component.value)
+            if not self.component.single_value and self.component.value
+            else self.component.value
+        )
+
         widget = widget_cls(
             options=self.component.options,
-            value=self.component.value if not self.component.single_value else self.component.value,
-            description=self.component.label,
+            value=initial_value,
+            description=description,
             style={"description_width": "initial"},
             layout=widgets.Layout(background_color="transparent"),
         )
-        widget.observe(
-            lambda change: self.on_change(self.component.id, change["new"], delay=not self.component.single_value),
-            names="value",
-        )
+
+        # Convert value to list in the change handler for multi-select
+        def handle_change(change):
+            new_value = list(change["new"]) if not self.component.single_value else change["new"]
+            self.on_change(self.component.id, new_value, delay=not self.component.single_value)
+
+        widget.observe(handle_change, names="value")
         return widget
 
     def _update_widget(self) -> None:
         logger.debug(f"Updating select widget {self.component.id}")
         self.widget.options = self.component.options
-        self.widget.value = self.component.value
-        self.widget.description = self.component.label
+        # Ensure value is a list for multi-select
+        self.widget.value = (
+            list(self.component.value)
+            if not self.component.single_value and self.component.value
+            else self.component.value
+        )
+        if not self.component.single_value:
+            self.widget.description = self.component.label + " (hold ctrl/cmd for multiple choices)"
+        else:
+            self.widget.description = self.component.label
 
 
 class IPyNumericComponent(UIComponent):
@@ -55,34 +77,79 @@ class IPyNumericComponent(UIComponent):
         super().__init__(component)
 
     def _create_widget(self) -> widgets.Widget:
-        logger.debug(f"Creating numeric widget for {self.component.id}")
-        widget_cls = widgets.IntSlider if isinstance(self.component.min_step, int) else widgets.FloatSlider
+        return self._create_or_update_widget()
 
-        config = self.component.widget_config
-        widget = widget_cls(
-            **config,
-            style={"description_width": "initial"},
-            layout=widgets.Layout(background_color="transparent"),
-            continuous_update=False,
-        )
+    def _create_or_update_widget(self) -> widgets.Widget:
+        bounds = self.component.bounds
+        is_int = isinstance(self.component, IntComponent)
+
+        if not bounds:
+            widget_cls = widgets.IntText if is_int else widgets.FloatText
+            widget = widget_cls(
+                value=self.component.value,
+                description=self.component.label,
+                step=1 if is_int else 0.1,
+                style={"description_width": "initial"},
+                layout=widgets.Layout(background_color="transparent"),
+            )
+        else:
+            widget_cls = widgets.BoundedIntText if is_int else widgets.BoundedFloatText
+            min_val = bounds.min_val if bounds.min_val is not None else -99999
+            max_val = bounds.max_val if bounds.max_val is not None else 99999
+
+            widget = widget_cls(
+                value=self.component.value,
+                description=self.component.label,
+                min=min_val,
+                max=max_val,
+                step=1 if is_int else 0.1,
+                style={"description_width": "initial"},
+                layout=widgets.Layout(background_color="transparent"),
+            )
+
         widget.observe(
-            lambda change: self.on_change(
-                self.component.id, change["new"], delay=not isinstance(self.component.min_step, int)
-            ),
+            lambda change: self.on_change(self.component.id, change["new"]),
             names="value",
         )
         return widget
 
+    def _needs_widget_recreation(self) -> bool:
+        """Check if widget needs to be recreated due to bounds changes."""
+        current_bounds = self.component.bounds
+        current_widget_type = type(self.widget)
+
+        is_bounded = isinstance(self.widget, (widgets.BoundedIntText, widgets.BoundedFloatText))
+        should_be_bounded = current_bounds is not None
+
+        if is_bounded != should_be_bounded:
+            return True
+
+        if is_bounded and should_be_bounded:
+            # Check if bounds values changed
+            current_min = self.widget.min
+            current_max = self.widget.max
+            new_min = current_bounds.min_val if current_bounds.min_val is not None else -99999
+            new_max = current_bounds.max_val if current_bounds.max_val is not None else 99999
+
+            return current_min != new_min or current_max != new_max
+
+        return False
+
     def _update_widget(self) -> None:
-        logger.debug(f"Updating numeric widget {self.component.id}")
-        logger.debug(f"Current widget config: {self.component.widget_config}")
-
-        config = self.component.widget_config
-        for key, value in config.items():
-            logger.debug(f"Setting {key} = {value}")
-            setattr(self.widget, key, value)
-
-        logger.debug(f"Widget update complete for {self.component.id}")
+        if self._needs_widget_recreation():
+            # Create new widget and replace the old one
+            new_widget = self._create_or_update_widget()
+            old_widget = self.widget
+            self.widget = new_widget
+            # Replace the widget in the parent container if it exists
+            if hasattr(old_widget, "parent") and old_widget.parent:
+                parent = old_widget.parent
+                idx = parent.children.index(old_widget)
+                parent.children = list(parent.children[:idx]) + [new_widget] + list(parent.children[idx + 1 :])
+        else:
+            # Just update value and description
+            self.widget.value = self.component.value
+            self.widget.description = self.component.label
 
 
 class IPyTextComponent(UIComponent):
@@ -158,7 +225,7 @@ class IPyMultiValueComponent(UIComponent):
 
     def _create_widget(self) -> widgets.Widget:
         # Calculate initial height based on number of values (minimum 2 rows)
-        num_rows = max(len(self.component.value), 2)
+        num_rows = len(self.component.value)
         # Reduced base height and row height
         height = f"{25 + (num_rows * 15)}px"  # Base height + row height
 
@@ -181,10 +248,20 @@ class IPyMultiValueComponent(UIComponent):
 
     def _parse_value(self, text: str) -> List[Any]:
         lines = [line.strip() for line in text.split("\n") if line.strip()]
+
+        def validate_value(val: Union[int, float]) -> Union[int, float]:
+            bounds = self.component.bounds
+            if bounds:
+                if bounds.min_val is not None and val < bounds.min_val:
+                    raise ValueError(f"Value must be >= {bounds.min_val}")
+                if bounds.max_val is not None and val > bounds.max_val:
+                    raise ValueError(f"Value must be <= {bounds.max_val}")
+            return val
+
         if isinstance(self.component, IntComponent):
-            return [int(line) for line in lines]
+            return [validate_value(int(line)) for line in lines]
         elif isinstance(self.component, FloatComponent):
-            return [float(line) for line in lines]
+            return [validate_value(float(line)) for line in lines]
         return lines  # For TextComponent
 
     def _handle_value_change(self, text: str) -> None:
@@ -199,7 +276,7 @@ class IPyMultiValueComponent(UIComponent):
         self.widget.description = self.component.label
 
         # Update height based on current number of values
-        num_rows = max(len(self.component.value), 2)
+        num_rows = len(self.component.value)
         self.widget.layout.height = f"{25 + (num_rows * 15)}px"  # Using same calculation as in create
 
 
@@ -256,7 +333,7 @@ class IPyWidgetsUI:
 
         # Rebuild widget list in correct order
         widgets_list = []
-        for comp_id, component in self.ui_handler.components.items():
+        for comp_id, component in affected_components.items():
             if comp_id in self.ui_components:
                 widgets_list.append(self.ui_components[comp_id].render())
 
