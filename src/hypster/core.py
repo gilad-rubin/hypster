@@ -3,12 +3,10 @@ import os
 import textwrap
 import types
 import uuid
-from typing import Any, Dict, List, Optional, OrderedDict, Tuple, Union
+from typing import Any, Dict, List, Optional
 
 from .ast_analyzer import (
     collect_hp_calls,
-    find_independent_select_calls,
-    find_referenced_vars,
     inject_names_to_source_code,
 )
 from .hp import HP
@@ -18,8 +16,6 @@ from .utils import find_hp_function_body_and_name, remove_function_signature
 # Correct logging configuration
 # logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
-
-HypsterReturn = Union[Dict[str, Any], Tuple[Dict[str, Any], Dict[str, Any]]]
 
 
 class Hypster:
@@ -43,35 +39,17 @@ class Hypster:
             inject_names_to_source_code(self.source_code, self.hp_calls) if inject_names else self.source_code
         )
 
-        self.referenced_vars = find_referenced_vars(self.source_code)
-        self.independent_select_calls = find_independent_select_calls(self.referenced_vars, self.hp_calls)
-        self.combinations: List[Dict[str, Any]] = []
-        self.defaults: Dict[str, Any] = {}
-        self.snapshot_history: List[OrderedDict[str, Any]] = []
-
     def __call__(
         self,
-        final_vars: Optional[List[str]] = None,
-        exclude_vars: Optional[List[str]] = None,
-        values: Optional[Dict[str, Any]] = None,
+        final_vars: List[str] = [],
+        exclude_vars: List[str] = [],
+        values: Dict[str, Any] = {},
         explore_mode: bool = False,
-    ) -> HypsterReturn:
-        """
-        Execute the Hypster instance with given parameters.
-
-        Args:
-            final_vars (Optional[List[str]], optional): List of variables to include in the final result.
-            exclude_vars (Optional[List[str]], optional): List of variables to exclude from the final result.
-            values (Optional[Dict[str, Any]], optional): Values for hyperparameters.
-            explore_mode (bool, optional): Whether to enable interactive/explore mode. Defaults to False.
-
-        Returns:
-            Dict[str, Any]: The execution result.
-        """
+    ) -> Dict[str, Any]:
         hp = HP(
-            final_vars or [],
-            exclude_vars or [],
-            values or {},
+            final_vars,
+            exclude_vars,
+            values,
             run_history=self.run_history,
             run_id=uuid.uuid4(),
             explore_mode=explore_mode,
@@ -91,14 +69,13 @@ class Hypster:
             Dict[str, Any]: The instantiated config.
         """
 
-        body_wo_signature = remove_function_signature(modified_source)
-        function_body = textwrap.dedent(body_wo_signature)
-
         # Create a new namespace with the original namespace and add the 'hp' object to it
         exec_namespace = self.namespace.copy()
         exec_namespace["hp"] = hp
 
         # Execute the modified function body in this namespace
+        body_wo_signature = remove_function_signature(modified_source)
+        function_body = textwrap.dedent(body_wo_signature)
         exec(function_body, exec_namespace)
 
         # Process and filter the results
@@ -189,6 +166,12 @@ class Hypster:
         if path is None:
             path = f"{self.name}.py"
         save(self, path)
+
+    def get_latest_snapshot(self) -> Dict[str, Any]:
+        return self.run_history.get_latest_run_records(flattened=True)
+
+    def get_snapshots(self) -> List[Dict[str, Any]]:
+        return self.run_history.get_run_records(flattened=True)
 
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):
