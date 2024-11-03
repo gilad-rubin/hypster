@@ -194,6 +194,7 @@ class HP:
             original_exclude_vars=self.exclude_vars,
             values=values,
             original_values=self.values,
+            explore_mode=self.explore_mode,
         )
 
         record = NestedDBRecord(
