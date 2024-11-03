@@ -14,29 +14,30 @@ class ParameterSource(str, Enum):
     UI = "ui"
 
 
-class ParameterRecord(BaseModel):
-    """Record of a parameter's value and metadata"""
+class HistoryRecord(BaseModel):
+    """Base class for all history records"""
 
     name: str
     parameter_type: str
+    run_id: UUID
+    source: ParameterSource
+
+
+class ParameterRecord(HistoryRecord):
+    """Record of a parameter's value and metadata"""
+
     single_value: bool
     default: Optional[Union[ValidKeyType, List[ValidKeyType]]] = None
     value: Union[ValidKeyType, List[ValidKeyType]]
     is_reproducible: Union[bool, List[bool]]
-    run_id: UUID
     options: Optional[List[ValidKeyType]] = None
     numeric_bounds: Optional[NumericBounds] = None
-    source: ParameterSource
 
 
-class NestedDBRecord(BaseModel):
+class NestedDBRecord(HistoryRecord):
     """Record type for nested configurations from propagate calls"""
 
-    name: str
-    parameter_type: str = "propagate"
-    run_id: UUID
     db: "HistoryDatabase"  # Forward reference
-    source: ParameterSource
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
