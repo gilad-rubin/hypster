@@ -90,36 +90,47 @@ class IPySelectComponent(IPyComponent):
             ),
         )
 
-        widget.observe(
-            lambda change: self.on_change(
-                self.component.id,
-                list(change["new"]) if not self.component.single_value else change["new"],
-                delay=not self.component.single_value,
-            ),
-            names="value",
-        )
+        if not self.component.single_value:
+            # Create a VBox to contain both the select widget and the note
+            container = widgets.VBox(
+                [
+                    widget,
+                    widgets.HTML(
+                        "<span style='font-size: 0.9em; color: #666; margin-top: 4px;'>"
+                        "* hold ctrl/cmd for multiple choices</span>"
+                    ),
+                ],
+                layout=widgets.Layout(background_color="transparent"),
+            )
+            return container
+
         return widget
 
     def _update_widget(self) -> None:
-        self.widget.options = self.component.options
-        self.widget.value = (
-            list(self.component.value)
-            if not self.component.single_value and self.component.value
-            else self.component.value
-        )
-        self.widget.description = (
-            self.component.label + "*" if not self.component.single_value else self.component.label
-        )
+        if not self.component.single_value:
+            # Update the select widget which is the first child of the VBox
+            select_widget = self.widget.children[0]
+            select_widget.options = self.component.options
+            select_widget.value = list(self.component.value)
+            select_widget.description = self.component.label + "*"
 
-        # Recalculate width based on content
-        max_option_length = max(len(str(opt)) for opt in self.component.options) if self.component.options else 0
-        description_length = len(self.widget.description)
-        content_width = max(max_option_length, description_length) * 8 + 50  # 8px per character + padding
+            # Recalculate width based on content
+            max_option_length = max(len(str(opt)) for opt in self.component.options) if self.component.options else 0
+            description_length = len(select_widget.description)
+            content_width = max(max_option_length, description_length) * 8 + 50
+            standardized_width = max(((content_width + 99) // 100) * 100, 300)
+            select_widget.layout.width = f"{standardized_width}px"
+        else:
+            # Original update logic for single-select
+            self.widget.options = self.component.options
+            self.widget.value = self.component.value
+            self.widget.description = self.component.label
 
-        # Use a standardized width that's a multiple of 100px
-        standardized_width = max(((content_width + 99) // 100) * 100, 300)  # Round up to nearest 100px, minimum 300px
-
-        self.widget.layout.width = f"{standardized_width}px"
+            max_option_length = max(len(str(opt)) for opt in self.component.options) if self.component.options else 0
+            description_length = len(self.widget.description)
+            content_width = max(max_option_length, description_length) * 8 + 50
+            standardized_width = max(((content_width + 99) // 100) * 100, 300)
+            self.widget.layout.width = f"{standardized_width}px"
 
 
 class IPyNumericComponent(IPyComponent):
@@ -338,7 +349,7 @@ class IPyPropagateComponent(IPyComponent):
                 padding="10px",
                 margin="5px 0",
                 background_color="transparent",
-                width="auto",  # Changed from "fit-content"
+                width="auto",
                 min_width="300px",
             )
         )
@@ -351,26 +362,12 @@ class IPyPropagateComponent(IPyComponent):
 
         # Create container for children
         child_widgets = []
-        has_multiselect = False
         for name, child in self.component.children.items():
             child_component = self._create_child_component(name, child)
             self.child_components[name] = child_component
             child_widgets.append(child_component.render())
 
-            # Check if any child is a multi-select component
-            if isinstance(child, SelectComponent) and not child.single_value:
-                has_multiselect = True
-
-        # Add multi-select note if needed with larger font
-        if has_multiselect:
-            note = widgets.HTML(
-                "<span style='font-size: 1em; color: #666; margin-top: 12px; "
-                "display: block;'>* hold ctrl/cmd for multiple choices</span>"
-            )
-            container.children = [label] + child_widgets + [note]
-        else:
-            container.children = [label] + child_widgets
-
+        container.children = [label] + child_widgets
         return container
 
     def _create_child_component(self, name: str, child: Union[ComponentBase, NestedComponent]) -> IPyComponent:
@@ -383,15 +380,11 @@ class IPyPropagateComponent(IPyComponent):
         return create_ipy_component(child, nested_change_handler)
 
     def _update_widget(self) -> None:
-        # Preserve the label and potentially the multi-select note
+        # Preserve the label
         existing_children = self.widget.children
         label = existing_children[0]
 
-        # Check if we have a note at the end
-        has_note = isinstance(existing_children[-1], widgets.HTML) and "hold ctrl/cmd" in existing_children[-1].value
-
         child_widgets = []
-        has_multiselect = False
         for name, child in self.component.children.items():
             if name not in self.child_components:
                 self.child_components[name] = self._create_child_component(name, child)
@@ -399,20 +392,7 @@ class IPyPropagateComponent(IPyComponent):
                 self.child_components[name].update(child)
             child_widgets.append(self.child_components[name].render())
 
-            # Check if any child is a multi-select component
-            if isinstance(child, SelectComponent) and not child.single_value:
-                has_multiselect = True
-
-        if has_multiselect and not has_note:
-            note = widgets.HTML(
-                "<span style='font-size: 1em; color: #666; margin-top: 12px; "
-                "display: block;'>* hold ctrl/cmd for multiple choices</span>"
-            )
-            self.widget.children = [label] + child_widgets + [note]
-        elif not has_multiselect and has_note:
-            self.widget.children = [label] + child_widgets
-        else:
-            self.widget.children = [label] + child_widgets + ([existing_children[-1]] if has_note else [])
+        self.widget.children = [label] + child_widgets
 
 
 class IPyWidgetsUI:
