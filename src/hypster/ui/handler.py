@@ -18,6 +18,7 @@ class ComponentBase(BaseModel):
     id: str
     label: str
     parameter_type: str
+    value: Any
     source: ParameterSource = ParameterSource.UI
 
 
@@ -70,13 +71,11 @@ class BooleanComponent(ComponentBase):
     single_value: bool
 
 
-# TODO: create NestedComponent. it should basically have id, label, parameter_type, source, children
-
-
 class NestedComponent(ComponentBase):
     """Component for handling propagated configurations."""
 
     parameter_type: str = "propagate"
+    value: Dict[str, Any]
     children: Dict[str, Union["NestedComponent", ComponentBase]]
 
 
@@ -102,11 +101,16 @@ class UIHandler:
         self.config_func = config_func
         self.initial_values: Dict[str, Any] = initial_values or {}
         self.components: OrderedDict[str, ComponentBase] = OrderedDict()
+        self.latest_results = None
         self._initialize_components()
 
     def _initialize_components(self) -> None:
         """Initialize components from initial config run."""
-        self.config_func(values=self.initial_values, explore_mode=True)
+        try:
+            self.latest_results = self.config_func(values=self.initial_values, explore_mode=True)
+        except Exception as e:
+            logger.error(f"Error running config: {e}")
+            self.latest_results = None
         latest_records = self.config_func.run_history.get_latest_run_records()
         self.components.clear()
 
@@ -122,11 +126,13 @@ class UIHandler:
             nested_components = {}
             nested_latest_records = record.db.get_latest_run_records()
             logger.debug(f"Nested latest records: {list(nested_latest_records.keys())}")
+            value_dct = {}
             for child_name, child_record in nested_latest_records.items():
                 child_component = self._create_component(child_name, child_record)
                 if child_component:
                     nested_components[child_name] = child_component
-            return NestedComponent(id=name, label=name, children=nested_components)
+                value_dct[child_name] = child_component.value
+            return NestedComponent(id=name, label=name, value=value_dct, children=nested_components)
 
         component_class = self.COMPONENT_MAPPING.get(record.parameter_type)
 
@@ -184,17 +190,23 @@ class UIHandler:
         logger.debug(f"Values: {values}")
 
         # Run config with new values and get latest records
-        self.config_func(values=values, explore_mode=True)
+        try:
+            self.latest_results = self.config_func(values=values, explore_mode=True)
+        except Exception as e:
+            logger.warning(f"Error running config: {e}")
+            self.latest_results = None
         latest_records = self.config_func.run_history.get_latest_run_records()
 
         # Update or create components after the changed component
         affected_components = []
         for name, record in latest_records.items():
-            logger.debug(f"Processing component {name}")
+            logger.debug(f"Processing component {name}, with record {record}")
             self.components[name] = self._create_component(name, record)
             affected_components.append(name)
 
-        return affected_components
+        affected_values = {name: self.components[name].value for name in affected_components}
+        logger.debug(f"Affected components: {affected_values}")
+        return affected_components, affected_values
 
     def get_ordered_components(self) -> List[ComponentBase]:
         """Get components in their definition order."""
@@ -203,6 +215,10 @@ class UIHandler:
     def get_component(self, component_id: str) -> Optional[ComponentBase]:
         """Get component by ID."""
         return self.components.get(component_id)
+
+    def get_latest_results(self) -> Any:
+        """Get the results from the most recent config function run."""
+        return self.latest_results
 
 
 def create_ui_handler(config_func: Callable, initial_values: Optional[Dict[str, Any]] = None) -> UIHandler:
