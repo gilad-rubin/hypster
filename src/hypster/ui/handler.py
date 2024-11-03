@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
 from pydantic import BaseModel
 
 from ..hp_calls import NumericBounds, ValidKeyType
-from ..run_history import NestedDBRecord, ParameterRecord, ParameterSource
+from ..run_history import NestedHistoryRecord, ParameterRecord, ParameterSource
 
 logger = logging.getLogger("hypster.ui.handler")
 
@@ -171,7 +171,7 @@ class UIHandler:
         self,
         components: OrderedDict[str, ComponentBase],
         component_id: str,
-        latest_records: Union[NestedDBRecord, ParameterRecord],
+        latest_records: Union[NestedHistoryRecord, ParameterRecord],
     ) -> None:
         latest_record_names = set(latest_records.keys())
         component_names = set(components.keys())
