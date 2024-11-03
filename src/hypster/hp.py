@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 from .hp_calls import (
     BaseHPCall,
@@ -20,7 +20,10 @@ from .hp_calls import (
     TextInputCall,
     ValidKeyType,
 )
-from .run_history import HistoryDatabase, NestedDBRecord, ParameterRecord, ParameterSource
+from .run_history import HistoryDatabase, NestedHistoryRecord, ParameterRecord, ParameterSource
+
+if TYPE_CHECKING:
+    from .core import Hypster
 
 logger = logging.getLogger(__name__)
 MAX_POTENTIAL_VALUES = 5
@@ -45,46 +48,6 @@ class HP:
         self.source = ParameterSource.UI if explore_mode else ParameterSource.USER
         logger.info(f"Initialized HP with explore_mode: {explore_mode}")
 
-    def _execute_call(
-        self,
-        call: BaseHPCall,
-        parameter_type: str,
-        options: Optional[List[ValidKeyType]] = None,
-        numeric_bounds: Optional[NumericBounds] = None,
-    ) -> Any:
-        """Execute HP call and record its result"""
-        logger.debug(f"Added {parameter_type}Call: {call.name}")
-
-        potential_values = []
-        if self.explore_mode:
-            potential_records = self.run_history.get_param_records(call.name)
-            potential_values = list(
-                reversed([record.value for record in potential_records.values() if record.source == ParameterSource.UI])
-            )[:MAX_POTENTIAL_VALUES]
-        result = call.execute(values=self.values, potential_values=potential_values, explore_mode=self.explore_mode)
-
-        if parameter_type in ("select", "multi_select"):
-            value = call.stored_value.value
-            is_reproducible = call.stored_value.reproducible
-        else:
-            value = result
-            is_reproducible = True
-
-        record = ParameterRecord(
-            name=call.name,
-            parameter_type=parameter_type,
-            single_value=call.single_value,
-            default=call.default,
-            value=value,
-            is_reproducible=is_reproducible,
-            options=options,
-            numeric_bounds=numeric_bounds,
-            run_id=self.run_id,
-            source=self.source,
-        )
-        self.run_history.add_record(record)
-        return result
-
     def select(
         self,
         options: OptionsType,
@@ -94,7 +57,8 @@ class HP:
         options_only: bool = False,
     ) -> Any:
         call = SelectCall(name=name, options=options, default=default, options_only=options_only)
-        return self._execute_call(call=call, parameter_type="select", options=list(call.processed_options.keys()))
+        options_keys = list(call.processed_options.keys())
+        return self._execute_call(call=call, parameter_type="select", options=options_keys)
 
     def multi_select(
         self,
@@ -105,15 +69,8 @@ class HP:
         options_only: bool = False,
     ) -> List[Any]:
         call = MultiSelectCall(name=name, options=options, default=default, options_only=options_only)
-        return self._execute_call(call=call, parameter_type="multi_select", options=list(call.processed_options.keys()))
-
-    def text_input(self, default: str, *, name: Optional[str] = None) -> str:
-        call = TextInputCall(name=name, default=default)
-        return self._execute_call(call=call, parameter_type="text")
-
-    def multi_text(self, default: List[str] = [], *, name: Optional[str] = None) -> List[str]:
-        call = MultiTextCall(name=name, default=default)
-        return self._execute_call(call=call, parameter_type="multi_text")
+        options_keys = list(call.processed_options.keys())
+        return self._execute_call(call=call, parameter_type="multi_select", options=options_keys)
 
     def number_input(
         self,
@@ -163,6 +120,14 @@ class HP:
         call = MultiIntCall(name=name, default=default, bounds=bounds)
         return self._execute_call(call=call, parameter_type="multi_int", numeric_bounds=bounds)
 
+    def text_input(self, default: str, *, name: Optional[str] = None) -> str:
+        call = TextInputCall(name=name, default=default)
+        return self._execute_call(call=call, parameter_type="text")
+
+    def multi_text(self, default: List[str] = [], *, name: Optional[str] = None) -> List[str]:
+        call = MultiTextCall(name=name, default=default)
+        return self._execute_call(call=call, parameter_type="multi_text")
+
     def bool_input(self, default: bool, *, name: Optional[str] = None) -> bool:
         call = BoolInputCall(name=name, default=default)
         return self._execute_call(call=call, parameter_type="bool")
@@ -173,7 +138,7 @@ class HP:
 
     def propagate(
         self,
-        config_func: Union[str, Path, Callable],
+        config_func: Union[str, Path, "Hypster"],
         *,
         name: Optional[str] = None,
         final_vars: List[str] = [],
@@ -197,8 +162,54 @@ class HP:
             explore_mode=self.explore_mode,
         )
 
-        record = NestedDBRecord(
-            name=name, parameter_type="propagate", db=config_func.run_history, run_id=self.run_id, source=self.source
+        record = NestedHistoryRecord(
+            name=name,
+            parameter_type="propagate",
+            run_history=config_func.run_history,
+            run_id=self.run_id,
+            source=self.source,
+        )
+        self.run_history.add_record(record)
+        return result
+
+    def _execute_call(
+        self,
+        call: BaseHPCall,
+        parameter_type: str,
+        options: Optional[List[ValidKeyType]] = None,
+        numeric_bounds: Optional[NumericBounds] = None,
+    ) -> Any:
+        """Execute HP call and record its result"""
+        logger.debug(f"Added {parameter_type}Call: {call.name}")
+
+        potential_values = []
+        if self.explore_mode:
+            # Get unique historical values for this parameter, most recent first
+            records = self.run_history.get_param_records(call.name)
+            potential_values = list(dict.fromkeys(record.value for record in reversed(records.values())))[
+                :MAX_POTENTIAL_VALUES
+            ]
+
+        result = call.execute(values=self.values, potential_values=potential_values, explore_mode=self.explore_mode)
+
+        if parameter_type in ("select", "multi_select"):
+            value = call.stored_value.value
+            is_reproducible = call.stored_value.reproducible
+        else:
+            value = result
+            is_reproducible = True
+
+        record = ParameterRecord(
+            name=call.name,
+            parameter_type=parameter_type,
+            single_value=call.single_value,
+            default=call.default,
+            value=value,
+            is_reproducible=is_reproducible,
+            options=options,
+            numeric_bounds=numeric_bounds,
+            run_id=self.run_id,
+            source=self.source,
         )
         self.run_history.add_record(record)
         return result
