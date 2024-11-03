@@ -197,7 +197,7 @@ class HP:
         )
 
         record = NestedDBRecord(
-            name=name, parameter_type="propagate", db=self.run_history, run_id=self.run_id, source=self.source
+            name=name, parameter_type="propagate", db=config_func.run_history, run_id=self.run_id, source=self.source
         )
         self.run_history.add_record(record)
         return result
