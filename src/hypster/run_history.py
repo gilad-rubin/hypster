@@ -34,10 +34,10 @@ class ParameterRecord(HistoryRecord):
     numeric_bounds: Optional[NumericBounds] = None
 
 
-class NestedDBRecord(HistoryRecord):
+class NestedHistoryRecord(HistoryRecord):
     """Record type for nested configurations from propagate calls"""
 
-    db: "HistoryDatabase"  # Forward reference
+    run_history: "HistoryDatabase"  # Forward reference
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -46,27 +46,27 @@ class HistoryDatabase(ABC):
     """Interface for parameter history storage"""
 
     @abstractmethod
-    def add_record(self, record: Union[ParameterRecord, NestedDBRecord]) -> None:
+    def add_record(self, record: Union[ParameterRecord, NestedHistoryRecord]) -> None:
         pass
 
     @abstractmethod
     def get_run_records(
         self, run_id: str, flattened: bool = False
-    ) -> Dict[str, Union[ParameterRecord, NestedDBRecord]]:
+    ) -> Dict[str, Union[ParameterRecord, NestedHistoryRecord]]:
         pass
 
     @abstractmethod
-    def get_latest_run_records(self, flattened: bool = False) -> Dict[str, Union[ParameterRecord, NestedDBRecord]]:
+    def get_latest_run_records(self, flattened: bool = False) -> Dict[str, Union[ParameterRecord, NestedHistoryRecord]]:
         pass
 
     @abstractmethod
     def get_param_records(
         self, param_name: str, run_ids: Optional[List[str]] = None
-    ) -> Dict[str, Union[ParameterRecord, NestedDBRecord]]:
+    ) -> Dict[str, Union[ParameterRecord, NestedHistoryRecord]]:
         pass
 
     @abstractmethod
-    def get_latest_param_record(self, param_name: str) -> Optional[Union[ParameterRecord, NestedDBRecord]]:
+    def get_latest_param_record(self, param_name: str) -> Optional[Union[ParameterRecord, NestedHistoryRecord]]:
         pass
 
 
@@ -74,10 +74,12 @@ class InMemoryHistory(HistoryDatabase):
     """In-memory implementation of parameter history storage"""
 
     def __init__(self):
-        self._records: Dict[str, OrderedDict[str, Union[ParameterRecord, NestedDBRecord]]] = defaultdict(OrderedDict)
+        self._records: Dict[str, OrderedDict[str, Union[ParameterRecord, NestedHistoryRecord]]] = defaultdict(
+            OrderedDict
+        )
         self._run_ids: List[str] = []
 
-    def add_record(self, record: Union[ParameterRecord, NestedDBRecord]) -> None:
+    def add_record(self, record: Union[ParameterRecord, NestedHistoryRecord]) -> None:
         if record.run_id not in self._run_ids:
             self._run_ids.append(record.run_id)
         if record.run_id not in self._records:
@@ -110,12 +112,12 @@ class InMemoryHistory(HistoryDatabase):
 
     def get_param_records(
         self, param_name: str, run_ids: Optional[List[str]] = None
-    ) -> Dict[str, Union[ParameterRecord, NestedDBRecord]]:
+    ) -> Dict[str, Union[ParameterRecord, NestedHistoryRecord]]:
         if run_ids is None:
             run_ids = self._run_ids
         return {run_id: self._records[run_id][param_name] for run_id in run_ids if param_name in self._records[run_id]}
 
-    def get_latest_param_record(self, param_name: str) -> Optional[Union[ParameterRecord, NestedDBRecord]]:
+    def get_latest_param_record(self, param_name: str) -> Optional[Union[ParameterRecord, NestedHistoryRecord]]:
         for run_id in reversed(self._run_ids):
             if param_name in self._records[run_id]:
                 return self._records[run_id][param_name]
@@ -141,14 +143,14 @@ class InMemoryHistory(HistoryDatabase):
                     "This means that putting these values in the config as-is will likely lead to an error."
                 )
 
-    def _flatten_records(self, records: Dict[str, Union[ParameterRecord, NestedDBRecord]]) -> Dict[str, Any]:
+    def _flatten_records(self, records: Dict[str, Union[ParameterRecord, NestedHistoryRecord]]) -> Dict[str, Any]:
         """Convert nested records to flat dictionary of values"""
         flattened = {}
         for name, record in records.items():
             if isinstance(record, ParameterRecord):
                 flattened[name] = record.value
                 self.check_reproducibility(record)
-            elif isinstance(record, NestedDBRecord):
-                nested_records = record.db.get_latest_run_records(flattened=True)
+            elif isinstance(record, NestedHistoryRecord):
+                nested_records = record.run_history.get_latest_run_records(flattened=True)
                 flattened.update({f"{name}.{k}": v for k, v in nested_records.items()})
         return flattened
