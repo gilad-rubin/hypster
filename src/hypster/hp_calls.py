@@ -275,6 +275,7 @@ class PropagateCall(BaseModel):
         original_exclude_vars: List[str] = [],
         values: Dict[str, Any] = {},
         original_values: Dict[str, Any] = {},
+        explore_mode: bool = False,
     ) -> Dict[str, Any]:
         """Execute the propagate call with nested configuration handling."""
         if len(original_final_vars) > 0:
@@ -294,6 +295,7 @@ class PropagateCall(BaseModel):
             final_vars=nested_final_vars,
             exclude_vars=nested_exclude_vars,
             values=nested_values,
+            explore_mode=explore_mode,
         )
 
     def _extract_nested_dict(self, config: Dict[str, Any]) -> Dict[str, Any]:
