@@ -3,8 +3,16 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
 
-import ipywidgets as widgets
-from IPython.display import HTML, display
+from ..core import Hypster
+
+try:
+    import ipywidgets as widgets
+    from IPython.display import HTML, display
+except ImportError:
+    raise ImportError(
+        "ipywidgets is required for interactive configuration. Please install with: `pip install hypster[jupyter]`"
+    )
+
 
 from .handler import (
     BooleanComponent,
@@ -54,7 +62,7 @@ class IPySelectComponent(IPyComponent):
         widget_cls = widgets.SelectMultiple if not self.component.single_value else widgets.Dropdown
         description = self.component.label
         if not self.component.single_value:
-            description += " (hold ctrl/cmd for multiple choices)"
+            description += "*"
 
         initial_value = (
             list(self.component.value)
@@ -62,12 +70,24 @@ class IPySelectComponent(IPyComponent):
             else self.component.value
         )
 
+        # Calculate width based on content
+        max_option_length = max(len(str(opt)) for opt in self.component.options) if self.component.options else 0
+        description_length = len(description)
+        content_width = max(max_option_length, description_length) * 8 + 50  # 8px per character + padding
+
+        # Use a standardized width that's a multiple of 100px
+        standardized_width = max(((content_width + 99) // 100) * 100, 300)  # Round up to nearest 100px, minimum 300px
+
         widget = widget_cls(
             options=self.component.options,
             value=initial_value,
             description=description,
-            style={"description_width": "initial"},
-            layout=widgets.Layout(background_color="transparent"),
+            style={"description_width": "auto"},
+            layout=widgets.Layout(
+                background_color="transparent",
+                width=f"{standardized_width}px",
+                min_width="300px",
+            ),
         )
 
         widget.observe(
@@ -88,10 +108,18 @@ class IPySelectComponent(IPyComponent):
             else self.component.value
         )
         self.widget.description = (
-            self.component.label + " (hold ctrl/cmd for multiple choices)"
-            if not self.component.single_value
-            else self.component.label
+            self.component.label + "*" if not self.component.single_value else self.component.label
         )
+
+        # Recalculate width based on content
+        max_option_length = max(len(str(opt)) for opt in self.component.options) if self.component.options else 0
+        description_length = len(self.widget.description)
+        content_width = max(max_option_length, description_length) * 8 + 50  # 8px per character + padding
+
+        # Use a standardized width that's a multiple of 100px
+        standardized_width = max(((content_width + 99) // 100) * 100, 300)  # Round up to nearest 100px, minimum 300px
+
+        self.widget.layout.width = f"{standardized_width}px"
 
 
 class IPyNumericComponent(IPyComponent):
@@ -265,11 +293,8 @@ class IPyMultiValueComponent(IPyComponent):
         return values
 
     def _handle_value_change(self, text: str) -> None:
-        try:
-            new_value = self._parse_value(text)
-            self.on_change(self.component.id, new_value, delay=True)
-        except (ValueError, TypeError) as e:
-            logger.warning(f"Invalid input: {e}")
+        new_value = self._parse_value(text)
+        self.on_change(self.component.id, new_value, delay=True)
 
     def _update_widget(self) -> None:
         self.widget.value = self._format_value(self.component.value)
@@ -313,8 +338,8 @@ class IPyPropagateComponent(IPyComponent):
                 padding="10px",
                 margin="5px 0",
                 background_color="transparent",
-                width="fit-content",  # Adjust to content width
-                min_width="300px",  # Minimum width to prevent too narrow boxes
+                width="auto",  # Changed from "fit-content"
+                min_width="300px",
             )
         )
 
@@ -326,13 +351,26 @@ class IPyPropagateComponent(IPyComponent):
 
         # Create container for children
         child_widgets = []
+        has_multiselect = False
         for name, child in self.component.children.items():
-            if name not in self.child_components:
-                self.child_components[name] = self._create_child_component(name, child)
-            child_widgets.append(self.child_components[name].render())
+            child_component = self._create_child_component(name, child)
+            self.child_components[name] = child_component
+            child_widgets.append(child_component.render())
 
-        # Combine label and children
-        container.children = [label] + child_widgets
+            # Check if any child is a multi-select component
+            if isinstance(child, SelectComponent) and not child.single_value:
+                has_multiselect = True
+
+        # Add multi-select note if needed with larger font
+        if has_multiselect:
+            note = widgets.HTML(
+                "<span style='font-size: 1em; color: #666; margin-top: 12px; "
+                "display: block;'>* hold ctrl/cmd for multiple choices</span>"
+            )
+            container.children = [label] + child_widgets + [note]
+        else:
+            container.children = [label] + child_widgets
+
         return container
 
     def _create_child_component(self, name: str, child: Union[ComponentBase, NestedComponent]) -> IPyComponent:
@@ -345,15 +383,36 @@ class IPyPropagateComponent(IPyComponent):
         return create_ipy_component(child, nested_change_handler)
 
     def _update_widget(self) -> None:
-        # Update children while preserving the label
-        label = self.widget.children[0]
+        # Preserve the label and potentially the multi-select note
+        existing_children = self.widget.children
+        label = existing_children[0]
+
+        # Check if we have a note at the end
+        has_note = isinstance(existing_children[-1], widgets.HTML) and "hold ctrl/cmd" in existing_children[-1].value
+
         child_widgets = []
+        has_multiselect = False
         for name, child in self.component.children.items():
             if name not in self.child_components:
                 self.child_components[name] = self._create_child_component(name, child)
+            else:
+                self.child_components[name].update(child)
             child_widgets.append(self.child_components[name].render())
 
-        self.widget.children = [label] + child_widgets
+            # Check if any child is a multi-select component
+            if isinstance(child, SelectComponent) and not child.single_value:
+                has_multiselect = True
+
+        if has_multiselect and not has_note:
+            note = widgets.HTML(
+                "<span style='font-size: 1em; color: #666; margin-top: 12px; "
+                "display: block;'>* hold ctrl/cmd for multiple choices</span>"
+            )
+            self.widget.children = [label] + child_widgets + [note]
+        elif not has_multiselect and has_note:
+            self.widget.children = [label] + child_widgets
+        else:
+            self.widget.children = [label] + child_widgets + ([existing_children[-1]] if has_note else [])
 
 
 class IPyWidgetsUI:
@@ -399,7 +458,8 @@ class IPyWidgetsUI:
             return
 
         logger.debug(f"Handling change for {component_id}: {new_value}")
-        affected_components = self.ui_handler.update_components(component_id, new_value)
+        # Unpack the tuple returned by update_components
+        affected_components, affected_values = self.ui_handler.update_components(component_id, new_value)
 
         for comp_id in affected_components:
             if comp_id in self.ui_components:
@@ -451,12 +511,41 @@ class IPyWidgetsUI:
         self._update_display()
         display(self.container)
 
+    def get_latest_results(self) -> Any:
+        """Get the latest results from the UI handler."""
+        return self.ui_handler.get_latest_results() if self.ui_handler else None
 
-def create_interactive_config(config_func: Callable, initial_values: Optional[Dict[str, Any]] = None) -> None:
-    logger.debug("Creating interactive config")
+
+class ResultsProxy(dict):
+    def __init__(self, initial_results, handler: UIHandler):
+        super().__init__(initial_results or {})
+        self._handler = handler
+
+    def __getitem__(self, key):
+        latest = self._handler.get_latest_results()
+        if latest is not None:
+            self.update(latest)
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        latest = self._handler.get_latest_results()
+        if latest is not None:
+            self.update(latest)
+        return super().get(key, default)
+
+
+def interactive_config(config_func: Hypster, initial_values: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Create an interactive config UI that automatically updates the results."""
     handler = create_ui_handler(config_func=config_func, initial_values=initial_values)
     ui = IPyWidgetsUI(ui_handler=handler)
+
+    # Store the original results object
+    results = handler.get_latest_results()
+
+    # Create a proxy dict that will update itself
+    proxy_results = ResultsProxy(results, handler)
     ui.display()
+    return proxy_results
 
 
 def apply_vscode_theme() -> None:
