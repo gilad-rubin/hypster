@@ -84,9 +84,7 @@ class InMemoryHistory(HistoryDatabase):
             self._records[record.run_id] = OrderedDict()
         self._records[record.run_id][record.name] = record
 
-    def get_run_records(
-        self, run_id: Optional[str] = None, flattened: bool = False
-    ) -> Dict[str, Union[ParameterRecord, NestedDBRecord]]:
+    def get_run_records(self, run_id: Optional[str] = None, flattened: bool = False) -> List[Dict[str, Any]]:
         if run_id is None:  # get all records
             records = self._records
         else:
@@ -94,12 +92,21 @@ class InMemoryHistory(HistoryDatabase):
 
         if not flattened:
             return records
-        return self._flatten_records(records)
+        else:
+            flattened_records = []
+            for run_id, run_records in self._records.items():
+                flattened_records.append(self._flatten_records(run_records))
+            return flattened_records
 
-    def get_latest_run_records(self, flattened: bool = False) -> Dict[str, Union[ParameterRecord, NestedDBRecord]]:
+    def get_latest_run_records(self, flattened: bool = False) -> Dict[str, Any]:
         if not self._run_ids:
             return {}
-        return self.get_run_records(self._run_ids[-1], flattened)
+        run_id = self._run_ids[-1]
+        records = self._records.get(run_id, {})
+        if not flattened:
+            return records
+        else:
+            return self._flatten_records(records)
 
     def get_param_records(
         self, param_name: str, run_ids: Optional[List[str]] = None
@@ -114,12 +121,33 @@ class InMemoryHistory(HistoryDatabase):
                 return self._records[run_id][param_name]
         return None
 
+    def check_reproducibility(self, record: ParameterRecord) -> None:
+        if isinstance(record.is_reproducible, bool):
+            if not record.is_reproducible:
+                print(
+                    f"Value {record.value} of parameter {record.name} was not originally of type: "
+                    "boolean, string, int or float type."
+                    "This means that putting this value in the config as-is will likely lead to an error."
+                )
+        elif isinstance(record.is_reproducible, List):
+            not_reproducible_values = []
+            for value, is_reproducible in zip(record.value, record.is_reproducible):
+                if not is_reproducible:
+                    not_reproducible_values.append(value)
+            if not_reproducible_values:
+                print(
+                    f"Values {not_reproducible_values} of parameter {record.name} were not originally of type: "
+                    "boolean, string, int or float type."
+                    "This means that putting these values in the config as-is will likely lead to an error."
+                )
+
     def _flatten_records(self, records: Dict[str, Union[ParameterRecord, NestedDBRecord]]) -> Dict[str, Any]:
         """Convert nested records to flat dictionary of values"""
         flattened = {}
         for name, record in records.items():
             if isinstance(record, ParameterRecord):
                 flattened[name] = record.value
+                self.check_reproducibility(record)
             elif isinstance(record, NestedDBRecord):
                 nested_records = record.db.get_latest_run_records(flattened=True)
                 flattened.update({f"{name}.{k}": v for k, v in nested_records.items()})
