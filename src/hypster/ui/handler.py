@@ -1,12 +1,11 @@
 import logging
-from abc import ABC, abstractmethod
 from collections import OrderedDict
 from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
 
 from pydantic import BaseModel
 
 from ..hp_calls import NumericBounds, ValidKeyType
-from ..run_history import ParameterRecord, ParameterSource
+from ..run_history import NestedDBRecord, ParameterRecord, ParameterSource
 
 logger = logging.getLogger("hypster.ui.handler")
 
@@ -18,10 +17,8 @@ class ComponentBase(BaseModel):
 
     id: str
     label: str
-    value: Any
     parameter_type: str
     source: ParameterSource = ParameterSource.UI
-    single_value: bool = True
 
 
 class SelectComponent(ComponentBase):
@@ -30,7 +27,7 @@ class SelectComponent(ComponentBase):
     parameter_type: str = "select"
     options: List[ValidKeyType]
     value: Union[ValidKeyType, List[ValidKeyType]]
-    single_value: bool = True
+    single_value: bool
 
 
 class NumericComponentBase(ComponentBase, Generic[T]):
@@ -38,7 +35,7 @@ class NumericComponentBase(ComponentBase, Generic[T]):
 
     value: Union[T, List[T]]
     bounds: Optional[NumericBounds] = None
-    single_value: bool = True
+    single_value: bool
 
 
 class IntComponent(NumericComponentBase[int]):
@@ -46,6 +43,7 @@ class IntComponent(NumericComponentBase[int]):
 
     parameter_type: str = "int"
     value: Union[int, List[int]]
+    single_value: bool
 
 
 class FloatComponent(NumericComponentBase[float]):
@@ -53,6 +51,7 @@ class FloatComponent(NumericComponentBase[float]):
 
     parameter_type: str = "number"
     value: Union[float, List[float]]
+    single_value: bool
 
 
 class TextComponent(ComponentBase):
@@ -60,7 +59,7 @@ class TextComponent(ComponentBase):
 
     parameter_type: str = "text"
     value: Union[str, List[str]]
-    single_value: bool = True
+    single_value: bool
 
 
 class BooleanComponent(ComponentBase):
@@ -68,111 +67,132 @@ class BooleanComponent(ComponentBase):
 
     parameter_type: str = "bool"
     value: Union[bool, List[bool]]
-    single_value: bool = True
+    single_value: bool
 
 
-class UIComponent(ABC):
-    """Base class for UI components."""
+# TODO: create NestedComponent. it should basically have id, label, parameter_type, source, children
 
-    def __init__(self, component: ComponentBase):
-        self.component = component
-        self.widget = self._create_widget()
 
-    @abstractmethod
-    def _create_widget(self) -> Any:
-        """Create the UI widget."""
-        pass
+class NestedComponent(ComponentBase):
+    """Component for handling propagated configurations."""
 
-    def render(self) -> Any:
-        """Render the widget."""
-        return self.widget
-
-    def update(self, component: ComponentBase) -> None:
-        """Update the component and widget."""
-        self.component = component
-        self._update_widget()
-
-    @abstractmethod
-    def _update_widget(self) -> None:
-        """Update the widget with current component state."""
-        pass
+    parameter_type: str = "propagate"
+    children: Dict[str, Union["NestedComponent", ComponentBase]]
 
 
 class UIHandler:
     """Generic UI handler that manages component state and updates."""
 
-    def __init__(self, config_func: Callable):
+    # Component type mapping
+    COMPONENT_MAPPING = {
+        "select": SelectComponent,
+        "multi_select": SelectComponent,
+        "int": IntComponent,
+        "multi_int": IntComponent,
+        "number": FloatComponent,
+        "multi_number": FloatComponent,
+        "text": TextComponent,
+        "multi_text": TextComponent,
+        "bool": BooleanComponent,
+        "multi_bool": BooleanComponent,
+        "propagate": NestedComponent,
+    }
+
+    def __init__(self, config_func: Callable, initial_values: Optional[Dict[str, Any]] = None):
         self.config_func = config_func
+        self.initial_values: Dict[str, Any] = initial_values or {}
         self.components: OrderedDict[str, ComponentBase] = OrderedDict()
         self._initialize_components()
 
     def _initialize_components(self) -> None:
         """Initialize components from initial config run."""
-        self.config_func(explore_mode=True)
+        self.config_func(values=self.initial_values, explore_mode=True)
         latest_records = self.config_func.run_history.get_latest_run_records()
         self.components.clear()
 
         for name, record in latest_records.items():
-            if record.__class__.__name__ == "ParameterRecord":
-                component = self._create_component(name, record)
-                if component:
-                    self.components[name] = component
+            self.components[name] = self._create_component(name, record)
 
-    def _create_component(self, name: str, record: ParameterRecord) -> Optional[ComponentBase]:
+    def _create_propagate_component(self, name: str, record: ParameterRecord) -> NestedComponent:
+        """Create a propagate component."""
+
+    def _create_component(self, name: str, record: ParameterRecord) -> ComponentBase:
         """Create a component based on parameter type."""
-        component_data = {"id": name, "label": name, "value": record.value, "single_value": record.single_value}
+        if record.parameter_type == "propagate":
+            nested_components = {}
+            nested_latest_records = record.db.get_latest_run_records()
+            logger.debug(f"Nested latest records: {list(nested_latest_records.keys())}")
+            for child_name, child_record in nested_latest_records.items():
+                child_component = self._create_component(child_name, child_record)
+                if child_component:
+                    nested_components[child_name] = child_component
+            return NestedComponent(id=name, label=name, children=nested_components)
 
-        if record.parameter_type in ["select", "multi_select"]:
-            return SelectComponent(**component_data, options=record.options, parameter_type="select")
-        elif record.parameter_type in ["int", "multi_int"]:
-            return IntComponent(**component_data, bounds=record.numeric_bounds, parameter_type="int")
-        elif record.parameter_type in ["number", "multi_number"]:
-            return FloatComponent(**component_data, bounds=record.numeric_bounds, parameter_type="number")
-        elif record.parameter_type in ["text", "multi_text"]:
-            return TextComponent(**component_data, parameter_type="text")
-        elif record.parameter_type in ["bool", "multi_bool"]:
-            return BooleanComponent(**component_data, parameter_type="bool")
-        return None
+        component_class = self.COMPONENT_MAPPING.get(record.parameter_type)
 
-    def _get_components_up_to(self, component_id: str) -> Dict[str, ComponentBase]:
-        components = {}
-        for name, component in self.components.items():
-            components[name] = component
-            if name == component_id:
-                break
-        return components
+        return component_class(
+            id=name,
+            label=name,
+            value=record.value,
+            single_value=record.single_value,
+            bounds=getattr(record, "numeric_bounds", None),
+            options=getattr(record, "options", None),
+        )
 
-    def update_component(self, component_id: str, new_value: Any) -> Dict[str, ComponentBase]:
+    def _get_new_values_dict(
+        self, components: OrderedDict[str, ComponentBase], component_id: str, new_value: Any
+    ) -> Dict[str, Any]:
+        logger.debug(f"Component ID: {component_id}")
+        logger.debug(f"New value: {new_value}")
+        logger.debug(f"Components: {list(components.keys())}")
+        component_names = list(components.keys())
+        names_up_to_id = component_names[: component_names.index(component_id)]
+        values = {name: component.value for name, component in components.items() if name in names_up_to_id}
+        component = components[component_id]
+        if component.parameter_type == "propagate":
+            nested_component_id = list(new_value.keys())[0]
+            nested_value = list(new_value.values())[0]
+            nested_components = component.children
+            logger.debug(f"Nested components: {list(nested_components.keys())}")
+            logger.debug(f"Nested component ID: {nested_component_id}")
+            logger.debug(f"Nested value: {nested_value}")
+            values[component_id] = self._get_new_values_dict(nested_components, nested_component_id, nested_value)
+        else:
+            values[component_id] = new_value
+        return values
+
+    def _remove_components(
+        self,
+        components: OrderedDict[str, ComponentBase],
+        component_id: str,
+        latest_records: Union[NestedDBRecord, ParameterRecord],
+    ) -> None:
+        latest_record_names = set(latest_records.keys())
+        component_names = set(components.keys())
+        for name in component_names:
+            if name not in latest_record_names:
+                components.pop(name)
+
+        component = components[component_id]
+        if component.parameter_type == "propagate":
+            self._remove_components(component.children, latest_records[component_id])
+
+    def update_components(self, component_id: str, new_value: Any) -> List[str]:
         """Update component and get affected components."""
-
-        components_for_values = self._get_components_up_to(component_id)
-        # logger.debug(f"Components for values: {components_for_values.keys()}")
-        values = {name: component.value for name, component in components_for_values.items()}
-        values[component_id] = new_value
+        values = self._get_new_values_dict(self.components, component_id, new_value)
 
         logger.debug(f"Values: {values}")
+
         # Run config with new values and get latest records
         self.config_func(values=values, explore_mode=True)
         latest_records = self.config_func.run_history.get_latest_run_records()
-        latest_record_names = set(latest_records.keys())
-
-        # Remove components that aren't in latest records
-        new_components = set(self.components.keys())
-        for name in new_components:
-            if name not in latest_record_names:
-                self.components.pop(name)
 
         # Update or create components after the changed component
-        affected_components = OrderedDict()
+        affected_components = []
         for name, record in latest_records.items():
             logger.debug(f"Processing component {name}")
-            if record.__class__.__name__ != "ParameterRecord":
-                continue
-
-            component = self._create_component(name, record)
-            if component:
-                self.components[name] = component
-                affected_components[name] = component
+            self.components[name] = self._create_component(name, record)
+            affected_components.append(name)
 
         return affected_components
 
@@ -185,6 +205,6 @@ class UIHandler:
         return self.components.get(component_id)
 
 
-def create_ui_handler(config_func: Callable) -> UIHandler:
+def create_ui_handler(config_func: Callable, initial_values: Optional[Dict[str, Any]] = None) -> UIHandler:
     """Create a UI handler for the given config function."""
-    return UIHandler(config_func)
+    return UIHandler(config_func, initial_values)
