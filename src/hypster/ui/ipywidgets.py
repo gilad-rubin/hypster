@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
 
@@ -26,7 +27,7 @@ from .handler import (
     create_ui_handler,
 )
 
-logger = logging.getLogger("hypster.ui.ipywidgets")
+logger = logging.getLogger(__name__)
 
 
 class IPyComponent(ABC):
@@ -102,8 +103,10 @@ class IPySelectComponent(IPyComponent):
                 ],
                 layout=widgets.Layout(background_color="transparent"),
             )
+            container.observe(lambda change: self.on_change(self.component.id, change["new"]), names="value")
             return container
 
+        widget.observe(lambda change: self.on_change(self.component.id, change["new"]), names="value")
         return widget
 
     def _update_widget(self) -> None:
@@ -206,10 +209,7 @@ class IPyTextComponent(IPyComponent):
             layout=widgets.Layout(background_color="transparent"),
             continuous_update=False,
         )
-        widget.observe(
-            lambda change: self.on_change(self.component.id, change["new"], delay=True),
-            names="value",
-        )
+        widget.observe(lambda change: self.on_change(self.component.id, change["new"], delay=True), names="value")
         return widget
 
     def _update_widget(self) -> None:
@@ -415,6 +415,7 @@ class IPyWidgetsUI:
     def _handle_change(self, component_id: str, new_value: Any, delay: bool = False) -> None:
         """Handle component changes, building proper nested structure."""
         if not self.ui_handler:
+            logger.debug("No UI handler available")
             return
 
         # Find the top-level component ID and build nested structure
@@ -427,9 +428,12 @@ class IPyWidgetsUI:
             component_id = path_parts[0]
             new_value = nested_value
 
-        logger.debug(f"Scheduling update for {component_id}: {new_value}")
+        logger.debug(f"Change detected - Component: {component_id}, Value: {new_value}, Delay: {delay}")
+
         if delay:
-            asyncio.create_task(self._delayed_update(component_id, new_value))
+            if self._update_timer:
+                self._update_timer.cancel()
+            self._update_timer = asyncio.create_task(self._delayed_update(component_id, new_value))
         else:
             self._handle_change_impl(component_id, new_value)
 
@@ -500,11 +504,16 @@ class ResultsProxy(dict):
     def __init__(self, initial_results, handler: UIHandler):
         super().__init__(initial_results or {})
         self._handler = handler
+        self._last_update = None  # Add timestamp tracking
 
     def __getitem__(self, key):
-        latest = self._handler.get_latest_results()
-        if latest is not None:
-            self.update(latest)
+        # Force update check at least every 100ms
+        current_time = time.time()
+        if self._last_update is None or (current_time - self._last_update) > 0.1:
+            latest = self._handler.get_latest_results()
+            if latest is not None:
+                self.update(latest)
+                self._last_update = current_time
         return super().__getitem__(key)
 
     def get(self, key, default=None):
