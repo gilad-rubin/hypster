@@ -42,6 +42,15 @@ def test_number_input_with_values():
     assert result["value"] == 1.5
 
 
+def test_number_input_with_values_different_type():
+    @config
+    def config_func(hp: HP):
+        value = hp.number_input(default=0.5, name="param")
+
+    result = config_func(values={"param": 1})  # this should work fine :)
+    assert result["value"] == 1
+
+
 def test_number_input_invalid_values():
     @config
     def config_func(hp: HP):
@@ -87,6 +96,15 @@ def test_multi_number_with_values():
 
     result = config_func(values={"param": [3.0, 4.0]})
     assert result["values"] == [3.0, 4.0]
+
+
+def test_multi_number_with_values():
+    @config
+    def config_func(hp: HP):
+        values = hp.multi_number(default=[], name="param")
+
+    result = config_func(values={"param": [3, 4.0]})
+    assert result["values"] == [3, 4.0]
 
 
 def test_multi_number_invalid_values_type():
