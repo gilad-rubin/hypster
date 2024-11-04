@@ -182,13 +182,7 @@ class HP:
         """Execute HP call and record its result"""
         logger.debug(f"Added {parameter_type}Call: {call.name}")
 
-        potential_values = []
-        if self.explore_mode:
-            # Get unique historical values for this parameter, most recent first
-            records = self.run_history.get_param_records(call.name)
-            potential_values = list(dict.fromkeys(record.value for record in reversed(records.values())))[
-                :MAX_POTENTIAL_VALUES
-            ]
+        potential_values = self._get_potential_values(call.name) if self.explore_mode else []
 
         result = call.execute(values=self.values, potential_values=potential_values, explore_mode=self.explore_mode)
 
@@ -213,3 +207,10 @@ class HP:
         )
         self.run_history.add_record(record)
         return result
+
+    def _get_potential_values(self, name: str) -> List[Any]:
+        records = self.run_history.get_param_records(name)
+        potential_values = list(dict.fromkeys(record.value for record in reversed(records.values())))[
+            :MAX_POTENTIAL_VALUES
+        ]
+        return potential_values
