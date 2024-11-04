@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from collections import defaultdict
-from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from pydantic import (
     BaseModel,
@@ -17,11 +17,6 @@ from pydantic import (
 ValidKeyType = Union[str, int, float, bool]
 OptionsType = Union[Dict[ValidKeyType, Any], List[ValidKeyType]]
 NumericType = Union[StrictInt, StrictFloat]
-
-
-class NumberInputCall(BaseModel):
-    single_value: bool = True
-    default: NumericType
 
 
 T = TypeVar("T", int, str, bool, NumericType)
@@ -63,38 +58,17 @@ class BaseHPCall(BaseModel):
         pass
 
 
-class NumericBounds(BaseModel):
-    """Numeric bounds configuration with validation."""
-
-    min_val: Optional[NumericType] = None
-    max_val: Optional[NumericType] = None
-
-    @field_validator("max_val")
-    def validate_bounds(cls, v: Optional[NumericType], info) -> Optional[NumericType]:
-        min_val = info.data.get("min_val")
-        if v is not None and min_val is not None and v < min_val:
-            raise ValueError("max_val must be greater than min_val")
-        return v
-
-    def validate_value(self, name: str, value: NumericType) -> None:
-        """Validate a numeric value against bounds."""
-        if self.min_val is not None and value < self.min_val:
-            raise HPCallError(name, f"Value must be >= {self.min_val}")
-        if self.max_val is not None and value > self.max_val:
-            raise HPCallError(name, f"Value must be <= {self.max_val}")
-
-
 class StoredValue(BaseModel):
     """Value stored in run history"""
 
-    value: ValidKeyType | str
+    value: ValidKeyType
     reproducible: bool
 
 
 class MultiStoredValue(BaseModel):
     """Multiple values stored in run history"""
 
-    value: List[ValidKeyType | str]
+    value: List[ValidKeyType]
     reproducible: List[bool]
 
 
@@ -107,6 +81,7 @@ class BaseOptionsHPCall(BaseHPCall):
 
     @property
     def processed_options(self) -> Dict[ValidKeyType, Any]:
+        """Convert options to a dictionary if they are a list"""
         if isinstance(self.options, list):
             return {item: item for item in self.options}
         return self.options
@@ -187,78 +162,122 @@ class MultiSelectCall(BaseOptionsHPCall):
         return results
 
 
+class NumericBounds(BaseModel):
+    """Numeric bounds configuration with validation."""
+
+    min_val: Optional[NumericType] = None
+    max_val: Optional[NumericType] = None
+
+    @field_validator("max_val")
+    def validate_bounds(cls, v: Optional[NumericType], info) -> Optional[NumericType]:
+        min_val = info.data.get("min_val")
+        if v is not None and min_val is not None and v < min_val:
+            raise ValueError("max_val must be greater than min_val")
+        return v
+
+    def validate_value(self, name: str, value: NumericType) -> None:
+        if self.min_val is not None and value < self.min_val:
+            raise HPCallError(name, f"Value must be >= {self.min_val}")
+        if self.max_val is not None and value > self.max_val:
+            raise HPCallError(name, f"Value must be <= {self.max_val}")
+
+
 class ValueHPCall(BaseHPCall, Generic[T]):
     """Base class for value-based HP calls."""
 
     default: T | List[T]
-    bounds: Optional[NumericBounds] = None
 
     def process_value(self, value: T | List[T]) -> T | List[T]:
         if self.single_value:
             if isinstance(value, list):
                 raise HPCallError(self.name, "Expected single value, got a list")
-            self._validate_single_value(value)
+            self.validate_single_value(value)
             return value
 
         if not isinstance(value, list):
             raise HPCallError(self.name, "Expected a list of values, got a single value")
         for v in value:
-            self._validate_single_value(v)
+            self.validate_single_value(v)
         return value
-
-    def get_expected_type(self, value: T | List[T]) -> Type[T]:
-        return type(value[0] if isinstance(value, list) else value)
-
-    def _validate_single_value(self, value: T) -> None:
-        expected_type = self.get_expected_type(self.default)
-        if not isinstance(value, expected_type):
-            raise HPCallError(self.name, f"Expected value of type {expected_type}, got {type(value)}")
-
-        if self.bounds and isinstance(value, (int, float)):
-            self.bounds.validate_value(self.name, value)
 
     def get_fallback_value(self, explore_mode: bool) -> Any:
         return self.process_value(self.default)
 
 
-class NumberInputCall(ValueHPCall[NumericType]):
+class NumberBaseCall(ValueHPCall[NumericType]):
+    allow_int: bool = True
+    allow_float: bool = True
+    bounds: Optional[NumericBounds] = None
+
+    def validate_single_value(self, value: NumericType) -> None:
+        if not isinstance(value, (int, float)):
+            raise HPCallError(self.name, f"Expected a number, got a non-number value: {value}")
+
+        if not self.allow_int and isinstance(value, int):
+            raise HPCallError(self.name, f"Integer values are not allowed: {value}")
+        if not self.allow_float and isinstance(value, float):
+            raise HPCallError(self.name, f"Float values are not allowed: {value}")
+
+        if self.bounds:
+            self.bounds.validate_value(self.name, value)
+
+
+class NumberInputCall(NumberBaseCall):
     single_value: bool = True
     default: NumericType
 
 
-class MultiNumberCall(ValueHPCall[NumericType]):
+class MultiNumberCall(NumberBaseCall):
     single_value: bool = False
     default: List[NumericType] = Field(default_factory=list)
 
 
-class IntInputCall(ValueHPCall[int]):
+class IntInputCall(NumberBaseCall):
     single_value: bool = True
     default: StrictInt
+    allow_float: bool = False
 
 
-class MultiIntCall(ValueHPCall[int]):
+class MultiIntCall(NumberBaseCall):
     single_value: bool = False
     default: List[StrictInt] = Field(default_factory=list)
+    allow_float: bool = False
 
 
 class TextInputCall(ValueHPCall[str]):
     single_value: bool = True
     default: StrictStr
 
+    def validate_single_value(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise HPCallError(self.name, f"Expected a string, got a non-string value: {value}")
+
 
 class MultiTextCall(ValueHPCall[str]):
     single_value: bool = False
     default: List[StrictStr] = Field(default_factory=list)
+
+    def validate_single_value(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise HPCallError(self.name, f"Expected a string, got a non-string value: {value}")
 
 
 class BoolInputCall(ValueHPCall[bool]):
     single_value: bool = True
     default: StrictBool
 
+    def validate_single_value(self, value: bool) -> None:
+        if not isinstance(value, bool):
+            raise HPCallError(self.name, f"Expected a boolean, got a non-boolean value: {value}")
+
 
 class MultiBoolCall(ValueHPCall[bool]):
     single_value: bool = False
     default: List[StrictBool] = Field(default_factory=list)
+
+    def validate_single_value(self, value: bool) -> None:
+        if not isinstance(value, bool):
+            raise HPCallError(self.name, f"Expected a boolean, got a non-boolean value: {value}")
 
 
 class PropagateCall(BaseModel):
