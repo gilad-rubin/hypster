@@ -3,23 +3,22 @@ import pytest
 from hypster import HP, config
 
 
-# Options validation
 def test_select_valid_options_list():
     @config
     def config_func(hp: HP):
-        value = hp.select(["a", "b", "c"], default="a", name="param")
+        value = hp.select(["a", 2, False, 4.5], default=2)
 
     result = config_func()
-    assert result["value"] == "a"
+    assert result["value"] == 2
 
 
 def test_select_valid_options_dict():
     @config
     def config_func(hp: HP):
-        value = hp.select({"k1": "v1", "k2": "v2"}, default="k1", name="param")
+        value = hp.select({"k1": 3, "k2": 4.2}, default="k1")
 
     result = config_func()
-    assert result["value"] == "v1"
+    assert result["value"] == 3
 
 
 def test_select_invalid_options_empty():
@@ -123,7 +122,7 @@ def test_invalid_list_value_types():
 
         @config
         def invalid_list_values(hp: HP):
-            var = hp.select([1, 2.0, True, "str", complex(1, 2)], default="str", name="param")
+            var = hp.select([complex(1, 2)])
 
         invalid_list_values()
 
@@ -133,7 +132,7 @@ def test_select_missing_default():
 
         @config
         def missing_default(hp: HP):
-            hp.select(["a", "b"], name="param")
+            hp.select(["a", "b"])
 
         missing_default()
 
@@ -141,15 +140,20 @@ def test_select_missing_default():
 def test_select_with_options_only():
     @config
     def config_func(hp: HP):
-        value = hp.select(["a", "b", "c"], default="a", name="param", options_only=True)
+        value = hp.select(["a", "b", "c"], default="a", options_only=True)
+        value2 = hp.select({"k1": 4, "k2": 2}, default="k1", options_only=True)
 
     # Should work with values
-    result = config_func(values={"param": "b"})
+    result = config_func(values={"value": "b"})
     assert result["value"] == "b"
 
     # Should fail with values
     with pytest.raises(Exception):
-        config_func(values={"param": "d"})
+        config_func(values={"value": "d"})
+
+    # Should fail with values
+    with pytest.raises(Exception):
+        config_func(values={"value2": "k3"})
 
 
 def test_select_rejects_list_selection():
