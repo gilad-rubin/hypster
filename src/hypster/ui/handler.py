@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from ..hp_calls import NumericBounds, ValidKeyType
 from ..run_history import NestedHistoryRecord, ParameterRecord, ParameterSource
 
-logger = logging.getLogger("hypster.ui.handler")
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T", int, float, str, bool)
 
@@ -124,7 +124,7 @@ class UIHandler:
         """Create a component based on parameter type."""
         if record.parameter_type == "propagate":
             nested_components = {}
-            nested_latest_records = record.db.get_latest_run_records()
+            nested_latest_records = record.run_history.get_latest_run_records()
             logger.debug(f"Nested latest records: {list(nested_latest_records.keys())}")
             value_dct = {}
             for child_name, child_record in nested_latest_records.items():
