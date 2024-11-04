@@ -10,10 +10,12 @@ keywords = ["configuration", "ai", "machine-learning"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
+pydantic = "^2.0.0"
 ipywidgets = { version = ">=8.0.0", optional = true }
 
 [tool.poetry.extras]
 jupyter = ["ipywidgets"]
+dev = ["pytest", "ruff", "mypy", "ipywidgets"]
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.0"
