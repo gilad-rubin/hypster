@@ -1,5 +1,0 @@
----
-icon: spa
----
-
-# Tutorials
