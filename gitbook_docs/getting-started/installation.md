@@ -51,4 +51,3 @@ pip install hypster[dev]
 * [ruff](https://github.com/astral-sh/ruff)
 * [mypy](https://github.com/python/mypy)
 * [pytest](https://github.com/pytest-dev/pytest)
-
