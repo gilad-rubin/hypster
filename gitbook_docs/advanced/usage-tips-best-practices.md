@@ -1,2 +1,1 @@
 # Usage tips / Best Practices
-
