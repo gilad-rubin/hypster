@@ -2,6 +2,7 @@
 
 Let's walk through a simple example to understand how Hypster works. We'll create a basic text classifier configuration.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import config, HP
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
@@ -30,7 +31,9 @@ def classifier_config(hp: HP):
 
         classifier = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, random_state=random_state)
 ```
+{% endcode %}
 
+{% code overflow="wrap" %}
 ```python
 # Instantiate with default values
 config_instance = classifier_config()
@@ -49,6 +52,7 @@ rf_config = classifier_config(values={
     "max_depth": 3
 })
 ```
+{% endcode %}
 
 This example demonstrates several key features of Hypster:
 
@@ -63,14 +67,15 @@ This example demonstrates several key features of Hypster:
 1. We define a configuration space using the `@config` decorator
 2. The configuration function takes an `hp` parameter of type `HP`
 3. We use various HP calls to define our parameter space:
-   - `hp.select()` for categorical choices
-   - `hp.number_input()` for floating-point numbers
-   - `hp.int()` for integer values
+   * `hp.select()` for categorical choices
+   * `hp.number_input()` for floating-point numbers
+   * `hp.int()` for integer values
 4. The configuration returns a dictionary with our instantiated objects
 5. We can create multiple instances with different parameter values
 
 ## Training and Evaluating
 
+{% code overflow="wrap" %}
 ```python
 # Train a model using the configuration
 from sklearn.datasets import make_classification
@@ -89,9 +94,11 @@ classifier.fit(X_train, y_train)
 score = classifier.score(X_test, y_test)
 print(f"Model accuracy: {score:.3f}")
 ```
+{% endcode %}
 
 This basic example shows how Hypster makes it easy to:
-- Define configuration spaces with type-safe parameters
-- Set reasonable defaults and parameter ranges
-- Create multiple configurations from the same space
-- Integrate with existing ML libraries seamlessly
+
+* Define configuration spaces with type-safe parameters
+* Set reasonable defaults and parameter ranges
+* Create multiple configurations from the same space
+* Integrate with existing ML libraries seamlessly
