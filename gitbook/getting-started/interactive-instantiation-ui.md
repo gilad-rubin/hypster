@@ -1,5 +1,7 @@
 # 🎮 Interactive Instantiation (UI)
 
+\#TODO: rewrite this whole page based on ipywidgets.ipynb!
+
 ## Manual Instantiation
 
 When working with configuration functions, you can directly specify parameter values using a dictionary:
@@ -35,7 +37,14 @@ To address these challenges, hypster provides a built-in Jupyter Notebook-based 
 * Visualize parameter dependencies
 * Work directly within your IDE using ipywidgets
 
+### In your notebook
 
+Here's an example of an interactive UI for a [modular-RAG](https://github.com/gilad-rubin/modular-rag) configuration.
+
+```python
+from hypster.ui import interactive_config
+results = interactive_config(my_config)
+```
 
 <figure><img src="../.gitbook/assets/image (9).png" alt=""><figcaption></figcaption></figure>
 

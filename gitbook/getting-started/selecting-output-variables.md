@@ -1,4 +1,22 @@
-# 🎰 Selecting Output Variables
+---
+coverY: 0
+layout:
+  cover:
+    visible: false
+    size: full
+  title:
+    visible: true
+  description:
+    visible: true
+  tableOfContents:
+    visible: true
+  outline:
+    visible: true
+  pagination:
+    visible: true
+---
+
+# 🍡 Selecting Output Variables
 
 When working with configuration functions, not all variables defined within them are needed for the final execution engine.&#x20;
 
@@ -62,4 +80,4 @@ config = my_config(exclude_vars=["cache", "temp_data"], values={...})
 run("Hello", **config)
 ```
 
-Choose `exclude_vars` when you have many variables to keep.
+Choose `exclude_vars` when you have many variables to keep and little to filter out.

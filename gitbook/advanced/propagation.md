@@ -1,3 +1,2 @@
 # Propagation
 
-## Best Practices

@@ -1,6 +1,14 @@
-# Basic Example
+# Machine Learning
 
 Let's walk through a simple example to understand how Hypster works. We'll create a basic ML classifier configuration.
+
+Prerequisites:
+
+```bash
+pip install scikit-learn
+```
+
+## Configurable Machine Learning Classifier
 
 ```python
 from hypster import HP, config
