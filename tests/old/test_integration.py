@@ -8,8 +8,8 @@ def test_defaults_selections_overrides():
     @config
     def config_func(hp: HP):
         model = hp.select(["cnn", "rnn", "transformer"], default="cnn")
-        lr = hp.number_input(0.001)
-        epochs = hp.number_input(10)
+        lr = hp.number(0.001)
+        epochs = hp.number(10)
 
     # Test defaults
     result = config_func()
@@ -99,8 +99,8 @@ def test_final_vars():
     @config
     def config_func(hp: HP):
         model = hp.select(["cnn", "rnn"], default="cnn")
-        lr = hp.number_input(0.001)
-        epochs = hp.number_input(10)
+        lr = hp.number(0.001)
+        epochs = hp.number(10)
 
     # Test partial final_vars
     result = config_func(final_vars=["model", "lr"])

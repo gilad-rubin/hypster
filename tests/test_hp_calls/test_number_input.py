@@ -4,57 +4,57 @@ from hypster import HP, config
 
 
 # Number Input Tests
-def test_number_input_with_default():
+def test_number_with_default():
     @config
     def config_func(hp: HP):
-        value = hp.number_input(default=0.5, name="param")
+        value = hp.number(default=0.5, name="param")
 
     result = config_func()
     assert result["value"] == 0.5
 
 
-def test_number_input_without_default():
+def test_number_without_default():
     with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
-            value = hp.number_input(name="param")
+            value = hp.number(name="param")
 
         config_func()
 
 
-def test_number_input_invalid_default():
+def test_number_invalid_default():
     with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
-            value = hp.number_input(default="not a number", name="param")
+            value = hp.number(default="not a number", name="param")
 
         config_func()
 
 
-def test_number_input_with_values():
+def test_number_with_values():
     @config
     def config_func(hp: HP):
-        value = hp.number_input(default=0.5, name="param")
+        value = hp.number(default=0.5, name="param")
 
     result = config_func(values={"param": 1.5})
     assert result["value"] == 1.5
 
 
-def test_number_input_with_values_different_type():
+def test_number_with_values_different_type():
     @config
     def config_func(hp: HP):
-        value = hp.number_input(default=0.5, name="param")
+        value = hp.number(default=0.5, name="param")
 
     result = config_func(values={"param": 1})  # this should work fine :)
     assert result["value"] == 1
 
 
-def test_number_input_invalid_values():
+def test_number_invalid_values():
     @config
     def config_func(hp: HP):
-        value = hp.number_input(default=0.5, name="param")
+        value = hp.number(default=0.5, name="param")
 
     with pytest.raises(Exception):
         config_func(values={"param": "not a number"})
@@ -125,67 +125,67 @@ def test_multi_number_invalid_values():
         config_func(values={"param": ["a", "b"]})  # Not numbers
 
 
-# Min/Max validation tests for number_input
-def test_number_input_with_min():
+# Min/Max validation tests for number
+def test_number_with_min():
     @config
     def config_func(hp: HP):
-        value = hp.number_input(default=0.5, min=0.0, name="param")
+        value = hp.number(default=0.5, min=0.0, name="param")
 
     result = config_func()
     assert result["value"] == 0.5
 
 
-def test_number_input_with_max():
+def test_number_with_max():
     @config
     def config_func(hp: HP):
-        value = hp.number_input(default=0.5, max=1.0, name="param")
+        value = hp.number(default=0.5, max=1.0, name="param")
 
     result = config_func()
     assert result["value"] == 0.5
 
 
-def test_number_input_with_min_max():
+def test_number_with_min_max():
     @config
     def config_func(hp: HP):
-        value = hp.number_input(default=0.5, min=0.0, max=1.0, name="param")
+        value = hp.number(default=0.5, min=0.0, max=1.0, name="param")
 
     result = config_func()
     assert result["value"] == 0.5
 
 
-def test_number_input_default_below_min():
+def test_number_default_below_min():
     with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
-            value = hp.number_input(default=-0.1, min=0.0, name="param")
+            value = hp.number(default=-0.1, min=0.0, name="param")
 
         config_func()
 
 
-def test_number_input_default_above_max():
+def test_number_default_above_max():
     with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
-            value = hp.number_input(default=1.1, max=1.0, name="param")
+            value = hp.number(default=1.1, max=1.0, name="param")
 
         config_func()
 
 
-def test_number_input_values_below_min():
+def test_number_values_below_min():
     @config
     def config_func(hp: HP):
-        value = hp.number_input(default=0.5, min=0.0, name="param")
+        value = hp.number(default=0.5, min=0.0, name="param")
 
     with pytest.raises(Exception):
         config_func(values={"param": -0.1})
 
 
-def test_number_input_values_above_max():
+def test_number_values_above_max():
     @config
     def config_func(hp: HP):
-        value = hp.number_input(default=0.5, max=1.0, name="param")
+        value = hp.number(default=0.5, max=1.0, name="param")
 
     with pytest.raises(Exception):
         config_func(values={"param": 1.1})

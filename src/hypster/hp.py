@@ -72,7 +72,7 @@ class HP:
         options_keys = list(call.processed_options.keys())
         return self._execute_call(call=call, parameter_type="multi_select", options=options_keys)
 
-    def number_input(
+    def number(
         self,
         default: NumericType,
         *,
@@ -96,7 +96,7 @@ class HP:
         call = MultiNumberCall(name=name, default=default, bounds=bounds)
         return self._execute_call(call=call, parameter_type="multi_number", numeric_bounds=bounds)
 
-    def int_input(
+    def int(
         self,
         default: int,
         *,
@@ -120,7 +120,7 @@ class HP:
         call = MultiIntCall(name=name, default=default, bounds=bounds)
         return self._execute_call(call=call, parameter_type="multi_int", numeric_bounds=bounds)
 
-    def text_input(self, default: str, *, name: Optional[str] = None) -> str:
+    def text(self, default: str, *, name: Optional[str] = None) -> str:
         call = TextInputCall(name=name, default=default)
         return self._execute_call(call=call, parameter_type="text")
 
@@ -128,7 +128,7 @@ class HP:
         call = MultiTextCall(name=name, default=default)
         return self._execute_call(call=call, parameter_type="multi_text")
 
-    def bool_input(self, default: bool, *, name: Optional[str] = None) -> bool:
+    def bool(self, default: bool, *, name: Optional[str] = None) -> bool:
         call = BoolInputCall(name=name, default=default)
         return self._execute_call(call=call, parameter_type="bool")
 

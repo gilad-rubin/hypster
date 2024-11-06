@@ -14,8 +14,8 @@ from hypster import HP, config
 def llm_config(hp: HP):
     models = {"gpt-4o-mini": "gpt-4o-mini", "gpt-4o": "gpt-4o"}
     model_name = hp.select(models, default="gpt-4o-mini")
-    temperature = hp.number_input(0.0, min=0.0, max=1.0)
-    max_tokens = hp.int_input(256, max=2048)
+    temperature = hp.number(0.0, min=0.0, max=1.0)
+    max_tokens = hp.int(256, max=2048)
 
 
 def generate(prompt: str, 

@@ -7,7 +7,7 @@ def test_variable_naming():
     @config
     def config_func(hp: HP):
         var1 = hp.select(["a", "b"], default="a")
-        var2 = hp.number_input(10)
+        var2 = hp.number(10)
 
     # Test with defaults
     result = config_func()
@@ -30,7 +30,7 @@ def test_dict_naming():
     def config_func(hp: HP):
         config = {
             "model_type": hp.select(["cnn", "rnn"], default="cnn"),
-            "learning_rate": hp.number_input(0.001),
+            "learning_rate": hp.number(0.001),
         }
 
     # Test with defaults
@@ -55,7 +55,7 @@ def test_nested_naming():
         outer = {
             "inner": {
                 "deep": hp.select(["x", "y"], default="x"),
-                "value": hp.number_input(5),
+                "value": hp.number(5),
             }
         }
 
@@ -85,7 +85,7 @@ def test_class_naming():
 
         model = ModelConfig(
             model_type=hp.select(["cnn", "rnn"], default="cnn"),
-            learning_rate=hp.number_input(0.001),
+            learning_rate=hp.number(0.001),
         )
 
     # Test with defaults
@@ -112,7 +112,7 @@ def test_function_naming():
 
         result = inner_func(
             param1=hp.select(["a", "b"], default="a"),
-            param2=hp.number_input(10),
+            param2=hp.number(10),
         )
 
     # Test with defaults
@@ -141,7 +141,7 @@ def test_disable_automatic_naming_with_explicit_names():
 
         model = ModelConfig(
             model_type=hp.select(["cnn", "rnn"], name="model_type", default="cnn"),
-            learning_rate=hp.number_input(0.001, name="learning_rate"),
+            learning_rate=hp.number(0.001, name="learning_rate"),
         )
 
     # Test with explicit names

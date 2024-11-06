@@ -77,7 +77,7 @@ By understanding the Hypster object, you can take full advantage of Hypster's po
 
 # HP Object Methods in Hypster
 
-The `HP` object provides several methods for defining hyperparameters in your configurations. This guide covers the main methods: `select`, `text_input`, and `number_input`.
+The `HP` object provides several methods for defining hyperparameters in your configurations. This guide covers the main methods: `select`, `text`, and `number`.
 
 ## 1. The `select` Method
 
@@ -112,26 +112,26 @@ This is equivalent to:
 activation = hp.select({'relu': 'relu', 'tanh': 'tanh', 'sigmoid': 'sigmoid'}, default='relu')
 ```
 
-## 2. The `text_input` Method
+## 2. The `text` Method
 
-`hp.text_input(default=None, name=None)`
+`hp.text(default=None, name=None)`
 
 Defines a text input with an optional default value.
 
 ```python
-model_name = hp.text_input(default='my_awesome_model')
+model_name = hp.text(default='my_awesome_model')
 ```
 
 Future implementations will include runtime type checking for string values.
 
-## 3. The `number_input` Method
+## 3. The `number` Method
 
-`hp.number_input(default=None, name=None)`
+`hp.number(default=None, name=None)`
 
 Defines a numeric input with an optional default value.
 
 ```python
-learning_rate = hp.number_input(default=0.001)
+learning_rate = hp.number(default=0.001)
 ```
 
 Future implementations will include runtime type checking for numeric values (integers or floats).
@@ -156,8 +156,8 @@ def hp_methods_example(hp: HP):
         True: lambda lr: torch.optim.AdamW(lr=lr)
     }, default='adam')
 
-    model_name = hp.text_input(default='my_awesome_model')
-    learning_rate = hp.number_input(default=0.001)
+    model_name = hp.text(default='my_awesome_model')
+    learning_rate = hp.number(default=0.001)
 
     # Using the selected values
     act_func = {
@@ -199,8 +199,8 @@ from hypster import HP
 def my_config(hp: HP):
     var1 = hp.select(["a", "b"], default="b")
     var2 = hp.select({"c": 5, "d": 7}, default="d")
-    var3 = hp.text_input("hello")
-    var4 = hp.number_input(10)
+    var3 = hp.text("hello")
+    var4 = hp.number(10)
 
 
 my_config(final_vars=["var2", "var3"])
@@ -224,8 +224,8 @@ from hypster import HP
 def my_config(hp: HP):
     var1 = hp.select(["a", "b"], default="b")
     var2 = hp.select({"c": 5, "d": 7}, default="d")
-    var3 = hp.text_input("hello")
-    var4 = hp.number_input(10)
+    var3 = hp.text("hello")
+    var4 = hp.number(10)
 
 
 my_config(selections={"var1": "a", "var2": "d"})
@@ -234,9 +234,9 @@ my_config(selections={"var1": "a", "var2": "d"})
 
 ## Overrides
 
-- Overrides work on both `hp.select`, `text_input` & `number_input` methods.
+- Overrides work on both `hp.select`, `text` & `number` methods.
 - For `hp.select`, if the override is a key in the options, it will output the value associated with that key.
-- If it's not in the option keys or if it's selected for a parameter that uses `text_input` or `number_input`, it will output that value directly.
+- If it's not in the option keys or if it's selected for a parameter that uses `text` or `number`, it will output that value directly.
 
 The precedence order is: overrides > selections > defaults```{warning}
 Currently, Hypster doesn't support type-checking. This feature will be added in the future.
@@ -251,8 +251,8 @@ from hypster import HP
 def my_config(hp: HP):
     var1 = hp.select(["a", "b"], default="b")
     var2 = hp.select({"c": 5, "d": 7}, default="d")
-    var3 = hp.text_input("hello")
-    var4 = hp.number_input(10)
+    var3 = hp.text("hello")
+    var4 = hp.number(10)
 
 
 my_config(overrides={"var1": "hey there", "var4": 5})
@@ -268,7 +268,7 @@ Note how the override takes precedence in the second example.
 ## Defaults
 
 - In `hp.select`, you need to specify the defaults explicitly.
-- For `text_input` and `number_input` methods, the value itself serves as the default.
+- For `text` and `number` methods, the value itself serves as the default.
 
 ### Common Use Case: Empty Call
 
@@ -282,8 +282,8 @@ from hypster import HP
 def my_config(hp: HP):
     var1 = hp.select(["a", "b"], default="b")
     var2 = hp.select({"c": 5, "d": 7}, default="d")
-    var3 = hp.text_input("hello")
-    var4 = hp.number_input(10)
+    var3 = hp.text("hello")
+    var4 = hp.number(10)
 
 
 my_config()
@@ -373,7 +373,7 @@ def explicit_naming(hp: HP):
 
 Hypster uses a name injection process to automatically name your hyperparameters. It's important to understand how this works, especially if you have security concerns about code modification:
 
-1. **Source Code Modification**: Hypster analyzes your configuration function's source code and injects `name` keyword arguments into the hyperparameter calls (`hp.select()`, `hp.number_input()`, etc.).
+1. **Source Code Modification**: Hypster analyzes your configuration function's source code and injects `name` keyword arguments into the hyperparameter calls (`hp.select()`, `hp.number()`, etc.).
 
 2. **AST Transformation**: This process uses Python's Abstract Syntax Tree (AST) to modify the source code without changing its functionality.
 
@@ -404,7 +404,7 @@ Hypster automatically infers variable names by utilizing the variable names, dic
    - Result: 'a' will be the name of this parameter
 
 2. Dictionary Keys
-   - Example: `config = {'learning_rate': hp.number_input(0.001)}`
+   - Example: `config = {'learning_rate': hp.number(0.001)}`
    - Result: The dictionary key 'learning_rate' will be the name of this parameter
 
 3. Class and Function Keyword Arguments
@@ -414,7 +414,7 @@ Hypster automatically infers variable names by utilizing the variable names, dic
 For nested structures, Hypster uses dot notation `(key.nested_key)` to represent the hierarchy. For example:
 ```python
 model = Model(model_type=hp.select(['cnn', 'rnn']), # Automatically named 'model.model_type'
-              model_kwargs={'lr' : hp.number_input(0.1)} # Automatically named 'model.model_kwargs.lr'
+              model_kwargs={'lr' : hp.number(0.1)} # Automatically named 'model.model_kwargs.lr'
              )
 ``````{warning}
 - Parameters are named based on the variable they're assigned to, **not the function or class name** they're associated with.
@@ -433,7 +433,7 @@ def automatic_naming(hp: HP):
 def dict_naming(hp: HP):
     config = {
         "model_type": hp.select(["cnn", "rnn"]),  # Automatically named 'config.model_type'
-        "learning_rate": hp.number_input(0.001),  # Automatically named 'config.learning_rate'
+        "learning_rate": hp.number(0.001),  # Automatically named 'config.learning_rate'
     }
 ```
 3. Class and function Keyword Arguments:```python
@@ -453,7 +453,7 @@ def class_kwargs_naming(hp: HP):
 
     model = ModelConfig(
         model_type=hp.select(["cnn", "rnn"]),  # Automatically named 'model.model_type'
-        learning_rate=hp.number_input(0.001),  # Automatically named 'model.learning_rate'
+        learning_rate=hp.number(0.001),  # Automatically named 'model.learning_rate'
     )
 
     var = func(param=hp.select(["option1", "option2"]))  # Automatically named 'var.param'
@@ -481,7 +481,7 @@ def class_kwargs_naming(hp: HP):
 
     model = ModelConfig(
         model_type=hp.select(["cnn", "rnn"], name="model_type"),
-        learning_rate=hp.number_input(0.001, name="learning_rate"),
+        learning_rate=hp.number(0.001, name="learning_rate"),
     )
     var = func(param=hp.select(["option1", "option2"], name="param"))
 ```
@@ -570,7 +570,7 @@ def class_kwargs_naming(hp: HP):
 
     model = ModelConfig(
         model_type=hp.select(["cnn", "rnn"]),  # Automatically named 'model.model_type'
-        learning_rate=hp.number_input(0.001),
+        learning_rate=hp.number(0.001),
     )  # Automatically named 'model.learning_rate'
 
     var = func(param=hp.select(["option1", "option2"]))  # Automatically named 'var.param'
@@ -602,9 +602,9 @@ def my_config(hp: HP):
         default="gpt-4o-mini",
     )
 
-    llm_config = {"temperature": hp.number_input(0), "max_tokens": hp.number_input(64)}
+    llm_config = {"temperature": hp.number(0), "max_tokens": hp.number(64)}
 
-    system_prompt = hp.text_input("You are a helpful assistant. Answer with one word only")
+    system_prompt = hp.text("You are a helpful assistant. Answer with one word only")
 ```
 ```python
 hypster.save(my_config, "my_config.py")
@@ -657,9 +657,9 @@ def my_config(hp: HP):
         default="gpt-4o-mini",
     )
 
-    llm_config = {"temperature": hp.number_input(0), "max_tokens": hp.number_input(64)}
+    llm_config = {"temperature": hp.number(0), "max_tokens": hp.number(64)}
 
-    system_prompt = hp.text_input("You are a helpful assistant. Answer with one word only")
+    system_prompt = hp.text("You are a helpful assistant. Answer with one word only")
 ```
 ```python
 hypster.save(my_config, "my_config.py")
@@ -727,7 +727,7 @@ def my_config(hp: HP):
         default="gpt-4o-mini",
     )
 
-    llm_config = {"temperature": hp.number_input(0), "max_tokens": 64}
+    llm_config = {"temperature": hp.number(0), "max_tokens": 64}
 
     model = LLMModel(chunking_strategy, llm_model, llm_config)
 
@@ -766,7 +766,7 @@ def my_config(hp: HP):
         default="gpt-4o-mini",
     )
 
-    llm_config = {"temperature": hp.number_input(0), "max_tokens": hp.number_input(64)}
+    llm_config = {"temperature": hp.number(0), "max_tokens": hp.number(64)}
 ```
 ```python
 save(my_config, "my_config.py")

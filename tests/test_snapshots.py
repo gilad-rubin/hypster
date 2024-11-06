@@ -7,8 +7,8 @@ def test_basic_snapshot():
     @config
     def basic_config(hp: HP):
         model = hp.select(["cnn", "rnn"], default="cnn")
-        lr = hp.number_input(0.001)
-        epochs = hp.number_input(10)
+        lr = hp.number(0.001)
+        epochs = hp.number(10)
 
     # Run with default values
     result1 = basic_config()
@@ -26,7 +26,7 @@ def test_nested_snapshot():
     @config
     def nested_config(hp: HP):
         optimizer = hp.select(["adam", "sgd"], default="adam")
-        lr = hp.number_input(0.001)
+        lr = hp.number(0.001)
 
     save(nested_config, "tests/helper_configs/nested_config.py")
 
@@ -54,7 +54,7 @@ def test_multi_select_snapshot():
     @config
     def multi_select_config(hp: HP):
         frameworks = hp.multi_select(["pytorch", "tensorflow", "jax"], default=["pytorch"])
-        batch_size = hp.number_input(32)
+        batch_size = hp.number(32)
 
     # Run with some values
     result1 = multi_select_config(values={"frameworks": ["pytorch", "tensorflow"]})
@@ -73,9 +73,9 @@ def test_conditional_snapshot():
     def conditional_config(hp: HP):
         model = hp.select(["cnn", "rnn"], default="cnn")
         if model == "cnn":
-            filters = hp.number_input(64)
+            filters = hp.number(64)
         else:
-            units = hp.number_input(128)
+            units = hp.number(128)
 
     # Run with CNN selection
     result_cnn = conditional_config(values={"model": "cnn"})
@@ -94,20 +94,20 @@ def test_conditional_snapshot():
     assert conditional_config(values=snapshot_rnn) == result_rnn
 
 
-def test_snapshot_with_text_input():
+def test_snapshot_with_text():
     @config
-    def text_input_config(hp: HP):
+    def text_config(hp: HP):
         model = hp.select(["cnn", "rnn"], default="cnn")
-        name = hp.text_input("default_model")
+        name = hp.text("default_model")
 
     # Run with some values and values
-    result1 = text_input_config(values={"model": "rnn", "name": "custom_rnn"})
-    snapshot1 = text_input_config.get_latest_snapshot()
+    result1 = text_config(values={"model": "rnn", "name": "custom_rnn"})
+    snapshot1 = text_config.get_latest_snapshot()
 
     assert snapshot1 == {"model": "rnn", "name": "custom_rnn"}
 
     # Run with the snapshot as values
-    result2 = text_input_config(values=snapshot1)
+    result2 = text_config(values=snapshot1)
 
     assert result1 == result2
 
@@ -116,7 +116,7 @@ def test_snapshot_history():
     @config
     def history_config(hp: HP):
         model = hp.select(["cnn", "rnn", "transformer"], default="cnn")
-        lr = hp.number_input(0.001)
+        lr = hp.number(0.001)
 
     # Run multiple times with different values
     history_config(values={"model": "cnn"})

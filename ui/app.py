@@ -45,7 +45,7 @@ def render_config_node(node: ConfigNode, path: str = "", state: Dict[str, str] =
     else:
         value = node.value if node.value is not None else ""
         shared_text = " [SHARED]" if node.is_shared else ""
-        new_value = st.text_input(
+        new_value = st.text(
             f"{get_suffix(node.name)}{shared_text}",
             value=str(value),
             key=f"{path}.{node.name}",

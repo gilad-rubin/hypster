@@ -5,8 +5,8 @@ def test_basic_exclude_vars():
     @config
     def config_func(hp: HP):
         model = hp.select(["cnn", "rnn"], default="cnn")
-        lr = hp.number_input(0.001)
-        epochs = hp.number_input(10)
+        lr = hp.number(0.001)
+        epochs = hp.number(10)
 
     # Test excluding single variable
     result = config_func(exclude_vars=["lr"])
@@ -31,8 +31,8 @@ def test_exclude_vars_with_final_vars():
     @config
     def config_func(hp: HP):
         model = hp.select(["cnn", "rnn"], default="cnn")
-        lr = hp.number_input(0.001)
-        epochs = hp.number_input(10)
+        lr = hp.number(0.001)
+        epochs = hp.number(10)
 
     # Test final_vars and exclude_vars together
     result = config_func(final_vars=["model", "lr", "epochs"], exclude_vars=["lr"])
@@ -45,7 +45,7 @@ def test_exclude_vars_with_propagation():
     @config
     def nested_config(hp: HP):
         nested_param = hp.select(["a", "b"], default="a")
-        nested_number = hp.number_input(1.0)
+        nested_number = hp.number(1.0)
 
     nested_config.save("tests/helper_configs/nested_config.py")
 
@@ -76,7 +76,7 @@ def test_exclude_vars_with_nested_propagation():
     @config
     def deep_nested_config(hp: HP):
         deep_param = hp.select(["deep1", "deep2"], default="deep1")
-        deep_number = hp.number_input(2.0)
+        deep_number = hp.number(2.0)
 
     deep_nested_config.save("tests/helper_configs/deep_nested_config.py")
 
@@ -110,7 +110,7 @@ def test_exclude_vars_in_propagate_call():
     @config
     def nested_config(hp: HP):
         nested_param = hp.select(["a", "b"], default="a")
-        nested_number = hp.number_input(1.0)
+        nested_number = hp.number(1.0)
         extra_param = hp.select(["x", "y"], default="x")
 
     nested_config.save("tests/helper_configs/nested_config.py")
