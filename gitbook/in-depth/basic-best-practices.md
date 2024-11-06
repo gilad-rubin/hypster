@@ -1,5 +1,3 @@
-I'll help improve the documentation with your suggestions:
-
 # Best Practices
 
 ## Shift Left Philosophy
