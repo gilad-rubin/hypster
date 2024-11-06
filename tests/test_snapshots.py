@@ -12,7 +12,7 @@ def test_basic_snapshot():
 
     # Run with default values
     result1 = basic_config()
-    snapshot1 = basic_config.get_latest_snapshot()
+    snapshot1 = basic_config.get_last_snapshot()
 
     assert snapshot1 == {"model": "cnn", "lr": 0.001, "epochs": 10}
 
@@ -40,7 +40,7 @@ def test_nested_snapshot():
 
     # Run with some values
     result1 = main_config(final_vars=["model", "nested_inputs"], values={"nested_inputs.optimizer": "sgd"})
-    snapshot1 = main_config.get_latest_snapshot()
+    snapshot1 = main_config.get_last_snapshot()
 
     assert snapshot1 == {"model": "cnn", "nested_inputs.optimizer": "sgd", "nested_inputs.lr": 0.001}
 
@@ -58,7 +58,7 @@ def test_multi_select_snapshot():
 
     # Run with some values
     result1 = multi_select_config(values={"frameworks": ["pytorch", "tensorflow"]})
-    snapshot1 = multi_select_config.get_latest_snapshot()
+    snapshot1 = multi_select_config.get_last_snapshot()
 
     assert snapshot1 == {"frameworks": ["pytorch", "tensorflow"], "batch_size": 32}
 
@@ -79,13 +79,13 @@ def test_conditional_snapshot():
 
     # Run with CNN selection
     result_cnn = conditional_config(values={"model": "cnn"})
-    snapshot_cnn = conditional_config.get_latest_snapshot()
+    snapshot_cnn = conditional_config.get_last_snapshot()
 
     assert snapshot_cnn == {"model": "cnn", "filters": 64}
 
     # Run with RNN selection
     result_rnn = conditional_config(values={"model": "rnn"})
-    snapshot_rnn = conditional_config.get_latest_snapshot()
+    snapshot_rnn = conditional_config.get_last_snapshot()
 
     assert snapshot_rnn == {"model": "rnn", "units": 128}
 
@@ -102,7 +102,7 @@ def test_snapshot_with_text():
 
     # Run with some values and values
     result1 = text_config(values={"model": "rnn", "name": "custom_rnn"})
-    snapshot1 = text_config.get_latest_snapshot()
+    snapshot1 = text_config.get_last_snapshot()
 
     assert snapshot1 == {"model": "rnn", "name": "custom_rnn"}
 
