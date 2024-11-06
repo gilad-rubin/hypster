@@ -1,124 +1,92 @@
-# Parameter Instantiation and Variable Selection
+# Instantiating a Config Function
 
 <figure><img src="../.gitbook/assets/image (19).png" alt=""><figcaption></figcaption></figure>
 
-In this section, we’ll explore how to configure parameters and select variables in a configuration setup. The process involves two main aspects: defining parameter values and selecting which variables to include in the final output.
+## Configuration Function
 
-## Configuration Setup
-
-In this section, we'll work with the following configuration function:
+In this section, we'll use the following toy configuration function:
 
 ```python
 from hypster import config, HP
 
 @config
-def my_config(hp: HP):
-    model_type = hp.select(["type1" ,"type2"], default="type1")
+def llm_config(hp: HP):
+    model_name = hp.select({"sonnet" : "claude-3-5-sonnet-20241022"
+                            "haiku" : "claude-3-5-haiku-20241022"}, 
+                            default="haiku")
     
-    if model_type == "type1":
-        param = hp.int(3, min=3, max=10)
+    if model_type == "haiku":
+        max_tokens = hp.int(256, max=2048)
     else:
-        param = hp.int(10, min=10, max=100)
+        max_tokens = hp.int(126, max=1024)
         
     cache = Cache(folder=hp.text("./cache"))
     config_dct = {"temperature" : hp.number(0, min=0, max=1),
-                  "max_tokens" : hp.int(16, max=256),
-                  "param" : param}
+                  "max_tokens" : max_tokens}
               
-    model = Model(model_type, cache)
+    model = Model(model_name, cache)
 ```
 
-## Parameter Instantiation
+## Basic Parameter Instantiation
 
 Parameter values can be set using a `values` dictionary:
 
 ```python
-config1 = my_config(values={"model_type" : "type2", "param" : 10})
-config2 = my_config(values={"max_tokens" : 256})
+config1 = llm_config(values={"model_name" : "sonnet"})
+config2 = llm_config(values={"max_tokens" : 256, "config_dct.temperature" : 0.5})
 ```
 
 Key considerations:&#x20;
 
-* Parameter values must align with the conditional logic in the configuration
-* Default values are used when specific values aren’t provided
+* Parameter values must align with the **conditional logic** in the configuration
+* **Dot notation** (e.g. `config_dct.temperature`) is used for automatic naming of nested parameter. More on that in the [Automatic Naming](../in-depth/automatic-naming.md) section.
+* **Default values** are used when specific values aren’t provided
 
-## Variable Selection
+## Instantiating `select` and `multi_select`
 
-When working with configuration functions, not all variables defined within them are needed for the final execution. Consider this execution function:
+we can define hp.select or multi\_select using a list or a dictionary. a list is equal to {item: item} dictionary.
 
-```python
-def run(input: str, model: Model, config_dict: Dict[str, Any]) -> str:
-    return model.run(input, **config_dict)
-```
+when you want to instantiate with select you either provide the key from the dictionary or define a value. the value can be outside of the predefined values.&#x20;
 
-This function only requires `model` and `config_dict`, but our configuration function creates additional variables like `cache`, `model_type`, and `param`. Passing unnecessary variables could:
+just note that if you provide a value that's not string, float, int, bool - hypster has a history mechanism for values and it will be saved as str(value). this means it won't be reproducible.&#x20;
 
-* Cause function signature mismatches
-* Lead to memory inefficiency
-* Create potential naming conflicts
+example:
 
-### Variable Selection Methods
+my\_config(values={"model\_name" : "claude-3-opus-20240229"}) will work and be serialized etc...
 
-To ensure we pass only the required variables, we have two filtering approaches:
+my\_config(values={"model\_name" : Complex(a=5)}) will also work, but won't be reproducible.
 
-1. **Include specific variables using `final_vars`**:
+## Instantiating number & int (also multi\_number and multi\_int)
 
-```python
-config = my_config(final_vars=["model", "config_dict"], values={...})
-run("Hello", **config)
-```
+here it'll work for int - ints. for number - float or int works. just if you provide bounds (min or max) - it'll validate that.
 
-Use `final_vars` when you need only a few specific variables
+## text or bool
 
-{% hint style="info" %}
-When `final_vars` is empty, all variables are returned (except those in `exclude_vars`)
-{% endhint %}
+will just make sure it's str or bool.
 
-2. **Exclude unwanted variables using `exclude_vars`**:
+## instantiating hp.propagte
+
+in order to instantiate it - it's nested config functions. we can use either dot notation or dictionary.
+
+example:
 
 ```python
-config = my_config(exclude_vars=["cache", "temp_data"], values={...})
-run("Hello", **config)
+from hypster import config, HP
+
+@config
+def rag_config(hp: HP):
+    llm = hp.propagate("path_to_llm_config.py")
+    retriever = hp.propagate("path_to_retriever_config.py")
+    
+    pipeline = [retriever["embedder"], llm["model"]]
+    #you can make this a bit better :)
 ```
 
-Choose `exclude_vars` when you have many variables to keep.
-
-## Instantiation ?
-
-There are two main ways to instantiate a configuration function:
-
-This:
+so we can instantiate it via:
 
 ```python
-results = modular_rag(
-    values={
-        "indexing.enrich_doc_w_llm": True,
-        "indexing.llm.model": "gpt-4o-mini",
-        "document_store_type": "qdrant",
-        "retrieval.bm25_weight": 0.8,
-        "embedder_type": "fastembed",
-        "reranker.model": "tiny-bert-v2",
-        "response.llm.model": "haiku",
-        "indexing.splitter.split_length": 6,
-        "reranker.top_k": 3,
-    },
-)
+rag_config(values={"retriever.embedding" : "jina", 
+                   "llm" : {"model_name" : "haiku"}
+                   })
 ```
 
-Or this:
-
-<figure><img src="../.gitbook/assets/image (9).png" alt=""><figcaption></figcaption></figure>
-
-Once you start getting used to creating configuration spaces, they can get somewhat complex. This makes it hard to track manually and instantiate them in a valid way.
-
-Let's look at a simple example:&#x20;
-
-In this toy example, if we want to instantiate `my_config` - we have to remember that `var2` can only be defined if `var == "a"`. This becomes much more difficult when we start using nested configurations and multiple conditions.
-
-To address this challenge - hypster offers a built-in Jupyter Notebook based UI to interactively select valid configurations inside your IDE using `ipywidgets`.
-
-## Interactive Instantiation
-
-
-
-## Manual Instantiation

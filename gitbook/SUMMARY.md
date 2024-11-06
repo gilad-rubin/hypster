@@ -5,13 +5,13 @@
 ## Getting Started
 
 * [Installation](getting-started/installation.md)
-* [Anatomy of A Config Function](getting-started/defining-a-configuration-space.md)
-* [Parameter Instantiation and Variable Selection](getting-started/instantiating-a-configuration-space.md)
-* [Configuration Instantiation Methods](getting-started/configuration-instantiation-methods/README.md)
-  * [Manual Instantiation](getting-started/configuration-instantiation-methods/manual-instantiation.md)
-  * [Interactive Instantiation (UI)](getting-started/configuration-instantiation-methods/interactive-instantiation-ui.md)
-* [Usage Example - Machine Learning](getting-started/basic-example.md)
-* [Usage Example - LLMs](getting-started/llms-and-generative-ai.md)
+* [Defining of A Config Function](getting-started/defining-a-configuration-space.md)
+* [Instantiating a Config Function](getting-started/instantiating-a-configuration-space.md)
+* [Filtering Output Variables](getting-started/filtering-output-variables.md)
+* [Interactive Instantiation (UI)](getting-started/interactive-instantiation-ui.md)
+* [Usage Examples](getting-started/usage-examples/README.md)
+  * [Machine Learning Classifiers](getting-started/usage-examples/basic-example.md)
+  * [LLM Generation](getting-started/usage-examples/llms-and-generative-ai.md)
 
 ## In Depth
 
