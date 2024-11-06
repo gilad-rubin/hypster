@@ -5,46 +5,41 @@ This tutorial demonstrates how to use Hypster with LiteLLM for managing differen
 ## Complete Example: Configurable LLM
 
 ```python
-from hypster import config, HP
-from litellm import completion
-from typing import Dict
 import os
+
+import llm
+
+from hypster import HP, config
+
 
 @config
 def llm_config(hp: HP):
-    anthropic_models = {"haiku": "claude-3-5-haiku-latest", "sonnet": "claude-3-5-sonnet-latest"}
-    openai_models = {"gpt-4o-mini": "gpt-4o-mini", "gpt-4o": "gpt-4o", "gpt-4o-latest": "gpt-4o-2024-08-06"}
-    model_options = {**anthropic_models, **openai_models}
-
-    model = hp.select(model_options, default="gpt-4o-mini")
+    models = {"gpt-4o-mini": "gpt-4o-mini", "gpt-4o": "gpt-4o"}
+    model_name = hp.select(models, default="gpt-4o-mini")
     temperature = hp.number_input(0.0, min=0.0, max=1.0)
-    max_tokens = hp.int(256)
+    max_tokens = hp.int_input(256, max=2048)
 
-def generate(prompt: str, llm_config: Dict) -> str:
-    """Generate text using the configured LLM."""
-    messages = [{"role": "user", "content": prompt}]
-    response = completion(messages=messages, **llm_config)
-    return response.choices[0].message.content
 
-# Example usage
-# Set your API keys
-os.environ["OPENAI_API_KEY"] = "your-openai-key"
-os.environ["ANTHROPIC_API_KEY"] = "your-anthropic-key"
+def generate(prompt: str, model_name: str, temperature: float, max_tokens: int) -> str:
+    model = llm.get_model(model_name)
+    return model.prompt(prompt, temperature=temperature, max_tokens=max_tokens)
+
+
+os.environ["OPENAI_API_KEY"] = "..."
 
 # Create configurations for different use cases
-final_vars=["model", "temperature", "max_tokens"]
+final_vars = ["model_name", "temperature", "max_tokens"]
 default_config = llm_config(final_vars=final_vars)
-creative_config = llm_config(values={"temperature": 1.0, "max_tokens": 1024}, final_vars=final_vars)
+creative_config = llm_config(values={"model_name": "gpt-4o", "temperature": 1.0}, final_vars=final_vars)
 
 # Example prompts
-prompt1 = "Explain what machine learning is."
-prompt2 = "Write a creative story about a time-traveling scientist."
-
+prompt1 = "Explain what machine learning is in 5 words."
+prompt2 = "Write a haiku about AI in 17 syllables."
 # Generate responses with different configurations
 print("Default Configuration (Balanced):")
-print(generate(prompt1, default_config))
+print(generate(prompt1, **default_config))
 print("\nCreative Configuration (Higher Temperature):")
-print(generate(prompt2, creative_config))
+print(generate(prompt2, **creative_config))
 ```
 
 This example demonstrates:
