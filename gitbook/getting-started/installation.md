@@ -1,4 +1,4 @@
-# Installation
+# 🖥️ Installation
 
 Hypster is a lightweight package, mainly dependent on `Pydantic` for type-checking.
 

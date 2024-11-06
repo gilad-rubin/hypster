@@ -1,4 +1,4 @@
-# Interactive Instantiation (UI)
+# 🎮 Interactive Instantiation (UI)
 
 ## Manual Instantiation
 

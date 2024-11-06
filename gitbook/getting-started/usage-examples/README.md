@@ -1,2 +1,2 @@
-# Usage Examples
+# 🪄 Usage Examples
 

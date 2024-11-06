@@ -1,4 +1,4 @@
-# Selecting Output Variables
+# 🎰 Selecting Output Variables
 
 When working with configuration functions, not all variables defined within them are needed for the final execution engine.&#x20;
 
