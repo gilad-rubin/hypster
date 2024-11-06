@@ -11,6 +11,6 @@ def my_config(hp: HP):
         default="gpt-4o-mini",
     )
     llm_config = {
-        "temperature": hp.number_input(0),
-        "max_tokens": hp.number_input(64),
+        "temperature": hp.number(0),
+        "max_tokens": hp.number(64),
     }

@@ -4,48 +4,48 @@ from hypster import HP, config
 
 
 # Text Input Tests
-def test_text_input_with_default():
+def test_text_with_default():
     @config
     def config_func(hp: HP):
-        value = hp.text_input(default="hello", name="param")
+        value = hp.text(default="hello", name="param")
 
     result = config_func()
     assert result["value"] == "hello"
 
 
-def test_text_input_without_default():
+def test_text_without_default():
     with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
-            value = hp.text_input(name="param")
+            value = hp.text(name="param")
 
         config_func()
 
 
-def test_text_input_invalid_default():
+def test_text_invalid_default():
     with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
-            value = hp.text_input(default=123, name="param")  # Not a string
+            value = hp.text(default=123, name="param")  # Not a string
 
         config_func()
 
 
-def test_text_input_with_values():
+def test_text_with_values():
     @config
     def config_func(hp: HP):
-        value = hp.text_input(default="hello", name="param")
+        value = hp.text(default="hello", name="param")
 
     result = config_func(values={"param": "world"})
     assert result["value"] == "world"
 
 
-def test_text_input_invalid_values():
+def test_text_invalid_values():
     @config
     def config_func(hp: HP):
-        value = hp.text_input(default="hello", name="param")
+        value = hp.text(default="hello", name="param")
 
     with pytest.raises(Exception):
         config_func(values={"param": 123})  # Not a string

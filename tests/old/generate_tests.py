@@ -28,7 +28,7 @@ class MultiSelectGenerator(HPCallGenerator):
 
 class NumberInputGenerator(HPCallGenerator):
     def generate_code(self) -> str:
-        return "var = hp.number_input(name='var', default=10)"
+        return "var = hp.number(name='var', default=10)"
 
     def generate_assertion(self) -> str:
         return "assert result['var'] == 10"
@@ -171,7 +171,7 @@ class TestCaseGenerator:
 
         # Special case: NumberInputGenerator without defaults should raise an error
         if isinstance(self.hp_call, NumberInputGenerator) and isinstance(self.defaults, WithoutDefaults):
-            assertions.append("with pytest.raises(Exception, match='number_input must have a default value'):")
+            assertions.append("with pytest.raises(Exception, match='number must have a default value'):")
             assertions.append("    config_func()")
             return assertions
 
@@ -214,7 +214,7 @@ def generate_test_case(hp_call: str, naming: str, structure: str, logic: str, de
     hp_call_map = {
         "select": SelectGenerator(),
         "multi_select": MultiSelectGenerator(),
-        "number_input": NumberInputGenerator(),
+        "number": NumberInputGenerator(),
     }
     naming_map = {"implicit": ImplicitNaming(), "explicit": ExplicitNaming()}
     structure_map = {"flat": FlatStructure(), "nested": NestedStructure()}
@@ -263,7 +263,7 @@ if __name__ == "__main__":
 
     # Generate all test cases
     all_test_cases = []
-    for hp_call in ["select", "multi_select", "number_input"]:
+    for hp_call in ["select", "multi_select", "number"]:
         for naming in ["implicit"]:
             for structure in ["flat", "nested"]:
                 for logic in ["no_conditionals", "simple_conditionals"]:
@@ -272,8 +272,8 @@ if __name__ == "__main__":
                         continue
 
                     for defaults in ["with_defaults", "without_defaults"]:
-                        # Skip number_input without defaults
-                        if hp_call == "number_input" and defaults == "without_defaults":
+                        # Skip number without defaults
+                        if hp_call == "number" and defaults == "without_defaults":
                             continue
 
                         test_case = generate_test_case(hp_call, naming, structure, logic, defaults)

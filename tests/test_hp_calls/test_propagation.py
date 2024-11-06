@@ -7,13 +7,13 @@ from hypster import HP, config
 @config
 def nested_config(hp: HP):
     nested_param = hp.select(["a", "b"], default="a")
-    nested_number = hp.number_input(default=1.0)
+    nested_number = hp.number(default=1.0)
 
 
 @config
 def deep_nested_config(hp: HP):
     deep_param = hp.select(["deep1", "deep2"], default="deep1")
-    deep_number = hp.number_input(default=2.0)
+    deep_number = hp.number(default=2.0)
 
 
 @config

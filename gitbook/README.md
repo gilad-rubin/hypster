@@ -44,8 +44,8 @@ from hypster import config, HP
 @config
 def my_config(hp: HP):
     model = hp.select(["gpt-4o", "claude-3-5-sonnet"], default="gpt-4o")
-    temperature = hp.number_input(0.5, min=0, max=1)
-    llm = LLM(model=model, temperature=temperature) 
+    temperature = hp.number(0.5, min=0, max=1)
+    llm = LLM(model=model, temperature=temperature)
 ```
 {% endstep %}
 

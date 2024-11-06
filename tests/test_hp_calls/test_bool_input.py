@@ -4,50 +4,50 @@ from hypster import HP, config
 
 
 # Bool Input Tests
-def test_bool_input_with_default():
+def test_bool_with_default():
     @config
     def config_func(hp: HP):
-        value = hp.bool_input(default=True, name="param")
+        value = hp.bool(default=True, name="param")
 
     result = config_func()
     assert result["value"] is True
     assert isinstance(result["value"], bool)
 
 
-def test_bool_input_without_default():
+def test_bool_without_default():
     with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
-            value = hp.bool_input(name="param")
+            value = hp.bool(name="param")
 
         config_func()
 
 
-def test_bool_input_invalid_default():
+def test_bool_invalid_default():
     with pytest.raises(Exception):
 
         @config
         def config_func(hp: HP):
-            value = hp.bool_input(default="abc", name="param")  # Not a boolean
+            value = hp.bool(default="abc", name="param")  # Not a boolean
 
         config_func()
 
 
-def test_bool_input_with_values():
+def test_bool_with_values():
     @config
     def config_func(hp: HP):
-        value = hp.bool_input(default=True, name="param")
+        value = hp.bool(default=True, name="param")
 
     result = config_func(values={"param": False})
     assert result["value"] is False
     assert isinstance(result["value"], bool)
 
 
-def test_bool_input_invalid_values():
+def test_bool_invalid_values():
     @config
     def config_func(hp: HP):
-        value = hp.bool_input(default=True, name="param")
+        value = hp.bool(default=True, name="param")
 
     with pytest.raises(Exception):
         config_func(values={"param": "true"})  # Not a boolean

@@ -16,17 +16,17 @@ def classifier_config(hp: HP):
 
     # Create the classifier based on selection
     if model_type == "hist_boost":
-        learning_rate = hp.number_input(0.01, min=0.001, max=0.1)
-        max_depth = hp.int_input(10, min=3, max=20)
+        learning_rate = hp.number(0.01, min=0.001, max=0.1)
+        max_depth = hp.int(10, min=3, max=20)
 
         classifier = HistGradientBoostingClassifier(
             learning_rate=learning_rate,
             max_depth=max_depth,
         )
     else:  # model_type == "random_forest"
-        n_estimators = hp.int_input(100, min=10, max=500)
-        max_depth = hp.int_input(5, min=3, max=10)
-        bootstrap = hp.bool_input(default=True)
+        n_estimators = hp.int(100, min=10, max=500)
+        max_depth = hp.int(5, min=3, max=10)
+        bootstrap = hp.bool(default=True)
 
         classifier = RandomForestClassifier(
             n_estimators=n_estimators,
@@ -67,8 +67,8 @@ This example demonstrates several key features of Hypster:
 2. The configuration function takes an `hp` parameter of type `HP`
 3. We use various HP calls to define our parameter space:
    * `hp.select()` for categorical choices
-   * `hp.number_input()` for floating-point & integer values
-   * `hp.int_input()` for integer values only
+   * `hp.number()` for floating-point & integer values
+   * `hp.int()` for integer values only
    * `hp.bool()` for boolean values
 4. The configuration returns a dictionary with our instantiated objects
 5. We can create multiple instances with different configurations
