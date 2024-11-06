@@ -1,6 +1,31 @@
-# Filtering Output Variables
+# Selecting Output Variables
 
-When working with configuration functions, not all variables defined within them are needed for the final execution. Consider this execution function:
+When working with configuration functions, not all variables defined within them are needed for the final execution engine.&#x20;
+
+Consider these configuration & execution functions:
+
+```python
+from hypster import config, HP
+
+@config
+def llm_config(hp: HP):
+    model_name = hp.select({"sonnet" : "claude-3-5-sonnet-20241022"
+                            "haiku" : "claude-3-5-haiku-20241022"}, 
+                            default="haiku")
+    
+    if model_type == "haiku":
+        max_tokens = hp.int(256, max=2048)
+    else:
+        max_tokens = hp.int(126, max=1024)
+        
+    cache = Cache(folder=hp.text("./cache"))
+    config_dct = {"temperature" : hp.number(0, min=0, max=1),
+                  "max_tokens" : max_tokens}
+              
+    model = Model(model_name, cache)
+```
+
+Execution function:
 
 ```python
 def run(input: str, model: Model, config_dict: Dict[str, Any]) -> str:
