@@ -41,4 +41,33 @@ pip install hypster[dev]
 {% endtab %}
 {% endtabs %}
 
-\#TODO: consider adding more content here! it's pretty empty :)
+## Verification
+
+After installation, you can verify your setup by running:
+
+```python
+import hypster
+print(hypster.__version__)
+```
+
+## System Requirements
+
+- Python 3.8 or higher
+- pip package manager
+- Optional: Jupyter Notebook/Lab for interactive features
+
+## Troubleshooting
+
+If you encounter any installation issues:
+
+1. Ensure your pip is up to date:
+```bash
+pip install --upgrade pip
+```
+
+2. For Jupyter-related issues, make sure Jupyter is properly installed:
+```bash
+pip install jupyter
+```
+
+3. If you're still having problems, please [open an issue](https://github.com/gilad-rubin/hypster/issues) on our GitHub repository.
