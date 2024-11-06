@@ -1,6 +1,12 @@
-# Usage Example - LLMs
+# LLM Generation
 
-This tutorial demonstrates how to use Hypster with LiteLLM for managing different LLM configurations. We'll create a simple example showing how to switch between models and adjust generation parameters.
+This tutorial demonstrates how to use Hypster with the `llm` package for managing different LLM configurations. We'll create a simple example showing how to switch between models and adjust generation parameters.
+
+Prerequisites:
+
+```bash
+pip install llm
+```
 
 ## Configurable LLM
 

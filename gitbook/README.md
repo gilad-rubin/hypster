@@ -1,12 +1,23 @@
 ---
 icon: hand-wave
+layout:
+  title:
+    visible: true
+  description:
+    visible: true
+  tableOfContents:
+    visible: true
+  outline:
+    visible: true
+  pagination:
+    visible: true
 ---
 
-# Welcome
+# 👋 Welcome
 
 <div data-full-width="false">
 
-<figure><img src=".gitbook/assets/hypster_with_text.png" alt=""><figcaption></figcaption></figure>
+<figure><img src=".gitbook/assets/hypster_with_text (1).png" alt=""><figcaption></figcaption></figure>
 
 </div>
 

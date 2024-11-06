@@ -1,5 +1,7 @@
 # 🔮 Instantiating a Config Function
 
+\#TODO: consider splitting the select, number, text etc... to separate pages under in-depth -> hp call types
+
 ## Configuration Function
 
 In this section, we'll use the following toy configuration function:
@@ -99,7 +101,7 @@ When instantiating parameters with values outside the predefined options, Hypste
 * Simple types (str, int, float, bool) are properly logged and reproducible
 * Complex objects: Serialized as strings, not reproducible
 
-### `number`, `int` and `multi_number` & `multi_int`
+## Numeric Parameters
 
 Hypster provides two types of numeric parameters with automatic validation:
 
@@ -132,24 +134,34 @@ Simple parameter types for strings and booleans:
 ```python
 # Text parameter - accepts any string
 cache_dir = hp.text("./cache")
-log_file = hp.text("app.log")
+log_files = hp.multi_text(["app.log", "config.log"])
 
 # Boolean parameter - True/False only
 use_cache = hp.bool(True)
-verbose = hp.bool(False)
+verbose_flags = hp.multi_bool([False, True])
 ```
 
-### Example Usage
+### Valid Usage
 
 ```python
 config = my_config(values={
-    "cache_dir": "/tmp/cache",     # Valid text value
-    "use_cache": True,             # Valid boolean
-    "verbose": False               # Valid boolean
+    "cache_dir": "/tmp/cache",       # Valid text value
+    "use_cache": True,               # Valid boolean
+    "verbose_flags": [False, False]  # Valid boolean
 })
 ```
 
-## Nested Configurations
+### Invalid Usage
+
+```python
+config = my_config(values={
+    "cache_dir": 125,       # Invalid numeric value
+    "use_cache": [True],    # Invalid list type
+    "verbose_flags": False  # Invalid single boolean instead of list
+})
+```
+
+## Nested Configurations using `propagate`&#x20;
 
 In more complex scenarios, you might want to nest configurations from different modules or files. Hypster supports this through the `hp.propagate` method, which allows you to include configurations from other files.
 

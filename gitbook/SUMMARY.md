@@ -7,10 +7,10 @@
 * [🖥️ Installation](getting-started/installation.md)
 * [🚀 Defining of A Config Function](getting-started/defining-a-configuration-space.md)
 * [🔮 Instantiating a Config Function](getting-started/instantiating-a-configuration-space.md)
-* [🎰 Selecting Output Variables](getting-started/selecting-output-variables.md)
+* [🍡 Selecting Output Variables](getting-started/selecting-output-variables.md)
 * [🎮 Interactive Instantiation (UI)](getting-started/interactive-instantiation-ui.md)
 * [🪄 Usage Examples](getting-started/usage-examples/README.md)
-  * [Machine Learning Classifiers](getting-started/usage-examples/basic-example.md)
+  * [Machine Learning](getting-started/usage-examples/basic-example.md)
   * [LLM Generation](getting-started/usage-examples/llms-and-generative-ai.md)
 
 ## In Depth
