@@ -1,4 +1,4 @@
-# Configuration Instantiation Methods
+# Interactive Instantiation (UI)
 
 ## Manual Instantiation
 
@@ -34,3 +34,15 @@ To address these challenges, hypster provides a built-in Jupyter Notebook-based 
 * Interactively select valid configurations
 * Visualize parameter dependencies
 * Work directly within your IDE using ipywidgets
+
+
+
+<figure><img src="../.gitbook/assets/image (9).png" alt=""><figcaption></figcaption></figure>
+
+Once you start getting used to creating configuration spaces, they can get somewhat complex. This makes it hard to track manually and instantiate them in a valid way.
+
+Let's look at a simple example:&#x20;
+
+In this toy example, if we want to instantiate `my_config` - we have to remember that `var2` can only be defined if `var == "a"`. This becomes much more difficult when we start using nested configurations and multiple conditions.
+
+To address this challenge - hypster offers a built-in Jupyter Notebook based UI to interactively select valid configurations inside your IDE using `ipywidgets`.
