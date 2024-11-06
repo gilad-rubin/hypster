@@ -1,7 +1,5 @@
 # Instantiating a Config Function
 
-<figure><img src="../.gitbook/assets/image (19).png" alt=""><figcaption></figcaption></figure>
-
 ## Configuration Function
 
 In this section, we'll use the following toy configuration function:
@@ -42,51 +40,150 @@ Key considerations:&#x20;
 * **Dot notation** (e.g. `config_dct.temperature`) is used for automatic naming of nested parameter. More on that in the [Automatic Naming](../in-depth/automatic-naming.md) section.
 * **Default values** are used when specific values aren’t provided
 
-## Instantiating `select` and `multi_select`
+## Parameter Types and Usage
 
-we can define hp.select or multi\_select using a list or a dictionary. a list is equal to {item: item} dictionary.
+### `select` and `multi_select` parameters
 
-when you want to instantiate with select you either provide the key from the dictionary or define a value. the value can be outside of the predefined values.&#x20;
+The `hp.select` and `hp.multi_select` methods allow defining categorical parameters using either lists or dictionaries:
 
-just note that if you provide a value that's not string, float, int, bool - hypster has a history mechanism for values and it will be saved as str(value). this means it won't be reproducible.&#x20;
+```python
+# List form - values and keys are identical
+model_type = hp.select(["haiku", "sonnet"])
 
-example:
+# Dictionary form - separate values and keys
+callbacks = hp.multi_select({"cost" : cost_callaback,
+                             "runtime" : runtime_callback})
+```
 
-my\_config(values={"model\_name" : "claude-3-opus-20240229"}) will work and be serialized etc...
+Use dictionary form when working with:
 
-my\_config(values={"model\_name" : Complex(a=5)}) will also work, but won't be reproducible.
+1. Long values (e.g. `claude-3-5-sonnet-20241022`)
+2. Specific numeric values (e.g. `1.524322`)
+3. Complex objects (e.g.`Model(n_estimators=100, ...)`)
 
-## Instantiating number & int (also multi\_number and multi\_int)
+#### `options_only` parameter
 
-here it'll work for int - ints. for number - float or int works. just if you provide bounds (min or max) - it'll validate that.
+The `options_only` parameter controls value validation:
 
-## text or bool
+```python
+# Flexible validation (default)
+model_type = hp.select(["haiku", "sonnet"], options_only=False)
 
-will just make sure it's str or bool.
+# Strict validation - only predefined options allowed
+model_type = hp.select(["haiku", "sonnet"], options_only=True)
+```
 
-## instantiating hp.propagte
+* When `options_only=True`: Only pre-defined values are accepted
+* When `options_only=False`: any value is accepted
 
-in order to instantiate it - it's nested config functions. we can use either dot notation or dictionary.
+#### Parameter Instantiation Examples
 
-example:
+**Using Predefined Values**
+
+```python
+my_config(values={"model_type": "haiku"})
+```
+
+**Using Custom Values**
+
+```python
+my_config(values={"model_type": "claude-3-opus-20240229"})
+```
+
+#### Reproducibility and Value History
+
+Hypster maintains a historical record of parameter values to ensure configuration reproducibility across different runs. This history can be accessed using `my_config.get_last_snapshot()`, allowing you to view and reuse previous configurations.
+
+#### Value Serialization
+
+When instantiating parameters with values outside the predefined options, Hypster handles serialization in two ways:
+
+* Simple types (str, int, float, bool) are properly logged and reproducible
+* Complex objects: Serialized as strings, not reproducible
+
+### `number`, `int` and `multi_number` & `multi_int`
+
+Hypster provides two types of numeric parameters with automatic validation:
+
+```python
+# Integer parameters
+max_tokens = hp.int(256, min=0, max=2048)  # Only accepts integers
+
+# Float parameters
+temperature = hp.number(0.7, min=0, max=1)  # Accepts both floats and integers
+```
+
+#### Valid instantiations
+
+```python
+config1 = my_config(values={"max_tokens": 1024})  # Within bounds
+config2 = my_config(values={"temperature": 0.5})  # Within bounds
+```
+
+#### invalid instantiations - will raise errors
+
+```python
+config3 = my_config(values={"max_tokens": 3000})  # Exceeds max
+config4 = my_config(values={"temperature": -0.1})  # Below min
+```
+
+### Text and Boolean Parameters
+
+Simple parameter types for strings and booleans:
+
+```python
+# Text parameter - accepts any string
+cache_dir = hp.text("./cache")
+log_file = hp.text("app.log")
+
+# Boolean parameter - True/False only
+use_cache = hp.bool(True)
+verbose = hp.bool(False)
+```
+
+#### Example Usage
+
+```python
+config = my_config(values={
+    "cache_dir": "/tmp/cache",     # Valid text value
+    "use_cache": True,             # Valid boolean
+    "verbose": False               # Valid boolean
+})
+```
+
+### Nested Configurations
+
+In more complex scenarios, you might want to nest configurations from different modules or files. Hypster supports this through the `hp.propagate` method, which allows you to include configurations from other files.
+
+#### Example: RAG Configuration
 
 ```python
 from hypster import config, HP
 
 @config
 def rag_config(hp: HP):
-    llm = hp.propagate("path_to_llm_config.py")
-    retriever = hp.propagate("path_to_retriever_config.py")
+    llm = hp.propagate("path_to_llm_config.py")  # Load LLM config from another file
+    retriever = hp.propagate("path_to_retriever_config.py")  # Load retriever config
     
     pipeline = [retriever["embedder"], llm["model"]]
-    #you can make this a bit better :)
 ```
 
-so we can instantiate it via:
+Instantiate nested parameters using either:
+
+1. **Dot Notation**
 
 ```python
-rag_config(values={"retriever.embedding" : "jina", 
-                   "llm" : {"model_name" : "haiku"}
-                   })
+config = rag_config(values={
+    "retriever.embedding": "jina",
+    "llm.model_name": "haiku"
+})
 ```
 
+2. **Nested Dictionary**
+
+```python
+config = rag_config(values={
+    "retriever": {"embedding": "jina"},
+    "llm": {"model_name": "haiku"}
+})
+```
