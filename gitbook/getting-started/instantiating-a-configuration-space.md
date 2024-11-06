@@ -25,7 +25,7 @@ def llm_config(hp: HP):
     model = Model(model_name, cache)
 ```
 
-## Basic Parameter Instantiation
+## Basic Instantiation
 
 Parameter values can be set using a `values` dictionary:
 
@@ -40,11 +40,9 @@ Key considerations:&#x20;
 * **Dot notation** (e.g. `config_dct.temperature`) is used for automatic naming of nested parameter. More on that in the [Automatic Naming](../in-depth/automatic-naming.md) section.
 * **Default values** are used when specific values aren’t provided
 
-## Parameter Types and Usage
+## `select` and `multi_select` parameters
 
-### `select` and `multi_select` parameters
-
-The `hp.select` and `hp.multi_select` methods allow defining categorical parameters using either lists or dictionaries:
+The `select` and `multi_select` methods allow defining categorical parameters using either lists or dictionaries:
 
 ```python
 # List form - values and keys are identical
@@ -57,11 +55,11 @@ callbacks = hp.multi_select({"cost" : cost_callaback,
 
 Use dictionary form when working with:
 
-1. Long values (e.g. `claude-3-5-sonnet-20241022`)
-2. Specific numeric values (e.g. `1.524322`)
-3. Complex objects (e.g.`Model(n_estimators=100, ...)`)
+1. Long values (e.g. `{"claude" : "claude-3-5-sonnet-20241022"}`)
+2. Specific numeric values (e.g. `{"small" : 1.524322}`)
+3. Complex objects (e.g.`{"rf" : RandomForest(n_estimators=100, ...)}`)
 
-#### `options_only` parameter
+### `options_only` parameter
 
 The `options_only` parameter controls value validation:
 
@@ -76,21 +74,21 @@ model_type = hp.select(["haiku", "sonnet"], options_only=True)
 * When `options_only=True`: Only pre-defined values are accepted
 * When `options_only=False`: any value is accepted
 
-#### Parameter Instantiation Examples
+### Parameter Instantiation Examples
 
-**Using Predefined Values**
+#### **Using Predefined Values**
 
 ```python
 my_config(values={"model_type": "haiku"})
 ```
 
-**Using Custom Values**
+#### **Using Custom Values**
 
 ```python
 my_config(values={"model_type": "claude-3-opus-20240229"})
 ```
 
-#### Reproducibility and Value History
+### Reproducibility and Value History
 
 Hypster maintains a historical record of parameter values to ensure configuration reproducibility across different runs. This history can be accessed using `my_config.get_last_snapshot()`, allowing you to view and reuse previous configurations.
 
@@ -116,18 +114,18 @@ temperature = hp.number(0.7, min=0, max=1)  # Accepts both floats and integers
 #### Valid instantiations
 
 ```python
-config1 = my_config(values={"max_tokens": 1024})  # Within bounds
-config2 = my_config(values={"temperature": 0.5})  # Within bounds
+config = my_config(values={"max_tokens": 1024})  # Within bounds
+config = my_config(values={"temperature": 0.5})  # Within bounds
 ```
 
-#### invalid instantiations - will raise errors
+#### Invalid instantiations - will raise errors
 
 ```python
-config3 = my_config(values={"max_tokens": 3000})  # Exceeds max
-config4 = my_config(values={"temperature": -0.1})  # Below min
+config = my_config(values={"max_tokens": 3000})  # Exceeds max
+config = my_config(values={"temperature": -0.1})  # Below min
 ```
 
-### Text and Boolean Parameters
+## Text and Boolean Parameters
 
 Simple parameter types for strings and booleans:
 
@@ -141,7 +139,7 @@ use_cache = hp.bool(True)
 verbose = hp.bool(False)
 ```
 
-#### Example Usage
+### Example Usage
 
 ```python
 config = my_config(values={
@@ -151,11 +149,11 @@ config = my_config(values={
 })
 ```
 
-### Nested Configurations
+## Nested Configurations
 
 In more complex scenarios, you might want to nest configurations from different modules or files. Hypster supports this through the `hp.propagate` method, which allows you to include configurations from other files.
 
-#### Example: RAG Configuration
+### Example: RAG Configuration
 
 ```python
 from hypster import config, HP
