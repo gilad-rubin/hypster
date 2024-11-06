@@ -1,4 +1,4 @@
-# Instantiating a Config Function
+# 🔮 Instantiating a Config Function
 
 ## Configuration Function
 

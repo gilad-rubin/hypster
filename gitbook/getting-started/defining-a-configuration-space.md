@@ -1,4 +1,4 @@
-# Anatomy of A Config Function
+# 🚀 Defining of A Config Function
 
 A hypster `config` function is the heart of this framework. It requires of 3 main components:
 

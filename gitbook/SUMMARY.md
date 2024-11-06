@@ -1,29 +1,29 @@
 # Table of contents
 
-* [Welcome](README.md)
+* [👋 Welcome](README.md)
 
 ## Getting Started
 
-* [Installation](getting-started/installation.md)
-* [Defining of A Config Function](getting-started/defining-a-configuration-space.md)
-* [Instantiating a Config Function](getting-started/instantiating-a-configuration-space.md)
-* [Selecting Output Variables](getting-started/selecting-output-variables.md)
-* [Interactive Instantiation (UI)](getting-started/interactive-instantiation-ui.md)
-* [Usage Examples](getting-started/usage-examples/README.md)
+* [🖥️ Installation](getting-started/installation.md)
+* [🚀 Defining of A Config Function](getting-started/defining-a-configuration-space.md)
+* [🔮 Instantiating a Config Function](getting-started/instantiating-a-configuration-space.md)
+* [🎰 Selecting Output Variables](getting-started/selecting-output-variables.md)
+* [🎮 Interactive Instantiation (UI)](getting-started/interactive-instantiation-ui.md)
+* [🪄 Usage Examples](getting-started/usage-examples/README.md)
   * [Machine Learning Classifiers](getting-started/usage-examples/basic-example.md)
   * [LLM Generation](getting-started/usage-examples/llms-and-generative-ai.md)
 
 ## In Depth
 
-* [Automatic Naming](in-depth/automatic-naming.md)
-* [HP Call Types](in-depth/hp-call-types/README.md)
+* [🤖 Automatic Naming](in-depth/automatic-naming.md)
+* [🍱 HP Call Types](in-depth/hp-call-types/README.md)
   * [select & multi\_select](in-depth/hp-call-types/select-and-multi\_select.md)
   * [number\_input & multi\_number](in-depth/hp-call-types/number\_input-and-multi\_number.md)
   * [int & multi\_int](in-depth/hp-call-types/int-and-multi\_int.md)
   * [bool & multi\_bool](in-depth/hp-call-types/bool-and-multi\_bool.md)
   * [text & multi\_text](in-depth/hp-call-types/text-and-multi\_text.md)
   * [propagate](in-depth/hp-call-types/propagate.md)
-* [Basic Best Practices](in-depth/basic-best-practices.md)
+* [🧠 Best Practices](in-depth/basic-best-practices.md)
 
 ## Advanced
 
