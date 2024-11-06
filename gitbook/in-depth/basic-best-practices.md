@@ -1,4 +1,4 @@
-# Best Practices
+# 🧠 Best Practices
 
 ## Shift Left Philosophy
 
@@ -43,14 +43,16 @@ model.fit(X_train, y_train)  # All complexity handled in config
 ```
 
 ### Performance Guidelines
-- **Keep configuration execution under 1ms**
-- **Never make API calls or database requests during configuration**
-- **Avoid any operations that incur costs**
-- **Defer resource initialization to execution phase**
+
+* **Keep configuration execution under 1ms**
+* **Never make API calls or database requests during configuration**
+* **Avoid any operations that incur costs**
+* **Defer resource initialization to execution phase**
 
 ## Pythonic Configuration
 
 ### Use Native Python Features
+
 ```python
 @config
 def model_config(hp: HP):
@@ -83,6 +85,7 @@ def model_config(hp: HP):
 ## Type Safety
 
 ### Built-in Type Checking
+
 ```python
 @config
 def typed_config(hp: HP):
@@ -93,6 +96,7 @@ def typed_config(hp: HP):
 ```
 
 ### Value Validation
+
 ```python
 @config
 def validated_config(hp: HP):

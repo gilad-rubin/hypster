@@ -17,12 +17,11 @@
 
 * [🤖 Automatic Naming](in-depth/automatic-naming.md)
 * [🍱 HP Call Types](in-depth/hp-call-types/README.md)
-  * [select & multi\_select](in-depth/hp-call-types/select-and-multi\_select.md)
-  * [number\_input & multi\_number](in-depth/hp-call-types/number\_input-and-multi\_number.md)
-  * [int & multi\_int](in-depth/hp-call-types/int-and-multi\_int.md)
-  * [bool & multi\_bool](in-depth/hp-call-types/bool-and-multi\_bool.md)
-  * [text & multi\_text](in-depth/hp-call-types/text-and-multi\_text.md)
-  * [propagate](in-depth/hp-call-types/propagate.md)
+  * [Selectable Types: select & multi\_select](in-depth/hp-call-types/select-and-multi\_select.md)
+  * [Numeric Types: int & number](in-depth/hp-call-types/int-and-multi\_int.md)
+  * [Boolean Types: bool & multi\_bool](in-depth/hp-call-types/bool-and-multi\_bool.md)
+  * [Textual Types: text & multi\_text](in-depth/hp-call-types/text-and-multi\_text.md)
+  * [Nested Configs: propagate](in-depth/hp-call-types/propagate.md)
 * [🧠 Best Practices](in-depth/basic-best-practices.md)
 
 ## Advanced

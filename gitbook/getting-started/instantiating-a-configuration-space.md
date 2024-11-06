@@ -28,14 +28,18 @@ def llm_config(hp: HP):
 ## Parameter Resolution Rules
 
 ### Default Values
+
 Parameters use their default values when not specified:
+
 ```python
 config = llm_config()
 # returns model_name = "haiku", max_tokens = 256, cache = Cache(folder="./cache"), ...
 ```
 
 ### Conditional Logic
+
 Values must respect the configuration's conditional logic:
+
 ```python
 # Valid: haiku model allows up to 2048 tokens
 config = llm_config(values={
@@ -51,7 +55,9 @@ config = llm_config(values={
 ```
 
 ### Value Validation
+
 Numeric parameters undergo bounds validation, if specified:
+
 ```python
 # These will raise validation errors:
 config = llm_config(values={
@@ -65,9 +71,10 @@ config = llm_config(values={
 Each parameter type has specific validation and behavior rules. See each section for more details:
 
 ### Core Types
-- [**select & multi_select**](../in-depth/hp-call-types/select-and-multi_select.md) - For categorical choices
-- [**number_input & multi_number**](../in-depth/hp-call-types/number_input-and-multi_number.md) - For floating-point numbers
-- [**int & multi_int**](../in-depth/hp-call-types/int-and-multi_int.md) - For integer values
-- [**bool & multi_bool**](../in-depth/hp-call-types/bool-and-multi_bool.md) - For boolean values
-- [**text & multi_text**](../in-depth/hp-call-types/text-and-multi_text.md) - For string values
-- [**propagate**](../in-depth/hp-call-types/propagate.md) - For nested configurations
+
+* [**select & multi\_select**](../in-depth/hp-call-types/select-and-multi\_select.md) - For categorical choices
+* [**number\_input & multi\_number**](broken-reference) - For floating-point numbers
+* [**int & multi\_int**](../in-depth/hp-call-types/int-and-multi\_int.md) - For integer values
+* [**bool & multi\_bool**](../in-depth/hp-call-types/bool-and-multi\_bool.md) - For boolean values
+* [**text & multi\_text**](../in-depth/hp-call-types/text-and-multi\_text.md) - For string values
+* [**propagate**](../in-depth/hp-call-types/propagate.md) - For nested configurations
