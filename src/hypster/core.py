@@ -167,7 +167,7 @@ class Hypster:
             path = f"{self.name}.py"
         save(self, path)
 
-    def get_latest_snapshot(self) -> Dict[str, Any]:
+    def get_last_snapshot(self) -> Dict[str, Any]:
         return self.run_history.get_latest_run_records(flattened=True)
 
     def get_snapshots(self) -> List[Dict[str, Any]]:
