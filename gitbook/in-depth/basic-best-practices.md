@@ -1,6 +1,6 @@
 # 🧠 Best Practices
 
-## Shift Left Philosophy
+## "Shift Left" - Move Complexity to your Configs
 
 Hypster encourages moving complexity into the configuration phase ("shifting left") rather than the execution phase:
 
@@ -42,12 +42,12 @@ model = config["model"]
 model.fit(X_train, y_train)  # All complexity handled in config
 ```
 
-### Performance Guidelines
+## Performance Guidelines
 
-* **Keep configuration execution under 1ms**
-* **Never make API calls or database requests during configuration**
-* **Avoid any operations that incur costs**
-* **Defer resource initialization to execution phase**
+* Keep configuration execution under 1ms
+* Never make API calls or database requests during configuration
+* Avoid any operations that incur costs
+* Defer resource initialization to execution phase
 
 ## Pythonic Configuration
 
@@ -82,9 +82,9 @@ def model_config(hp: HP):
     dropout = hp.number(0.5, name="dropout") if model_type == "transformer" else hp.number(0.3, name="dropout")
 ```
 
-## Type Safety
+## Utilize Hypster's built-in Type Safety
 
-### Built-in Type Checking
+### Use Built-in Type Checking
 
 ```python
 @config
