@@ -1,57 +1,91 @@
-# 🎮 Interactive Instantiation (UI)
+# 🎮 Interactive Configuration (UI)
 
-\#TODO: rewrite this whole page based on ipywidgets.ipynb!
+As configuration spaces become more complex, manual instantiation can become challenging. Hypster provides an interactive UI for Jupyter notebooks that makes configuration management intuitive and error-free.
 
-## Manual Instantiation
+## Manual vs Interactive Configuration
 
-When working with configuration functions, you can directly specify parameter values using a dictionary:
-
-```
-pythonresults = modular_rag(
+### Manual Configuration
+```python
+# Manual configuration requires knowing all valid parameter combinations
+results = modular_rag(
     values={
-        "indexing.enrich_doc_w_llm": True,
-        "indexing.llm.model": "gpt-4o-mini",
-        "document_store_type": "qdrant",
-        "retrieval.bm25_weight": 0.8,
         "embedder_type": "fastembed",
-        "reranker.model": "tiny-bert-v2",
-        "response.llm.model": "haiku",
-        "indexing.splitter.split_length": 6,
-        "reranker.top_k": 3,
-    },
+        "embedder.model": "mini-lm",
+        "embedder.parallel": 4
+    }
 )
 ```
 
-However, as configuration spaces become more complex, manual instantiation can become challenging. Consider this example:\
-\[Add your toy example here]This becomes particularly difficult when:
-
-* Dealing with nested configurations
-* Managing multiple conditional parameters
-* Ensuring parameter value validity
-
-### Interactive Instantiation
-
-To address these challenges, hypster provides a built-in Jupyter Notebook-based UI that allows you to:
-
-* Interactively select valid configurations
-* Visualize parameter dependencies
-* Work directly within your IDE using ipywidgets
-
-### In your notebook
-
-Here's an example of an interactive UI for a [modular-RAG](https://github.com/gilad-rubin/modular-rag) configuration.
-
+### Interactive Configuration
 ```python
 from hypster.ui import interactive_config
-results = interactive_config(my_config)
+
+# Create an interactive UI
+results = interactive_config(modular_rag)
 ```
 
-<figure><img src="../.gitbook/assets/image (9).png" alt=""><figcaption></figcaption></figure>
+## VS Code Setup
+For VS Code users with dark theme:
+```python
+from hypster.ui import apply_vscode_theme
+apply_vscode_theme()  # Enables dark mode compatibility
+```
 
-Once you start getting used to creating configuration spaces, they can get somewhat complex. This makes it hard to track manually and instantiate them in a valid way.
+## Example: Conditional Configuration
 
-Let's look at a simple example:&#x20;
+Here's an example showing how the UI handles conditional parameters:
 
-In this toy example, if we want to instantiate `my_config` - we have to remember that `var2` can only be defined if `var == "a"`. This becomes much more difficult when we start using nested configurations and multiple conditions.
+```python
+@config
+def conditional_config(hp: HP):
+    model = hp.select(["cnn", "rnn", "transformer"], default="rnn")
 
-To address this challenge - hypster offers a built-in Jupyter Notebook based UI to interactively select valid configurations inside your IDE using `ipywidgets`.
+    if model == "cnn":
+        layers = hp.select([3, 5, 7], default=5)
+        kernel_size = hp.select([3, 5], default=3)
+    elif model == "rnn":
+        cell_type = hp.select(["lstm", "gru"], default="lstm")
+        num_layers = hp.int(5, min=1, max=100)
+    else:  # transformer
+        num_heads = hp.select([4, 8, 16], default=8)
+        num_layers = hp.int(2, min=1, max=10)
+
+# Create interactive UI
+results = interactive_config(conditional_config)
+```
+
+The UI automatically:
+- Shows/hides parameters based on conditions
+- Validates parameter values
+- Updates dependent parameters
+
+## Example: Nested Configurations
+
+The UI also handles nested configurations elegantly:
+
+```python
+@config
+def modular_rag(hp: HP):
+    embedder_type = hp.select(["fastembed", "jina"], default="fastembed")
+
+    match embedder_type:
+        case "fastembed":
+            embedder = hp.propagate("configs/fast_embed.py")
+        case "jina":
+            embedder = hp.propagate("configs/jina_embed.py")
+
+# Create interactive UI
+results = interactive_config(modular_rag)
+```
+
+## Working with Results
+
+The `results` object from `interactive_config` is dynamic and always reflects the current UI state:
+
+## Key Features
+
+- **Real-time Updates**: UI components update automatically based on conditions
+- **Validation**: Prevents invalid parameter combinations
+- **Nested Support**: Handles complex nested configurations
+- **Type-specific Inputs**: Provides appropriate input widgets for each parameter type
+- **VS Code Integration**: Seamless integration with VS Code's Jupyter extension
