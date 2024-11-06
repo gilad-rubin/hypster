@@ -5,13 +5,16 @@
 ## Getting Started
 
 * [Installation](getting-started/installation.md)
+* [Anatomy of A Config Function](getting-started/defining-a-configuration-space.md)
+* [Parameter Instantiation and Variable Selection](getting-started/instantiating-a-configuration-space.md)
+* [Configuration Instantiation Methods](getting-started/configuration-instantiation-methods/README.md)
+  * [Manual Instantiation](getting-started/configuration-instantiation-methods/manual-instantiation.md)
+  * [Interactive Instantiation (UI)](getting-started/configuration-instantiation-methods/interactive-instantiation-ui.md)
 * [Usage Example - Machine Learning](getting-started/basic-example.md)
 * [Usage Example - LLMs](getting-started/llms-and-generative-ai.md)
 
 ## In Depth
 
-* [Defining A Configuration Space](in-depth/defining-a-configuration-space.md)
-* [Instantiating a Configuration Space](in-depth/instantiating-a-configuration-space.md)
 * [Automatic Naming](in-depth/automatic-naming.md)
 * [HP Call Types](in-depth/hp-call-types/README.md)
   * [select & multi\_select](in-depth/hp-call-types/select-and-multi\_select.md)
