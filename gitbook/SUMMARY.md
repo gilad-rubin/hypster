@@ -5,10 +5,8 @@
 ## Getting Started
 
 * [Installation](getting-started/installation.md)
-* [Basic Example](getting-started/basic-example.md)
-* [Tutorials](getting-started/tutorials/README.md)
-  * [LLMs & Generative AI](getting-started/tutorials/llms-and-generative-ai.md)
-  * [Machine Learning](getting-started/tutorials/machine-learning.md)
+* [Usage Example - Machine Learning](getting-started/basic-example.md)
+* [Usage Example - LLMs](getting-started/llms-and-generative-ai.md)
 
 ## In Depth
 
