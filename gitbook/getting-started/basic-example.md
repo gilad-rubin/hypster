@@ -3,13 +3,16 @@
 Let's walk through a simple example to understand how Hypster works. We'll create a basic ML classifier configuration.
 
 ```python
-from hypster import config, HP
-from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
+from hypster import HP, config
+
 
 @config
 def classifier_config(hp: HP):
+    from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
+
     # Define the model type choice
-    model_type = hp.select(["random_forest", "hist_boost"], default="hist_boost")
+    model_type = hp.select(["random_forest", "hist_boost"],
+                           default="hist_boost")
 
     # Create the classifier based on selection
     if model_type == "hist_boost":
@@ -20,13 +23,13 @@ def classifier_config(hp: HP):
             learning_rate=learning_rate,
             max_depth=max_depth,
         )
-    else: # model_type == "random_forest"
+    else:  # model_type == "random_forest"
         n_estimators = hp.int_input(100, min=10, max=500)
         max_depth = hp.int_input(5, min=3, max=10)
         bootstrap = hp.bool_input(default=True)
 
         classifier = RandomForestClassifier(
-            n_estimators=n_estimators, 
+            n_estimators=n_estimators,
             max_depth=max_depth,
             bootstrap=bootstrap
         )
@@ -84,9 +87,9 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
 # Use the configured classifier
 for model_type in ["random_forest", "hist_boost"]:
-    results = classifier_config(values={"model" : model_type)
+    results = classifier_config(values={"model_type": model_type})
     classifier = results["classifier"]
-    
+
     # Train and evaluate
     classifier.fit(X_train, y_train)
     score = classifier.score(X_test, y_test)
