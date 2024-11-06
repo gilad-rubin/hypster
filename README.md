@@ -1,91 +1,64 @@
----
-icon: hand-wave
----
+<p align="center">
+  <img src="assets/hypster_with_text.png" alt="Hypster Logo" width="600"/>
+</p>
 
-# Welcome
+</p>
+<p align="center">
+  <span style="font-size: 18px;">
+    <a href="https://gilad-rubin.github.io/hypster/">[Documentation]</a> |
+    <a href="#installation">[Installation]</a> |
+    <a href="#quick-start">[Quick Start]</a>
+  </span>
+</p>
 
-<div data-full-width="false">
+**`Hypster`** is a lightweight configuration system for AI & Machine Learning projects.
+It offers minimal, intuitive pythonic syntax, supporting hierarchical and swappable configurations.
 
-<figure><img src=".gitbook/assets/hypster_with_text.png" alt=""><figcaption></figcaption></figure>
+## Installation
 
-</div>
-
-### **Hypster is a lightweight framework for defining and optimizing ML & AI Workflows.**
-
-### Key Features
-
-* :snake: **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
-* :nesting\_dolls: **Hierarchical Configurations**: Support for nested and swappable configurations
-* :triangular\_ruler: **Type Safety**: Built-in type hints and validation using [`Pydantic`](https://github.com/pydantic/pydantic)
-* :package: **Portability**: Easy serialization and loading of configurations
-* :test\_tube: **Experiment Ready**: Built-in support for hyperparameter optimization
-* :video\_game: **Interactive UI**: Jupyter widgets integration for interactive parameter selection
-
-> Show your support by giving us a [star](https://github.com/gilad-rubin/hypster)! ⭐&#x20;
-
-### How Does it work?
-
-{% stepper %}
-{% step %}
-#### Install Hypster
+You can install Hypster using pip:
 
 ```bash
 pip install hypster
 ```
-{% endstep %}
 
-{% step %}
-#### Define a configuration space
+## Quick Start
+
+Here's a simple example of how to use Hypster:
 
 ```python
-from hypster import config, HP
-
+from hypster import HP, config
 
 @config
 def my_config(hp: HP):
-    model = hp.select(["gpt-4o", "claude-3-5-sonnet"], default="gpt-4o")
-    temperature = hp.number(0.5)
-    llm = LLM(model=model, temperature=temperature)
-```
-{% endstep %}
+    chunking_strategy = hp.select(['paragraph', 'semantic', 'fixed'], default='paragraph')
 
-{% step %}
-#### Instantiate your configuration
+    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307',
+                           'sonnet': 'claude-3-5-sonnet-20240620',
+                           'gpt-4o-mini': 'gpt-4o-mini'}, default='gpt-4o-mini')
+
+    llm_config = {'temperature': hp.number(0),
+                  'max_tokens': hp.number(64)}
+
+    system_prompt = hp.text('You are a helpful assistant. Answer with one word only')
+```
+
+Now we can instantiate the configs with our selections and overrides:
 
 ```python
-results = my_config(values={"model" : "claude-3-5-sonnet"})
+results = my_config(final_vars=["chunking_strategy", "llm_config", "llm_model"],
+                    values={"llm_model" : "haiku", "llm_config.temperature" : 0.5})
 ```
-{% endstep %}
 
-{% step %}
-#### Define an execution function
+## Inspiration
 
-```python
-def generate(llm: LLM, prompt: str):
-    return llm.invoke(prompt)
-```
-{% endstep %}
+Hypster draws inspiration from Meta's [hydra](https://github.com/facebookresearch/hydra) and [hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) framework.
+The API design is influenced by [Optuna's](https://github.com/optuna/optuna) "define-by-run" API.
 
-{% step %}
-#### Execute!
+## Contributing
 
-```python
-generate(results["llm"], prompt="What is Hypster?")
-```
-{% endstep %}
-{% endstepper %}
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Discover Hypster
+## License
 
-<table data-view="cards"><thead><tr><th></th><th></th><th></th><th data-hidden data-card-cover data-type="files"></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Getting Started</strong></td><td>How to create &#x26; instantiate Hypster configs</td><td></td><td><a href=".gitbook/assets/Group 4 (5).png">Group 4 (5).png</a></td><td><a href="getting-started/installation.md">installation.md</a></td></tr><tr><td><strong>Best Practices</strong></td><td>How to make the most out of Hypster in your AI/ML project</td><td></td><td><a href=".gitbook/assets/Group 26.png">Group 26.png</a></td><td><a href="in-depth/basic-best-practices.md">basic-best-practices.md</a></td></tr><tr><td><strong>Tutorials</strong></td><td>Learn step-by-step tutorials for ML &#x26; Generative AI use-cases </td><td></td><td><a href=".gitbook/assets/Group 53.png">Group 53.png</a></td><td><a href="getting-started/tutorials/">tutorials</a></td></tr></tbody></table>
-
-## Why Use Hypster?
-
-In modern AI/ML development, we often need to handle **multiple configurations across different scenarios**. This is essential because:
-
-1. We don't know in advance **which** **hyperparameters** will best optimize our performance metrics and satisfy our constraints.
-2. We need to support **multiple "modes"** for different scenarios. For example:
-   1. Local vs. Remote Environments, Development vs. Production Settings
-   2. Different App Configurations for specific use-cases and populations
-
-Hypster takes care of these challenges by providing a simple way to define configuration spaces and instantiate them into concrete workflows, turning your codebase into a "superposition" of workflows.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
