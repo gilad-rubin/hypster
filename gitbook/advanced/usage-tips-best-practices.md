@@ -1,2 +1,0 @@
-# Usage tips / Best Practices
-
