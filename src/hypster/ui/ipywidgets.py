@@ -420,7 +420,8 @@ class IPyWidgetsUI:
 
         # Find the top-level component ID and build nested structure
         path_parts = component_id.split(".")
-        if len(path_parts) > 1:
+        comp_type = self.ui_handler.components[component_id].parameter_type
+        if len(path_parts) > 1 and comp_type == "propagate":
             # Build nested structure from path
             nested_value = new_value
             for key in reversed(path_parts[1:]):
