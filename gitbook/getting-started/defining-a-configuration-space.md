@@ -66,9 +66,35 @@ Now that we've created a configuration space/function - we can instantiate it us
 ```python
 my_config(final_vars=["instance"], values={"var" : "b"})
 ```
+
+Congratulations! :tada: You've created and instantiated your first Hypster config.
 {% endstep %}
 {% endstepper %}
 
-Congratulations! :tada: You've created and instantiated your first Hypster config.
+## Saving & Loading Config Functions
 
-To dive deeper into instantiation, please visit the [next section](instantiating-a-configuration-space.md).
+Save configurations to reuse them across projects:
+
+```python
+# Save directly from config function
+my_config.save("configs/my_config.py") # Creates directories if needed
+
+# Save using hypster.save
+from hypster import save
+save(my_config, "configs/nested/my_config.py")
+```
+
+#### Loading Configurations
+
+Load saved configurations in two ways:
+
+```python
+# Method 1: Direct loading
+from hypster import load
+my_config = load("configs/my_config.py")
+
+# Method 2: Load for propagation
+@config
+def parent_config(hp: HP):
+    nested_config = hp.propagate("configs/my_config.py")
+```

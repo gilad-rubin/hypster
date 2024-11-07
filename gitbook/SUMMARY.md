@@ -15,7 +15,7 @@
 
 ## In Depth
 
-* [🤖 Automatic Naming](in-depth/automatic-naming.md)
+* [🤖 Parameter Naming](in-depth/automatic-naming.md)
 * [🍱 HP Call Types](in-depth/hp-call-types/README.md)
   * [Selectable Types](in-depth/hp-call-types/select-and-multi\_select.md)
   * [Numeric Types](in-depth/hp-call-types/int-and-multi\_int.md)
