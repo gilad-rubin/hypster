@@ -91,13 +91,14 @@ class BaseOptionsHPCall(BaseHPCall):
 
     def validate_and_transform_value(self, value: Any) -> Tuple[Any, bool]:
         """Validate value and return transformed value with reproducibility flag"""
-        if value in self.processed_options:
-            return self.processed_options[value], True
+        is_reproducible = isinstance(value, ValidKeyType)
+
+        if value in self.processed_options.keys() or value in self.processed_options.values():
+            return self.processed_options[value], is_reproducible
 
         if self.options_only:
             raise HPCallError(self.name, f"Value '{value}' must be one of the options")
 
-        is_reproducible = isinstance(value, ValidKeyType)
         return value, is_reproducible
 
     def get_fallback_value(self, explore_mode: bool) -> Any:
