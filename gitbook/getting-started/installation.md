@@ -53,7 +53,6 @@ print(hypster.__version__)
 ## System Requirements
 
 * Python 3.10 or higher
-* `pip` package manager
 * Optional: Jupyter Notebook/Lab for interactive features
 
 ## Troubleshooting

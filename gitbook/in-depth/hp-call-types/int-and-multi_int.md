@@ -1,14 +1,66 @@
-# int, number, multi_int & multi_number
+# Numeric Types
 
 Hypster provides flexible numeric parameter configuration through four methods: `number`, `multi_number`, `int`, and `multi_int`. These methods support automatic validation with optional bounds checking.
+
+I'll create a comprehensive documentation for the numeric parameters:
+
+## Numeric Parameters
+
+Hypster provides flexible numeric parameter configuration through four methods: `number`, `multi_number`, `int`, and `multi_int`. These methods support automatic validation with optional bounds checking.
+
+### Function Signatures
+
+#### Single Value Methods
+
+```python
+NumericType = Union[StrictInt, StrictFloat] #pydantic types
+
+def number(
+    default: NumericType,
+    *,
+    name: Optional[str] = None,
+    min: Optional[NumericType] = None,
+    max: Optional[NumericType] = None
+) -> NumericType
+
+def int(
+    default: int,
+    *,
+    name: Optional[str] = None,
+    min: Optional[int] = None,
+    max: Optional[int] = None
+) -> int
+```
+
+#### Multiple Value Methods
+
+```python
+def multi_number(
+    default: List[NumericType] = [],
+    *,
+    name: Optional[str] = None,
+    min: Optional[NumericType] = None,
+    max: Optional[NumericType] = None
+) -> List[NumericType]
+
+def multi_int(
+    default: List[int] = [],
+    *,
+    name: Optional[str] = None,
+    min: Optional[int] = None,
+    max: Optional[int] = None
+) -> List[int]
+```
 
 ## Type Flexibility
 
 ### Number vs Integer
-- `number`/`multi_number`: Accepts both integers and floating-point values
-- `int`/`multi_int`: Accepts only integer values
+
+* `number`/`multi_number`: Accepts both integers and floating-point values
+* `int`/`multi_int`: Accepts only integer values
 
 The first argument in both methods is the default value:
+
 ```python
 # Number parameters accept both types
 temperature = hp.number(0.7, min=0, max=1) # min and max are optional

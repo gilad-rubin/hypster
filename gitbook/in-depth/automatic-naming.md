@@ -32,9 +32,9 @@ Hypster automatically infers names from three contexts:
 
     ```python
     config = {
-        "learning_rate": hp.number(0.001),    # "config.learning_rate"
+        "learning_rate": hp.number(0.001), # "config.learning_rate"
         "model_params": {
-            "layers": hp.int(3)               # "config.model_params.layers"
+            "layers": hp.int(3)            # "config.model_params.layers"
         }
     }
     ```

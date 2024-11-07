@@ -1,8 +1,6 @@
-# 🔮 Instantiating a Config Function
+# ⚡ Instantiating a Config Function
 
-## Configuration Function
-
-In this section, we'll use the following toy configuration function:
+In this section, we'll use the following configuration function:
 
 ```python
 from hypster import config, HP
@@ -25,7 +23,7 @@ def llm_config(hp: HP):
     model = Model(model_name, cache)
 ```
 
-## Parameter Resolution Rules
+## Instantiation Rules
 
 ### Default Values
 
@@ -33,7 +31,7 @@ Parameters use their default values when not specified:
 
 ```python
 config = llm_config()
-# returns model_name = "haiku", max_tokens = 256, cache = Cache(folder="./cache"), ...
+# equivalent to {"model_name" : "haiku", "max_tokens" = 256, "cache.folder" : "./cache"), ...
 ```
 
 ### Conditional Logic
@@ -54,7 +52,7 @@ config = llm_config(values={
 })
 ```
 
-### Value Validation
+### Numeric Bounds Validation
 
 Numeric parameters undergo bounds validation, if specified:
 
@@ -73,8 +71,7 @@ Each parameter type has specific validation and behavior rules. See each section
 ### Core Types
 
 * [**select & multi\_select**](../in-depth/hp-call-types/select-and-multi\_select.md) - For categorical choices
-* [**number\_input & multi\_number**](broken-reference) - For floating-point numbers
-* [**int & multi\_int**](../in-depth/hp-call-types/int-and-multi\_int.md) - For integer values
+* [**int, number & multi\_int, multi\_number**](../in-depth/hp-call-types/int-and-multi\_int.md) - For numeric values
 * [**bool & multi\_bool**](../in-depth/hp-call-types/bool-and-multi\_bool.md) - For boolean values
 * [**text & multi\_text**](../in-depth/hp-call-types/text-and-multi\_text.md) - For string values
 * [**propagate**](../in-depth/hp-call-types/propagate.md) - For nested configurations

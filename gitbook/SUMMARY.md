@@ -6,7 +6,7 @@
 
 * [🖥️ Installation](getting-started/installation.md)
 * [🚀 Defining of A Config Function](getting-started/defining-a-configuration-space.md)
-* [🔮 Instantiating a Config Function](getting-started/instantiating-a-configuration-space.md)
+* [⚡ Instantiating a Config Function](getting-started/instantiating-a-configuration-space.md)
 * [🍡 Selecting Output Variables](getting-started/selecting-output-variables.md)
 * [🎮 Interactive Instantiation (UI)](getting-started/interactive-instantiation-ui.md)
 * [🪄 Usage Examples](getting-started/usage-examples/README.md)
@@ -17,11 +17,11 @@
 
 * [🤖 Automatic Naming](in-depth/automatic-naming.md)
 * [🍱 HP Call Types](in-depth/hp-call-types/README.md)
-  * [Selectable Types: select & multi\_select](in-depth/hp-call-types/select-and-multi\_select.md)
-  * [Numeric Types: int & number](in-depth/hp-call-types/int-and-multi\_int.md)
-  * [Boolean Types: bool & multi\_bool](in-depth/hp-call-types/bool-and-multi\_bool.md)
-  * [Textual Types: text & multi\_text](in-depth/hp-call-types/text-and-multi\_text.md)
-  * [Nested Configs: propagate](in-depth/hp-call-types/propagate.md)
+  * [Selectable Types](in-depth/hp-call-types/select-and-multi\_select.md)
+  * [Numeric Types](in-depth/hp-call-types/int-and-multi\_int.md)
+  * [Boolean Types](in-depth/hp-call-types/bool-and-multi\_bool.md)
+  * [Textual Types](in-depth/hp-call-types/text-and-multi\_text.md)
+  * [Nested Configurations](in-depth/hp-call-types/propagate.md)
 * [🧠 Best Practices](in-depth/basic-best-practices.md)
 
 ## Advanced
@@ -37,10 +37,11 @@
 * [Experiment Tracking](reproducibility/experiment-tracking.md)
 * [Serialization](reproducibility/serialization.md)
 * [Cards](reproducibility/cards.md)
+* [Deploying to production](reproducibility/deploying-to-production.md)
 
 ## Integrations
 
-* [Hamilton](integrations/hamilton.md)
+* [Hamilton & HyperNodes](integrations/hamilton.md)
 * [Haystack](integrations/haystack.md)
 
 ## Philosophy

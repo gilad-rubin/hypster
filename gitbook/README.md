@@ -53,10 +53,10 @@ from hypster import config, HP
 
 
 @config
-def my_config(hp: HP):
-    model = hp.select(["gpt-4o", "claude-3-5-sonnet"], default="gpt-4o")
-    temperature = hp.number(0.5, min=0, max=1)
-    llm = LLM(model=model, temperature=temperature) 
+def llm_config(hp: HP):
+    model_name = hp.select(["gpt-4o-mini", "gpt-4o"])
+    temperature = hp.number(0.0, min=0.0, max=1.0)
+    max_tokens = hp.int(256, max=2048)
 ```
 {% endstep %}
 
@@ -64,7 +64,7 @@ def my_config(hp: HP):
 #### Instantiate your configuration
 
 ```python
-results = my_config(values={"model" : "claude-3-5-sonnet"})
+results = my_config(values={"model" : "gpt-4o"})
 ```
 {% endstep %}
 
@@ -72,8 +72,15 @@ results = my_config(values={"model" : "claude-3-5-sonnet"})
 #### Define an execution function
 
 ```python
-def generate(llm: LLM, prompt: str):
-    return llm.invoke(prompt)
+def generate(prompt: str, 
+             model_name: str, 
+             temperature: float, 
+             max_tokens: int) -> str:
+    model = llm.get_model(model_name)
+    response = model.prompt(prompt, 
+                            temperature=temperature, 
+                            max_tokens=max_tokens)
+    return response
 ```
 {% endstep %}
 
@@ -81,7 +88,7 @@ def generate(llm: LLM, prompt: str):
 #### Execute!
 
 ```python
-generate(results["llm"], prompt="What is Hypster?")
+generate(prompt="What is Hypster?", **results)
 ```
 {% endstep %}
 {% endstepper %}
@@ -99,4 +106,29 @@ In modern AI/ML development, we often need to handle **multiple configurations a
    1. Local vs. Remote Environments, Development vs. Production Settings
    2. Different App Configurations for specific use-cases and populations
 
-Hypster takes care of these challenges by providing a simple way to define configuration spaces and instantiate them into concrete workflows. This enables you to easily manage and optimize multiple configurations in your codebase.&#x20;
+Hypster takes care of these challenges by providing a simple way to define configuration spaces and instantiate them into concrete workflows. This enables you to easily manage and optimize multiple configurations in your codebase.
+
+## Additional Reading
+
+Explore these articles to deepen your understanding of Hypster and its applications:
+
+### Core Concepts
+
+* [Introducing Hypster: A Pythonic Framework for Managing Configurations](https://medium.com/@giladrubin/introducing-hypster-a-pythonic-framework-for-managing-configurations-to-build-highly-optimized-ai-5ee004dbd6a5)
+  * Overview of Hypster's core concepts
+  * Understanding configuration spaces
+  * Basic usage patterns and examples
+
+### Practical Applications - Modular RAG
+
+* [Implementing Modular RAG with Haystack and Hypster](https://towardsdatascience.com/implementing-modular-rag-with-haystack-and-hypster-d2f0ecc88b8f)
+  * Real-world example of building modular RAG systems
+  * Integration with Haystack
+  * Advanced configuration patterns
+
+### The Philosophy Behind Hypster
+
+* [5 Pillars for a Hyper-Optimized AI Workflow](https://medium.com/@giladrubin/5-pillars-for-a-hyper-optimized-ai-workflow-21fcaefe48ca)
+  * Design principles for AI workflows
+  * Optimization strategies
+  * System architecture considerations

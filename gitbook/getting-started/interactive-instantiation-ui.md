@@ -1,22 +1,30 @@
-# 🎮 Interactive Configuration (UI)
+# 🎮 Interactive Instantiation (UI)
 
-As configuration spaces become more complex, manual instantiation can become challenging. Hypster provides an interactive UI for Jupyter notebooks that makes configuration management intuitive and error-free.
+As configuration spaces become more complex, manual instantiation can become challenging.&#x20;
+
+To tackle this challenge, Hypster provides an interactive UI for Jupyter notebooks on JupyterLab, VSCode, Google Colab, and any platform that supports `ipywidgets`.
+
+Using the interactive UI makes configuration management more intuitive and less error-prone.
 
 ## Manual vs Interactive Configuration
 
 ### Manual Configuration
+
 ```python
 # Manual configuration requires knowing all valid parameter combinations
 results = modular_rag(
     values={
-        "embedder_type": "fastembed",
-        "embedder.model": "mini-lm",
-        "embedder.parallel": 4
+        "embedder_type": "jina",
+        "embedder.model": "v3",
+        "doc_embedder.batch_size": 16,
+        "doc_embedder.dimensions": 256,
+        "document_store_type" : "in_memory",
     }
 )
 ```
 
 ### Interactive Configuration
+
 ```python
 from hypster.ui import interactive_config
 
@@ -24,8 +32,12 @@ from hypster.ui import interactive_config
 results = interactive_config(modular_rag)
 ```
 
+<figure><img src="../.gitbook/assets/image (2).png" alt=""><figcaption><p>An example UI from <a href="https://github.com/gilad-rubin/modular-rag">Modular-RAG</a></p></figcaption></figure>
+
 ## VS Code Setup
+
 For VS Code users with dark theme:
+
 ```python
 from hypster.ui import apply_vscode_theme
 apply_vscode_theme()  # Enables dark mode compatibility
@@ -54,10 +66,13 @@ def conditional_config(hp: HP):
 results = interactive_config(conditional_config)
 ```
 
+<figure><img src="../.gitbook/assets/image (5).png" alt=""><figcaption></figcaption></figure>
+
 The UI automatically:
-- Shows/hides parameters based on conditions
-- Validates parameter values
-- Updates dependent parameters
+
+* Shows/hides parameters based on conditions
+* Validates parameter values
+* Updates dependent parameter values
 
 ## Example: Nested Configurations
 
@@ -78,14 +93,16 @@ def modular_rag(hp: HP):
 results = interactive_config(modular_rag)
 ```
 
+<figure><img src="../.gitbook/assets/image (8).png" alt=""><figcaption></figcaption></figure>
+
 ## Working with Results
 
 The `results` object from `interactive_config` is dynamic and always reflects the current UI state:
 
 ## Key Features
 
-- **Real-time Updates**: UI components update automatically based on conditions
-- **Validation**: Prevents invalid parameter combinations
-- **Nested Support**: Handles complex nested configurations
-- **Type-specific Inputs**: Provides appropriate input widgets for each parameter type
-- **VS Code Integration**: Seamless integration with VS Code's Jupyter extension
+* **Real-time Updates**: UI components update automatically based on conditions
+* **Validation**: Prevents invalid parameter combinations
+* **Nested Support**: Handles complex nested configurations
+* **Type-specific Inputs**: Provides appropriate input widgets for each parameter type
+* **VS Code Integration**: Seamless integration with VS Code's Jupyter extension

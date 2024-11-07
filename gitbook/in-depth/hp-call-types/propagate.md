@@ -1,8 +1,35 @@
-# Configuration Propagation
+# Nested Configurations
 
 Hypster enables hierarchical configuration management through the `hp.propagate()` method, allowing you to compose complex configurations from smaller, reusable components.
 
-## Basic Propagation
+> For an in depth tutorial, please check out the article on Medium: [**Implementing Modular-RAG using Haystack and Hypster**](https://towardsdatascience.com/implementing-modular-rag-with-haystack-and-hypster-d2f0ecc88b8f)
+
+## `propagate` Function Signature
+
+```python
+def propagate(
+    config_func: Union[str, Path, "Hypster"],
+    *,
+    name: Optional[str] = None,
+    final_vars: List[str] = [],
+    exclude_vars: List[str] = [],
+    values: Dict[str, Any] = {}
+) -> Dict[str, Any]
+```
+
+#### Parameters
+
+* `config_func`: Either a path to a saved configuration or a Hypster config object
+* `name`: Optional name for the nested configuration (used in dot notation)
+* `final_vars`: List of variables that cannot be modified by parent configs
+* `exclude_vars`: List of variables to exclude from the configuration
+* `values`: Dictionary of values to override in the nested configuration
+
+## Steps for propagation
+
+{% stepper %}
+{% step %}
+### Define a reusable config
 
 ```python
 from hypster import config, HP
@@ -14,10 +41,21 @@ def llm_config(hp: HP):
         "sonnet": "claude-3-sonnet-20240229"
     }, default="haiku")
     temperature = hp.number(0.7, min=0, max=1)
+```
+{% endstep %}
 
-# Save configuration for reuse
+{% step %}
+### Save it
+
+```python
 llm_config.save("configs/llm.py")
+```
+{% endstep %}
 
+{% step %}
+### Define a parent config and use `hp.propagate`
+
+```python
 @config
 def qa_config(hp: HP):
     # Load and propagate LLM configuration
@@ -33,17 +71,33 @@ def qa_config(hp: HP):
         max_context_length=max_context_length
     )
 ```
+{% endstep %}
+
+{% step %}
+### Instantiate using dot notation
+
+```python
+qa_config(values={
+    "llm.model": "sonnet",
+    "llm.temperature": 0.5,
+    "max_context_length": 1500
+})
+```
+{% endstep %}
+{% endstepper %}
 
 ## Configuration Sources
 
 `hp.propagate()` accepts two types of sources:
 
 ### Path to Configuration File
+
 ```python
 llm = hp.propagate("configs/llm.py")
 ```
 
 ### Direct Configuration Object
+
 ```python
 from hypster import load
 
@@ -76,9 +130,9 @@ qa_config(values={
 })
 ```
 
-## Multiple Propagations
+## Hierarchical Propagations
 
-Configurations can be nested to create modular, reusable components:
+Configurations can be nested multiple times to create modular, reusable components:
 
 ```python
 @config
@@ -102,66 +156,54 @@ def rag_config(hp: HP):
     indexing = hp.propagate("configs/indexing.py")
 
     # Add retrieval configuration
-    retrieval = hp.propagate(
-        "configs/retrieval.py",
-        values={"embedding_dim": indexing["embedding_dim"]}
-    )
+    retrieval = hp.propagate("configs/retrieval.py")
 ```
 
-## Advanced Configuration Options
+## Passing Values to Nested Configs
 
-### Passing Values to Nested Configs
-Use the `values` parameter to override nested configuration values:
+Use the `values` parameter to pass dependent values to nested configuration values:
 
 ```python
 retrieval = hp.propagate(
     "configs/retrieval.py",
     values={
-        "embedding_dim": 768,
+        "embedding_dim": indexing["embedding_dim"],
         "top_k": 5
     }
 )
 ```
+
 `final_vars` and `exclude_vars` are also supported.
 
 ## Best Practices
 
 1. **Modular Design**
-   - Create small, focused configurations for specific components
-   - Combine configurations only when there are clear dependencies
-   - Keep configurations reusable across different use cases
+   * Create small, focused configurations for specific components
+   * Combine configurations only when there are clear dependencies
+   * Keep configurations reusable across different use cases
+2.  **Clear Naming**
 
-2. **Clear Naming**
-   ```python
-   # Use descriptive names for propagated configs
-   llm = hp.propagate("configs/llm.py", name="llm")
-   indexer = hp.propagate("configs/indexer.py", name="indexer")
-   ```
+    ```python
+    # Use descriptive names for propagated configs
+    llm = hp.propagate("configs/llm.py", name="llm")
+    indexer = hp.propagate("configs/indexer.py", name="indexer")
+    ```
+3.  **Value Dependencies**
 
-3. **Value Dependencies**
-   ```python
-   # Explicitly pass dependent values
-   retriever = hp.propagate(
-       "configs/retriever.py",
-       values={"embedding_dim": embedder["embedding_dim"]}
-   )
-   ```
+    ```python
+    # Explicitly pass dependent values
+    retriever = hp.propagate(
+        "configs/retriever.py",
+        values={"embedding_dim": embedder["embedding_dim"]}
+    )
+    ```
+4.  **File Organization**
 
-4. **File Organization**
-   ```python
-   # Keep related configs in a dedicated directory
-   configs/
-   ├── llm.py
-   ├── indexing.py
-   ├── retrieval.py
-   └── rag.py
-   ```
-
-5. **Version Control**
-   - Save configurations to files for version control
-   - Document dependencies between configurations
-   - Use meaningful commit messages for configuration changes
-
-Citations:
-[1] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/666410/31192efe-80c7-41fa-9373-7f63c8ccb9d3/paste.txt
-[2] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/666410/5aba7b6f-d557-439b-94b7-e26f09f47f68/paste.txt
+    ```python
+    # Keep related configs in a dedicated directory
+    configs/
+    ├── llm.py
+    ├── indexing.py
+    ├── retrieval.py
+    └── rag.py
+    ```

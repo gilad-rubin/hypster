@@ -20,7 +20,7 @@ layout:
 
 When working with configuration functions, not all variables defined within them are needed for the final execution engine.&#x20;
 
-Consider these configuration & execution functions:
+Consider this configuration function:
 
 ```python
 from hypster import config, HP
@@ -43,7 +43,7 @@ def llm_config(hp: HP):
     model = Model(model_name, cache)
 ```
 
-Execution function:
+Along with this execution function:
 
 ```python
 def run(input: str, model: Model, config_dict: Dict[str, Any]) -> str:

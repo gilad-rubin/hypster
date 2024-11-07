@@ -1,15 +1,49 @@
-# Select & Multi_select Parameters
+# Selectable Types
 
 The `select` and `multi_select` methods enable categorical parameter configuration. These methods support both single and multiple value selection with flexible validation options.
 
+I'll help improve the documentation for the select and multi\_select parameters by adding the requested information. Here's the enhanced version:
+
+## Select & Multi\_select Parameters
+
+The `select` and `multi_select` methods enable categorical parameter configuration using either lists or dictionaries. These methods support both single and multiple value selection with flexible validation options.
+
+### Function Signatures
+
+#### select
+
+```python
+def select(
+    options: Union[Dict[ValidKeyType, Any], List[ValidKeyType]],
+    *,
+    name: Optional[str] = None,
+    default: Optional[ValidKeyType] = None,
+    options_only: bool = False
+) -> Any
+```
+
+#### multi\_select
+
+```python
+def multi_select(
+    options: Union[Dict[ValidKeyType, Any], List[ValidKeyType]],
+    *,
+    name: Optional[str] = None,
+    default: List[ValidKeyType] = None,
+    options_only: bool = False
+) -> List[Any]
+```
+
 ### Parameters
-- `options`: Either a list of valid values or a dictionary mapping keys to values
-- `default`: Default value(s) if none provided (single value for select, list for multi_select)
-- `options_only`: When True, only allows values from the predefined options
+
+* `options`: Either a list of valid values or a dictionary mapping keys to values
+* `default`: Default value(s) if none provided (single value for select, list for multi\_select)
+* `options_only`: When True, only allows values from the predefined options
 
 ## Pre-defined Parameter Forms
 
 ### List Form
+
 Use when the parameter keys and values are identical:
 
 ```python
@@ -21,6 +55,7 @@ features = hp.multi_select(["price", "size", "color"], default=["price", "size"]
 ```
 
 ### Dictionary Form
+
 Use when parameter keys need to map to different values:
 
 ```python
@@ -38,6 +73,7 @@ callbacks = hp.multi_select({
 ```
 
 ### Value Resolution
+
 When using dictionary form, the configuration system maps input keys to their corresponding values:
 
 ```python
@@ -59,17 +95,16 @@ config = my_config(values={"model": "sonnet"})
 
 Dictionary form is recommended when working with:
 
-- Long string values: `{"haiku": "claude-3-haiku-20240307"}`
-- Precise numeric values: `{"small": 1.524322}`
-- Object references: `{"rf": RandomForest(n_estimators=100)}`
-
-I'll add a section about defaults that emphasizes the validation requirements based on the code:
+* Long string values: `{"haiku": "claude-3-haiku-20240307"}`
+* Precise numeric values: `{"small": 1.524322}`
+* Object references: `{"rf": RandomForest(n_estimators=100)}`
 
 ## Default Values
 
 The `default` parameter must be a valid option from the predefined choices. For dictionary form, the default must be one of the keys (not values).
 
 ### List Form Defaults
+
 When using list form, the default must be one of the items in the list:
 
 ```python
@@ -83,6 +118,7 @@ features = hp.multi_select(["price", "size"], default=["color"])  # Error: "colo
 ```
 
 ### Dictionary Form Defaults
+
 When using dictionary form, the default must be one of the dictionary keys:
 
 ```python
@@ -109,7 +145,8 @@ callbacks = hp.multi_select({
 }, default=["timing"])  # Error: "timing" is not a key
 ```
 
-### Optional Default Values
+### Instantiating With Missing Default Values
+
 If no default is provided, a value must be specified during configuration:
 
 ```python
@@ -153,14 +190,24 @@ my_config(values={"model_type": "claude-3-opus-20240229"})
 I'll improve the Reproducibility and Value History section by adding clear examples:
 
 ## Reproducibility and Value History
+
 Hypster maintains a historical record of parameter values to ensure configuration reproducibility across different runs. This history can be accessed using `my_config.get_last_snapshot()`, allowing you to view and reuse previous configurations.
 
 ### Value Serialization
-When instantiating parameters with values outside the predefined options, Hypster handles serialization in two ways:
-- Simple types (str, int, float, bool) are properly logged and reproducible, regardless of if they were originally in the pre-defined options or not.
-- Complex objects: Serialized as strings and are not reproducible.
 
-#### Examples
+When instantiating parameters with values outside the predefined options, Hypster handles serialization in two ways:
+
+#### Simple types (str, int, float, bool)&#x20;
+
+are properly logged and reproducible, regardless of if they were originally in the pre-defined options or not.
+
+#### Complex objects
+
+{% hint style="warning" %}
+Complex object (classes, functions, anything outside of str, int, float, bool) will be serialized as strings using `str(value)` and will **not be reproducible for future runs**.
+{% endhint %}
+
+### Examples
 
 ```python
 # Define configuration with options
