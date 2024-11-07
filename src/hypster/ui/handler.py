@@ -1,9 +1,10 @@
 import logging
 from collections import OrderedDict
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
+from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 
 from pydantic import BaseModel
 
+from ..core import Hypster
 from ..hp_calls import NumericBounds, ValidKeyType
 from ..run_history import NestedHistoryRecord, ParameterRecord, ParameterSource
 
@@ -97,7 +98,7 @@ class UIHandler:
         "propagate": NestedComponent,
     }
 
-    def __init__(self, config_func: Callable, initial_values: Optional[Dict[str, Any]] = None):
+    def __init__(self, config_func: Hypster, initial_values: Optional[Dict[str, Any]] = None):
         self.config_func = config_func
         self.initial_values: Dict[str, Any] = initial_values or {}
         self.components: OrderedDict[str, ComponentBase] = OrderedDict()
@@ -221,6 +222,6 @@ class UIHandler:
         return self.latest_results
 
 
-def create_ui_handler(config_func: Callable, initial_values: Optional[Dict[str, Any]] = None) -> UIHandler:
+def create_ui_handler(config_func: Hypster, initial_values: Optional[Dict[str, Any]] = None) -> UIHandler:
     """Create a UI handler for the given config function."""
     return UIHandler(config_func, initial_values)

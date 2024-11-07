@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from collections import defaultdict
-from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 from pydantic import (
     BaseModel,
@@ -13,6 +13,9 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+
+if TYPE_CHECKING:
+    from .core import Hypster
 
 ValidKeyType = Union[str, int, float, bool]
 OptionsType = Union[Dict[ValidKeyType, Any], List[ValidKeyType]]
@@ -287,7 +290,7 @@ class PropagateCall(BaseModel):
 
     def execute(
         self,
-        config_func: Callable,
+        config_func: "Hypster",
         final_vars: List[str] = [],
         original_final_vars: List[str] = [],
         exclude_vars: List[str] = [],
