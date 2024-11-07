@@ -62,7 +62,7 @@ class Hypster:
         Execute the modified source code with the given HP instance.
 
         Args:
-            hp (HP): The HP instance for selections & overrides management.
+            hp (HP): The HP instance for values management.
             modified_source (str): The modified source code to execute.
 
         Returns:
