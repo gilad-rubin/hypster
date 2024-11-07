@@ -17,7 +17,7 @@ layout:
 
 <div data-full-width="false">
 
-<figure><img src=".gitbook/assets/hypster_with_text (1).png" alt=""><figcaption></figcaption></figure>
+<figure><picture><source srcset=".gitbook/assets/hypster_text_white_text.png" media="(prefers-color-scheme: dark)"><img src=".gitbook/assets/hypster_with_text (1).png" alt=""></picture><figcaption></figcaption></figure>
 
 </div>
 
