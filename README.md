@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="assets/hypster_with_text.png" alt="Hypster Logo" width="600"/>
+  <picture>
+    <source srcset="assets/hypster_white_text.png" media="(prefers-color-scheme: dark)">
+    <img src="assets/hypster_with_text.png" alt="Hypster Logo" width="600"/>
+  </picture>
 </p>
 
 </p>
