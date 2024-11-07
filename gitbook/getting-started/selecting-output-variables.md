@@ -56,7 +56,7 @@ This function only requires `model` and `config_dict`, but our configuration fun
 * Lead to memory inefficiency
 * Create potential naming conflicts
 
-### Variable Selection Methods
+## Variable Selection Methods
 
 To ensure we pass only the required variables, we have two filtering approaches:
 

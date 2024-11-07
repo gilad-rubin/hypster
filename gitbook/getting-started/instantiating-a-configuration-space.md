@@ -64,6 +64,32 @@ config = llm_config(values={
 })
 ```
 
+## Variable Selection Methods
+
+To ensure we pass only the required variables, we have two filtering approaches:
+
+1. **Include specific variables using `final_vars`**:
+
+```python
+config = my_config(final_vars=["model", "config_dict"], values={...})
+run("Hello", **config)
+```
+
+Use `final_vars` when you need only a few specific variables
+
+{% hint style="info" %}
+When `final_vars` is empty, all variables are returned (except those in `exclude_vars`)
+{% endhint %}
+
+2. **Exclude unwanted variables using `exclude_vars`**:
+
+```python
+config = my_config(exclude_vars=["cache", "temp_data"], values={...})
+run("Hello", **config)
+```
+
+Choose `exclude_vars` when you have many variables to keep and little to filter out.
+
 ## Available Parameter Types
 
 Each parameter type has specific validation and behavior rules. See each section for more details:
