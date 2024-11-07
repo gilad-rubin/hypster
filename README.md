@@ -9,7 +9,7 @@
 <p align="center">
   <span style="font-size: 18px;">
     <a href="https://gilad-rubin.gitbook.io/hypster">[Documentation]</a> |
-    <a href="#installation">[Installation]</a> |
+    <a href="https://gilad-rubin.gitbook.io/hypster/getting-started/installation">[Installation]</a> |
     <a href="#quick-start">[Quick Start]</a>
   </span>
 </p>
