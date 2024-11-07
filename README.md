@@ -8,7 +8,7 @@
 </p>
 <p align="center">
   <span style="font-size: 18px;">
-    <a href="https://gilad-rubin.github.io/hypster/">[Documentation]</a> |
+    <a href="https://gilad-rubin.gitbook.io/hypster">[Documentation]</a> |
     <a href="#installation">[Installation]</a> |
     <a href="#quick-start">[Quick Start]</a>
   </span>
@@ -46,7 +46,7 @@ def my_config(hp: HP):
     system_prompt = hp.text('You are a helpful assistant. Answer with one word only')
 ```
 
-Now we can instantiate the configs with our selections and overrides:
+Now we can instantiate the configs with our values:
 
 ```python
 results = my_config(final_vars=["chunking_strategy", "llm_config", "llm_model"],
