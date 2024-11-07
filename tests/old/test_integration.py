@@ -162,14 +162,28 @@ def test_pythonic_api():
     assert result["layer_sizes"][1] == 128
 
 
+@config
+def complex_config(hp: HP):
+    import os
+
+    def func(x):
+        return x
+
+    class TestClass:
+        def __init__(self, hello):
+            self.hello = hello
+
+    b = func(6)
+    c = TestClass("hey")
+    cwd = os.getcwd()
+    nested_param = hp.select(["a", "b"], default="a")
+
+
+complex_config.save("tests/helper_configs/complex_config.py")
+
+
 def test_save_load_complex_module():
     complex_config = hypster.load("tests/helper_configs/complex_config.py")
-
-    # def nested_config(hp: HP):
-    #     b = func(6)
-    #     c = TestClass("hey")
-    #     cwd = os.getcwd()
-    #     nested_param = hp.select(["a", "b"], default="a")
 
     results = complex_config()
 
