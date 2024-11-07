@@ -20,7 +20,7 @@ layout:
 
 </div>
 
-### **Hypster is a lightweight framework for defining and optimizing ML & AI Workflows.**
+### **Hypster is a lightweight framework for defining configurations spaces to optimize ML & AI workflows.**
 
 ### Key Features
 
@@ -55,7 +55,6 @@ from hypster import config, HP
 def llm_config(hp: HP):
     model_name = hp.select(["gpt-4o-mini", "gpt-4o"])
     temperature = hp.number(0.0, min=0.0, max=1.0)
-    max_tokens = hp.int(256, max=2048)
 ```
 {% endstep %}
 
@@ -63,7 +62,7 @@ def llm_config(hp: HP):
 #### Instantiate your configuration
 
 ```python
-results = my_config(values={"model" : "gpt-4o"})
+results = my_config(values={"model" : "gpt-4o", "temperature" : 1.0})
 ```
 {% endstep %}
 
@@ -71,14 +70,9 @@ results = my_config(values={"model" : "gpt-4o"})
 #### Define an execution function
 
 ```python
-def generate(prompt: str, 
-             model_name: str, 
-             temperature: float, 
-             max_tokens: int) -> str:
+def generate(prompt: str, model_name: str, temperature: float) -> str:
     model = llm.get_model(model_name)
-    response = model.prompt(prompt, 
-                            temperature=temperature, 
-                            max_tokens=max_tokens)
+    response = model.prompt(prompt, temperature=temperature)
     return response
 ```
 {% endstep %}
@@ -109,25 +103,6 @@ Hypster takes care of these challenges by providing a simple way to define confi
 
 ## Additional Reading
 
-Explore these articles to deepen your understanding of Hypster and its applications:
-
-### Core Concepts
-
-* [Introducing Hypster: A Pythonic Framework for Managing Configurations](https://medium.com/@giladrubin/introducing-hypster-a-pythonic-framework-for-managing-configurations-to-build-highly-optimized-ai-5ee004dbd6a5)
-  * Overview of Hypster's core concepts
-  * Understanding configuration spaces
-  * Basic usage patterns and examples
-
-### Practical Applications - Modular RAG
-
-* [Implementing Modular RAG with Haystack and Hypster](https://towardsdatascience.com/implementing-modular-rag-with-haystack-and-hypster-d2f0ecc88b8f)
-  * Real-world example of building modular RAG systems
-  * Integration with Haystack
-  * Advanced configuration patterns
-
-### The Philosophy Behind Hypster
-
-* [5 Pillars for a Hyper-Optimized AI Workflow](https://medium.com/@giladrubin/5-pillars-for-a-hyper-optimized-ai-workflow-21fcaefe48ca)
-  * Design principles for AI workflows
-  * Optimization strategies
-  * System architecture considerations
+* [Introducing Hypster](https://medium.com/@giladrubin/introducing-hypster-a-pythonic-framework-for-managing-configurations-to-build-highly-optimized-ai-5ee004dbd6a5) - A comprehensive introduction to Hypster's core concepts and design philosophy.
+* [Implementing Modular RAG With Haystack & Hypster](https://towardsdatascience.com/implementing-modular-rag-with-haystack-and-hypster-d2f0ecc88b8f) - A practical guide to building modular, LEGO-like reconfigurable RAG systems.
+* [5 Pillars for Hyper-Optimized AI Workflows](https://medium.com/@giladrubin/5-pillars-for-a-hyper-optimized-ai-workflow-21fcaefe48ca) - Key principles for designing optimized AI systems. The process behind this article gave rise to hypster's design.

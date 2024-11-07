@@ -94,7 +94,7 @@ Choose `exclude_vars` when you have many variables to keep and little to filter 
 
 Each parameter type has specific validation and behavior rules. See each section for more details:
 
-### Core Types
+### HP Call Types
 
 * [**select & multi\_select**](../in-depth/hp-call-types/select-and-multi\_select.md) - For categorical choices
 * [**int, number & multi\_int, multi\_number**](../in-depth/hp-call-types/int-and-multi\_int.md) - For numeric values

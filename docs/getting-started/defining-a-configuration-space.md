@@ -39,13 +39,13 @@ def my_config(hp: HP):
     instance = Class(var=var, num=num, text=text)
 ```
 
-Hypster comes with the following options:
+Hypster comes with the following HP calls:
 
-* `hp.select()` and `hp.multi_select()` for categorical choices
-* `hp.int()` and `hp.multi_int()` for integer values
-* `hp.number()`and `hp.multi_number()` for numeric values
-* `hp.text()` and `hp.multi_text()` for string values
-* `hp.bool()` and `hp.multi_bool()` for boolean values
+* `hp.select()` and `hp.multi_select()` for [categorical choices](../in-depth/hp-call-types/select-and-multi\_select.md)
+* `hp.int()` and `hp.multi_int()` for [integer values](../in-depth/hp-call-types/int-and-multi\_int.md)
+* `hp.number()`and `hp.multi_number()` for [numeric values](../in-depth/hp-call-types/int-and-multi\_int.md)
+* `hp.text()` and `hp.multi_text()` for [string values](../in-depth/hp-call-types/text-and-multi\_text.md)
+* `hp.bool()` and `hp.multi_bool()` for [boolean values](../in-depth/hp-call-types/bool-and-multi\_bool.md)
 
 Please note:
 
@@ -54,7 +54,7 @@ Please note:
 {% endhint %}
 
 {% hint style="info" %}
-**No return statement is allowed (nor needed)**. This enables selecting the variables we want to retrieve upon instantiation using `final_vars` and `exclude_vars`
+**No return statement is allowed (nor needed)**. This enables [selecting the variables](selecting-output-variables.md) we want to retrieve upon instantiation using `final_vars` and `exclude_vars`
 {% endhint %}
 {% endstep %}
 
