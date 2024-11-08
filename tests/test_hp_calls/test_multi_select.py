@@ -163,13 +163,3 @@ def test_multi_select_invalid_list_value_types():
             var = hp.multi_select([1, 2.0, True, "str", complex(1, 2)], default=["str"], name="param")
 
         invalid_list_values()
-
-
-def test_multi_select_missing_default():
-    with pytest.raises(Exception):
-
-        @config
-        def missing_default(hp: HP):
-            hp.multi_select(["a", "b"], name="param")
-
-        missing_default()

@@ -65,7 +65,7 @@ class HP:
         options: OptionsType,
         *,
         name: Optional[str] = None,
-        default: List[ValidKeyType] = None,
+        default: Optional[List[ValidKeyType]] = [],
         options_only: bool = False,
     ) -> List[Any]:
         call = MultiSelectCall(name=name, options=options, default=default, options_only=options_only)
