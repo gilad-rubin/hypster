@@ -98,7 +98,7 @@ def test_multi_bool_invalid_values():
         values = hp.multi_bool(default=[True, False], name="param")
 
     with pytest.raises(Exception):
-        config_func(values={"param": [True, "false"]})  # Not all booleans
+        config_func(values={"param": [True, "3alse"]})  # Not all booleans
 
 
 def test_multi_bool_invalid_values_type():

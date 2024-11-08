@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
+from uuid import UUID
 
 from .hp_calls import (
     BaseHPCall,
@@ -36,7 +37,7 @@ class HP:
         exclude_vars: List[str],
         values: Dict[str, Any],
         run_history: HistoryDatabase,
-        run_id: str,
+        run_id: UUID,
         explore_mode: bool = False,
     ):
         self.final_vars = final_vars
@@ -210,7 +211,17 @@ class HP:
 
     def _get_potential_values(self, name: str) -> List[Any]:
         records = self.run_history.get_param_records(name)
-        potential_values = list(dict.fromkeys(record.value for record in reversed(records.values())))[
-            :MAX_POTENTIAL_VALUES
-        ]
+        potential_values = reversed(  # LIFO
+            list(
+                dict.fromkeys(  # remove duplicates
+                    record.value
+                    for record in records.values()
+                    if (
+                        record.is_reproducible
+                        if isinstance(record.is_reproducible, bool)
+                        else all(record.is_reproducible)
+                    )
+                )
+            )
+        )[:MAX_POTENTIAL_VALUES]
         return potential_values
