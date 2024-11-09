@@ -96,8 +96,8 @@ Each parameter type has specific validation and behavior rules. See each section
 
 ### HP Call Types
 
-* [**select & multi\_select**](../in-depth/hp-call-types/select-and-multi\_select.md) - For categorical choices
-* [**int, number & multi\_int, multi\_number**](../in-depth/hp-call-types/int-and-multi\_int.md) - For numeric values
-* [**bool & multi\_bool**](../in-depth/hp-call-types/bool-and-multi\_bool.md) - For boolean values
-* [**text & multi\_text**](../in-depth/hp-call-types/text-and-multi\_text.md) - For string values
+* [**select & multi\_select**](../in-depth/hp-call-types/select-and-multi-select.md) - For categorical choices
+* [**int, number & multi\_int, multi\_number**](../in-depth/hp-call-types/int-and-multi-int.md) - For numeric values
+* [**bool & multi\_bool**](../in-depth/hp-call-types/bool-and-multi-bool.md) - For boolean values
+* [**text & multi\_text**](../in-depth/hp-call-types/text-and-multi-text.md) - For string values
 * [**propagate**](../in-depth/hp-call-types/propagate.md) - For nested configurations

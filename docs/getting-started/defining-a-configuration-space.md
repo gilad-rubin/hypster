@@ -31,21 +31,21 @@ The function definition consists of the `@config` decorator and the signature. I
 @config
 def my_config(hp: HP):
     from package import Class
-    
+
     var = hp.select(["a", "b", "c"], default="a")
     num = hp.number(10)
     text = hp.text("Hey!")
-    
+
     instance = Class(var=var, num=num, text=text)
 ```
 
 Hypster comes with the following HP calls:
 
-* `hp.select()` and `hp.multi_select()` for [categorical choices](../in-depth/hp-call-types/select-and-multi\_select.md)
-* `hp.int()` and `hp.multi_int()` for [integer values](../in-depth/hp-call-types/int-and-multi\_int.md)
-* `hp.number()`and `hp.multi_number()` for [numeric values](../in-depth/hp-call-types/int-and-multi\_int.md)
-* `hp.text()` and `hp.multi_text()` for [string values](../in-depth/hp-call-types/text-and-multi\_text.md)
-* `hp.bool()` and `hp.multi_bool()` for [boolean values](../in-depth/hp-call-types/bool-and-multi\_bool.md)
+* `hp.select()` and `hp.multi_select()` for [categorical choices](../in-depth/hp-call-types/select-and-multi-select.md)
+* `hp.int()` and `hp.multi_int()` for [integer values](../in-depth/hp-call-types/int-and-multi-int.md)
+* `hp.number()`and `hp.multi_number()` for [numeric values](../in-depth/hp-call-types/int-and-multi-int.md)
+* `hp.text()` and `hp.multi_text()` for [string values](../in-depth/hp-call-types/text-and-multi-text.md)
+* `hp.bool()` and `hp.multi_bool()` for [boolean values](../in-depth/hp-call-types/bool-and-multi-bool.md)
 
 Please note:
 
