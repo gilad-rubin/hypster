@@ -6,14 +6,14 @@ Hypster provides string parameter configuration through `text` and `multi_text` 
 
 ```python
 def text(
-    default: str, 
-    *, 
+    default: str,
+    *,
     name: Optional[str] = None
 ) -> str
 
 def multi_text(
-    default: List[str] = [], 
-    *, 
+    default: List[str] = [],
+    *,
     name: Optional[str] = None
 ) -> List[str]
 ```

@@ -6,14 +6,14 @@ Hypster provides boolean parameter configuration through `bool` and `multi_bool`
 
 ```python
 def bool(
-    default: bool, 
-    *, 
+    default: bool,
+    *,
     name: Optional[str] = None
 ) -> bool
 
 def multi_bool(
-    default: List[bool] = [], 
-    *, 
+    default: List[bool] = [],
+    *,
     name: Optional[str] = None
 ) -> List[bool]
 ```
