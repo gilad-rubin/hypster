@@ -210,17 +210,16 @@ class HP:
         return result
 
     def _get_potential_values(self, name: str) -> List[Any]:
-        records = self.run_history.get_param_records(name)
-        potential_values = reversed(  # LIFO
-            list(
-                dict.fromkeys(  # remove duplicates
-                    record.value
-                    for record in records.values()
-                    if (
-                        record.is_reproducible
-                        if isinstance(record.is_reproducible, bool)
-                        else all(record.is_reproducible)
-                    )
+        records_dict = self.run_history.get_param_records(name)
+        # Extract just the records, ignoring the run_ids
+        records = list(records_dict.values())
+        potential_values = list(
+            dict.fromkeys(  # remove duplicates
+                record.value
+                for record in reversed(records)  # LIFO
+                if isinstance(record, ParameterRecord)
+                and (
+                    record.is_reproducible if isinstance(record.is_reproducible, bool) else all(record.is_reproducible)
                 )
             )
         )[:MAX_POTENTIAL_VALUES]
