@@ -317,7 +317,7 @@ class IPyMultiValueComponent(IPyComponent):
 def create_ipy_component(component: Union[ComponentBase, NestedComponent], on_change: Callable) -> IPyComponent:
     """Create appropriate IPyComponent based on component type."""
     if isinstance(component, NestedComponent):
-        return IPyPropagateComponent(component, on_change)
+        return IPynestComponent(component, on_change)
     elif isinstance(component, SelectComponent):
         return IPySelectComponent(component, on_change)
     elif isinstance(component, (IntComponent, FloatComponent)):
@@ -334,8 +334,8 @@ def create_ipy_component(component: Union[ComponentBase, NestedComponent], on_ch
         raise ValueError(f"Unsupported component type: {type(component)}")
 
 
-class IPyPropagateComponent(IPyComponent):
-    """Widget for handling nested/propagated configurations."""
+class IPynestComponent(IPyComponent):
+    """Widget for handling nested/nested configurations."""
 
     def __init__(self, component: NestedComponent, on_change: Callable):
         self.child_components: Dict[str, IPyComponent] = {}
@@ -421,7 +421,7 @@ class IPyWidgetsUI:
         # Find the top-level component ID and build nested structure
         path_parts = component_id.split(".")
         comp_type = self.ui_handler.components[component_id].parameter_type
-        if len(path_parts) > 1 and comp_type == "propagate":
+        if len(path_parts) > 1 and comp_type == "nest":
             # Build nested structure from path
             nested_value = new_value
             for key in reversed(path_parts[1:]):

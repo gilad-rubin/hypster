@@ -41,7 +41,7 @@ def test_exclude_vars_with_final_vars():
     assert "lr" not in result
 
 
-def test_exclude_vars_with_propagation():
+def test_exclude_vars_with_nesting():
     @config
     def nested_config(hp: HP):
         nested_param = hp.select(["a", "b"], default="a")
@@ -51,7 +51,7 @@ def test_exclude_vars_with_propagation():
 
     @config
     def main_config(hp: HP):
-        nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
+        nested = hp.nest("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test excluding nested variables with dot notation
@@ -72,7 +72,7 @@ def test_exclude_vars_with_propagation():
     assert "nested" not in result
 
 
-def test_exclude_vars_with_nested_propagation():
+def test_exclude_vars_with_nested_nesting():
     @config
     def deep_nested_config(hp: HP):
         deep_param = hp.select(["deep1", "deep2"], default="deep1")
@@ -82,14 +82,14 @@ def test_exclude_vars_with_nested_propagation():
 
     @config
     def middle_config(hp: HP):
-        deep = hp.propagate("tests/helper_configs/deep_nested_config.py", name="deep")
+        deep = hp.nest("tests/helper_configs/deep_nested_config.py", name="deep")
         middle_param = hp.select(["mid1", "mid2"], default="mid1")
 
     middle_config.save("tests/helper_configs/middle_config.py")
 
     @config
     def main_config(hp: HP):
-        middle = hp.propagate("tests/helper_configs/middle_config.py", name="middle")
+        middle = hp.nest("tests/helper_configs/middle_config.py", name="middle")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test excluding deeply nested variables
@@ -106,7 +106,7 @@ def test_exclude_vars_with_nested_propagation():
     assert "main_param" in result
 
 
-def test_exclude_vars_in_propagate_call():
+def test_exclude_vars_in_nest_call():
     @config
     def nested_config(hp: HP):
         nested_param = hp.select(["a", "b"], default="a")
@@ -117,14 +117,14 @@ def test_exclude_vars_in_propagate_call():
 
     @config
     def main_config(hp: HP):
-        nested = hp.propagate(
+        nested = hp.nest(
             "tests/helper_configs/nested_config.py",
             name="nested",
-            exclude_vars=["extra_param"],  # Exclude within propagate call
+            exclude_vars=["extra_param"],  # Exclude within nest call
         )
         main_param = hp.select(["x", "y"], default="x")
 
-    # Test excluding variables in propagate call
+    # Test excluding variables in nest call
     result = main_config()
     assert "nested_param" in result["nested"]
     assert "nested_number" in result["nested"]

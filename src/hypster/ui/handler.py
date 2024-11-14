@@ -73,9 +73,9 @@ class BooleanComponent(ComponentBase):
 
 
 class NestedComponent(ComponentBase):
-    """Component for handling propagated configurations."""
+    """Component for handling nested configurations."""
 
-    parameter_type: str = "propagate"
+    parameter_type: str = "nest"
     value: Dict[str, Any]
     children: Dict[str, Union["NestedComponent", ComponentBase]]
 
@@ -95,7 +95,7 @@ class UIHandler:
         "multi_text": TextComponent,
         "bool": BooleanComponent,
         "multi_bool": BooleanComponent,
-        "propagate": NestedComponent,
+        "nest": NestedComponent,
     }
 
     def __init__(self, config_func: Hypster, initial_values: Optional[Dict[str, Any]] = None):
@@ -118,12 +118,12 @@ class UIHandler:
         for name, record in latest_records.items():
             self.components[name] = self._create_component(name, record)
 
-    def _create_propagate_component(self, name: str, record: ParameterRecord) -> NestedComponent:
-        """Create a propagate component."""
+    def _create_nest_component(self, name: str, record: ParameterRecord) -> NestedComponent:
+        """Create a nest component."""
 
     def _create_component(self, name: str, record: ParameterRecord) -> ComponentBase:
         """Create a component based on parameter type."""
-        if record.parameter_type == "propagate":
+        if record.parameter_type == "nest":
             nested_components = {}
             nested_latest_records = record.run_history.get_latest_run_records()
             logger.debug(f"Nested latest records: {list(nested_latest_records.keys())}")
@@ -156,7 +156,7 @@ class UIHandler:
         names_up_to_id = component_names[: component_names.index(component_id)]
         values = {name: component.value for name, component in components.items() if name in names_up_to_id}
         component = components[component_id]
-        if component.parameter_type == "propagate":
+        if component.parameter_type == "nest":
             nested_component_id = list(new_value.keys())[0]
             nested_value = list(new_value.values())[0]
             nested_components = component.children
@@ -181,7 +181,7 @@ class UIHandler:
                 components.pop(name)
 
         component = components[component_id]
-        if component.parameter_type == "propagate":
+        if component.parameter_type == "nest":
             self._remove_components(component.children, latest_records[component_id])
 
     def update_components(self, component_id: str, new_value: Any) -> List[str]:

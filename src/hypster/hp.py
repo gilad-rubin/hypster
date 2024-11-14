@@ -12,11 +12,11 @@ from .hp_calls import (
     MultiNumberCall,
     MultiSelectCall,
     MultiTextCall,
+    NestedCall,
     NumberInputCall,
     NumericBounds,
     NumericType,
     OptionsType,
-    PropagateCall,
     SelectCall,
     TextInputCall,
     ValidKeyType,
@@ -137,7 +137,7 @@ class HP:
         call = MultiBoolCall(name=name, default=default)
         return self._execute_call(call=call, parameter_type="multi_bool")
 
-    def propagate(
+    def nest(
         self,
         config_func: Union[str, Path, "Hypster"],
         *,
@@ -151,7 +151,7 @@ class HP:
 
             config_func = load(str(config_func))
 
-        call = PropagateCall(name=name)
+        call = NestedCall(name=name)
         result = call.execute(
             config_func,
             final_vars=final_vars,
@@ -165,7 +165,7 @@ class HP:
 
         record = NestedHistoryRecord(
             name=name,
-            parameter_type="propagate",
+            parameter_type="nest",
             run_history=config_func.run_history,
             run_id=self.run_id,
             source=self.source,

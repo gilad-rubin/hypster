@@ -18,7 +18,7 @@ def deep_nested_config(hp: HP):
 
 @config
 def middle_config(hp: HP):
-    deep = hp.propagate("tests/helper_configs/deep_nested_config.py", name="deep")
+    deep = hp.nest("tests/helper_configs/deep_nested_config.py", name="deep")
     middle_param = hp.select(["mid1", "mid2"], default="mid1")
 
 
@@ -34,11 +34,11 @@ def setup_config_files():
     middle_config.save("tests/helper_configs/middle_config.py")
 
 
-# Basic Two-Layer Propagation Tests
+# Basic Two-Layer Nesting Tests
 def test_basic_two_layer_defaults():
     @config
     def main_config(hp: HP):
-        nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
+        nested = hp.nest("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     result = main_config()
@@ -50,7 +50,7 @@ def test_basic_two_layer_defaults():
 def test_basic_dot_notation_values():
     @config
     def main_config(hp: HP):
-        nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
+        nested = hp.nest("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test dot notation selections
@@ -63,7 +63,7 @@ def test_basic_dot_notation_values():
 def test_basic_dot_notation_values():
     @config
     def main_config(hp: HP):
-        nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
+        nested = hp.nest("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test dot notation overrides
@@ -76,7 +76,7 @@ def test_basic_dot_notation_values():
 def test_basic_dict_style_values():
     @config
     def main_config(hp: HP):
-        nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
+        nested = hp.nest("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test dictionary style selections
@@ -89,7 +89,7 @@ def test_basic_dict_style_values():
 def test_basic_dict_style_values():
     @config
     def main_config(hp: HP):
-        nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
+        nested = hp.nest("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test dictionary style overrides
@@ -102,7 +102,7 @@ def test_basic_dict_style_values():
 def test_basic_final_vars():
     @config
     def main_config(hp: HP):
-        nested = hp.propagate("tests/helper_configs/nested_config.py", name="nested")
+        nested = hp.nest("tests/helper_configs/nested_config.py", name="nested")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test dot notation final vars
@@ -116,11 +116,11 @@ def test_basic_final_vars():
     assert "nested_param" not in result["nested"]
 
 
-# Three-Layer Propagation Tests
+# Three-Layer Nesting Tests
 def test_three_layer_defaults():
     @config
     def main_config(hp: HP):
-        middle = hp.propagate("tests/helper_configs/middle_config.py", name="middle")
+        middle = hp.nest("tests/helper_configs/middle_config.py", name="middle")
         main_param = hp.select(["x", "y"], default="x")
 
     result = main_config()
@@ -133,7 +133,7 @@ def test_three_layer_defaults():
 def test_three_layer_dot_notation():
     @config
     def main_config(hp: HP):
-        middle = hp.propagate("tests/helper_configs/middle_config.py", name="middle")
+        middle = hp.nest("tests/helper_configs/middle_config.py", name="middle")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test selections through all layers
@@ -148,7 +148,7 @@ def test_three_layer_dot_notation():
 def test_three_layer_dict_style():
     @config
     def main_config(hp: HP):
-        middle = hp.propagate("tests/helper_configs/middle_config.py", name="middle")
+        middle = hp.nest("tests/helper_configs/middle_config.py", name="middle")
         main_param = hp.select(["x", "y"], default="x")
 
     # Test dictionary style through all layers
@@ -163,7 +163,7 @@ def test_three_layer_dict_style():
 def test_inner_configurations():
     @config
     def main_config(hp: HP):
-        nested = hp.propagate(
+        nested = hp.nest(
             "tests/helper_configs/nested_config.py",
             name="nested",
             final_vars=["nested_param", "nested_number"],
@@ -193,7 +193,7 @@ def test_inner_configurations():
 def test_inner_configurations_dict_style():
     @config
     def main_config(hp: HP):
-        nested = hp.propagate(
+        nested = hp.nest(
             "tests/helper_configs/nested_config.py",
             name="nested",
             final_vars=["nested_param", "nested_number"],

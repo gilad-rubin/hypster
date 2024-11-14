@@ -96,9 +96,9 @@ class Hypster:
             # Get the top-level variable name before any dot notation
             prefix = var.split(".")[0] if "." in var else var
 
-            # Check if this variable is a propagated config
+            # Check if this variable is a nested config
             for record in run_history.get_latest_run_records().values():
-                if record.name == prefix and record.parameter_type == "propagate":
+                if record.name == prefix and record.parameter_type == "nest":
                     nested_vars.append(var)
                     break
 

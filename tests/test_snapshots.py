@@ -36,7 +36,7 @@ def test_nested_snapshot():
 
         model = hp.select(["cnn", "rnn"], default="cnn")
         nested_config = load("tests/helper_configs/nested_config.py")
-        nested_inputs = hp.propagate(nested_config)
+        nested_inputs = hp.nest(nested_config)
 
     # Run with some values
     result1 = main_config(final_vars=["model", "nested_inputs"], values={"nested_inputs.optimizer": "sgd"})

@@ -284,8 +284,8 @@ class MultiBoolCall(ValueHPCall[bool]):
             raise HPCallError(self.name, f"Expected a boolean, got a non-boolean value: {value}")
 
 
-class PropagateCall(BaseModel):
-    """Handles nested configuration propagation."""
+class NestedCall(BaseModel):
+    """Handles nested configuration nesting."""
 
     name: str
 
@@ -300,7 +300,7 @@ class PropagateCall(BaseModel):
         original_values: Dict[str, Any] = {},
         explore_mode: bool = False,
     ) -> Dict[str, Any]:
-        """Execute the propagate call with nested configuration handling."""
+        """Execute the nest call with nested configuration handling."""
         if len(original_final_vars) > 0:
             nested_final_vars = self._process_final_vars(original_final_vars)
         else:

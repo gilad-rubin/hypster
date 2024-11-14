@@ -58,7 +58,7 @@ llm_config.save("configs/llm.py")
 ```python
 @config
 def qa_config(hp: HP):
-    # propagate LLM configuration
+    # Load and propagate LLM configuration
     llm = hp.propagate("configs/llm.py")
 
     # Add QA-specific parameters

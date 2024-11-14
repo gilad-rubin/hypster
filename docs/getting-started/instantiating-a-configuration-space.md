@@ -100,4 +100,4 @@ Each parameter type has specific validation and behavior rules. See each section
 * [**int, number & multi\_int, multi\_number**](../in-depth/hp-call-types/int-and-multi-int.md) - For numeric values
 * [**bool & multi\_bool**](../in-depth/hp-call-types/bool-and-multi-bool.md) - For boolean values
 * [**text & multi\_text**](../in-depth/hp-call-types/text-and-multi-text.md) - For string values
-* [**propagate**](../in-depth/hp-call-types/propagate.md) - For nested configurations
+* [**nest**](../in-depth/hp-call-types/nest.md) - For nested configurations

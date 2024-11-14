@@ -192,7 +192,7 @@ def test_save_load_complex_module():
     assert results["nested_param"] == "a"
 
 
-def test_propagation():
+def test_nesting():
     @config
     def nested_config(hp: HP):
         nested_param = hp.select(["a", "b"], default="a")
@@ -201,7 +201,7 @@ def test_propagation():
 
     @config
     def main_config(hp: HP):
-        nested = hp.propagate("tests/helper_configs/nested_config.py")
+        nested = hp.nest("tests/helper_configs/nested_config.py")
 
         main_param = hp.select(["x", "y"], default="x")
 
@@ -231,7 +231,7 @@ def test_propagation():
     assert result["nested"]["nested_param"] == "b"
 
 
-def test_propagation():
+def test_nesting():
     @config
     def nested_config(hp: HP):
         nested_param = hp.select(["a", "b"], default="a")
@@ -240,7 +240,7 @@ def test_propagation():
 
     @config
     def main_config(hp: HP):
-        nested = hp.propagate(
+        nested = hp.nest(
             "tests/helper_configs/nested_config.py",
             final_vars=["nested_param"],
             values={"nested_param": "b"},

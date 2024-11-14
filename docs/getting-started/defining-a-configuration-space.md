@@ -93,8 +93,8 @@ Load saved configurations in two ways:
 from hypster import load
 my_config = load("configs/my_config.py")
 
-# Method 2: Load for propagation
+# Method 2: Load for nesting
 @config
 def parent_config(hp: HP):
-    nested_config = hp.propagate("configs/my_config.py")
+    nested_config = hp.nest("configs/my_config.py")
 ```

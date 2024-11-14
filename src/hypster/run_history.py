@@ -35,7 +35,7 @@ class ParameterRecord(HistoryRecord):
 
 
 class NestedHistoryRecord(HistoryRecord):
-    """Record type for nested configurations from propagate calls"""
+    """Record type for nested configurations from nest calls"""
 
     run_history: "HistoryDatabase"  # Forward reference
 

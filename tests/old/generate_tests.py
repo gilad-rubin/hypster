@@ -77,7 +77,7 @@ nested_func.save("tests/helper_configs/nested_func.py")
 
 @config
 def config_func(hp: HP):
-    result = hp.propagate("tests/helper_configs/nested_func.py")"""
+    result = hp.nest("tests/helper_configs/nested_func.py")"""
 
 
 class LogicGenerator:

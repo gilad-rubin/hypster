@@ -85,9 +85,9 @@ def modular_rag(hp: HP):
 
     match embedder_type:
         case "fastembed":
-            embedder = hp.propagate("configs/fast_embed.py")
+            embedder = hp.nest("configs/fast_embed.py")
         case "jina":
-            embedder = hp.propagate("configs/jina_embed.py")
+            embedder = hp.nest("configs/jina_embed.py")
 
 # Create interactive UI
 results = interactive_config(modular_rag)

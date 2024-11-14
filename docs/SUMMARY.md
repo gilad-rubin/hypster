@@ -21,12 +21,12 @@
   * [Numeric Types](in-depth/hp-call-types/int-and-multi-int.md)
   * [Boolean Types](in-depth/hp-call-types/bool-and-multi-bool.md)
   * [Textual Types](in-depth/hp-call-types/text-and-multi-text.md)
-  * [Nested Configurations](in-depth/hp-call-types/propagate.md)
+  * [Nested Configurations](in-depth/hp-call-types/nest.md)
 * [🧠 Best Practices](in-depth/basic-best-practices.md)
 
 ## Advanced
 
-* [Propagation](advanced/propagation.md)
+* [Nesting](advanced/nesting.md)
 * [Usage tips / Best Practices](advanced/usage-tips-best-practices.md)
 * [Saving & Loading Configs](advanced/saving-and-loading-configs.md)
 * [Performing Hyperparameter Optimization](advanced/performing-hyperparameter-optimization.md)

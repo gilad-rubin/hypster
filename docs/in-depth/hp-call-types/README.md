@@ -28,7 +28,7 @@ Hypster provides several parameter types to handle different configuration needs
 
 ### Advanced Types
 
-* **propagate**
+* **nest**
   * Nested configuration management
   * Enables modular, reusable configs
 

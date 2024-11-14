@@ -243,11 +243,11 @@ def my_config(hp: HP):
 
 Hypster comes with the following HP calls:
 
-* `hp.select()` and `hp.multi_select()` for [categorical choices](../in-depth/hp-call-types/select-and-multi\_select.md)
-* `hp.int()` and `hp.multi_int()` for [integer values](../in-depth/hp-call-types/int-and-multi\_int.md)
-* `hp.number()`and `hp.multi_number()` for [numeric values](../in-depth/hp-call-types/int-and-multi\_int.md)
-* `hp.text()` and `hp.multi_text()` for [string values](../in-depth/hp-call-types/text-and-multi\_text.md)
-* `hp.bool()` and `hp.multi_bool()` for [boolean values](../in-depth/hp-call-types/bool-and-multi\_bool.md)
+* `hp.select()` and `hp.multi_select()` for [categorical choices](../in-depth/hp-call-types/select-and-multi-select.md)
+* `hp.int()` and `hp.multi_int()` for [integer values](../in-depth/hp-call-types/int-and-multi-int.md)
+* `hp.number()`and `hp.multi_number()` for [numeric values](../in-depth/hp-call-types/int-and-multi-int.md)
+* `hp.text()` and `hp.multi_text()` for [string values](../in-depth/hp-call-types/text-and-multi-text.md)
+* `hp.bool()` and `hp.multi_bool()` for [boolean values](../in-depth/hp-call-types/bool-and-multi-bool.md)
 
 Please note:
 
@@ -295,10 +295,10 @@ Load saved configurations in two ways:
 from hypster import load
 my_config = load("configs/my_config.py")
 
-# Method 2: Load for propagation
+# Method 2: Load for nesting
 @config
 def parent_config(hp: HP):
-    nested_config = hp.propagate("configs/my_config.py")
+    nested_config = hp.nest("configs/my_config.py")
 ```
 
 
@@ -402,11 +402,11 @@ Each parameter type has specific validation and behavior rules. See each section
 
 ### HP Call Types
 
-* [**select & multi\_select**](../in-depth/hp-call-types/select-and-multi\_select.md) - For categorical choices
-* [**int, number & multi\_int, multi\_number**](../in-depth/hp-call-types/int-and-multi\_int.md) - For numeric values
-* [**bool & multi\_bool**](../in-depth/hp-call-types/bool-and-multi\_bool.md) - For boolean values
-* [**text & multi\_text**](../in-depth/hp-call-types/text-and-multi\_text.md) - For string values
-* [**propagate**](../in-depth/hp-call-types/propagate.md) - For nested configurations
+* [**select & multi\_select**](../in-depth/hp-call-types/select-and-multi-select.md) - For categorical choices
+* [**int, number & multi\_int, multi\_number**](../in-depth/hp-call-types/int-and-multi-int.md) - For numeric values
+* [**bool & multi\_bool**](../in-depth/hp-call-types/bool-and-multi-bool.md) - For boolean values
+* [**text & multi\_text**](../in-depth/hp-call-types/text-and-multi-text.md) - For string values
+* [**nest**](../in-depth/hp-call-types/nest.md) - For nested configurations
 
 
 # getting-started/selecting-output-variables.md
@@ -869,7 +869,7 @@ Hypster provides several parameter types to handle different configuration needs
 
 ### Advanced Types
 
-* **propagate**
+* **nest**
   * Nested configuration management
   * Enables modular, reusable configs
 
@@ -1391,18 +1391,18 @@ restored_config = config(values=snapshot)
 ```
 
 
-# in-depth/hp-call-types/propagate.md
+# in-depth/hp-call-types/nest.md
 
 # Nested Configurations
 
-Hypster enables hierarchical configuration management through the `hp.propagate()` method, allowing you to compose complex configurations from smaller, reusable components.
+Hypster enables hierarchical configuration management through the `hp.nest()` method, allowing you to compose complex configurations from smaller, reusable components.
 
 > For an in depth tutorial, please check out the article on Medium: [**Implementing Modular-RAG using Haystack and Hypster**](https://towardsdatascience.com/implementing-modular-rag-with-haystack-and-hypster-d2f0ecc88b8f)
 
-## `propagate` Function Signature
+## `nest` Function Signature
 
 ```python
-def propagate(
+def nest(
     config_func: Union[str, Path, "Hypster"],
     *,
     name: Optional[str] = None,
@@ -1420,7 +1420,7 @@ def propagate(
 * `exclude_vars`: List of variables to exclude from the configuration
 * `values`: Dictionary of values to override in the nested configuration
 
-## Steps for propagation
+## Steps for nesting
 
 {% stepper %}
 {% step %}
@@ -1448,13 +1448,13 @@ llm_config.save("configs/llm.py")
 {% endstep %}
 
 {% step %}
-### Define a parent config and use `hp.propagate`
+### Define a parent config and use `hp.nest`
 
 ```python
 @config
 def qa_config(hp: HP):
-    # Load and propagate LLM configuration
-    llm = hp.propagate("configs/llm.py")
+    # Load and nest LLM configuration
+    llm = hp.nest("configs/llm.py")
 
     # Add QA-specific parameters
     max_context_length = hp.int(1000, min=100, max=2000)
@@ -1483,12 +1483,12 @@ qa_config(values={
 
 ## Configuration Sources
 
-`hp.propagate()` accepts two types of sources:
+`hp.nest()` accepts two types of sources:
 
 ### Path to Configuration File
 
 ```python
-llm = hp.propagate("configs/llm.py")
+llm = hp.nest("configs/llm.py")
 ```
 
 ### Direct Configuration Object
@@ -1500,7 +1500,7 @@ from hypster import load
 llm_config = load("configs/llm.py")
 
 # Use the loaded config
-qa_config = hp.propagate(llm_config)
+qa_config = hp.nest(llm_config)
 ```
 
 ## Value Assignment
@@ -1525,7 +1525,7 @@ qa_config(values={
 })
 ```
 
-## Hierarchical Propagations
+## Hierarchical Nesting
 
 Configurations can be nested multiple times to create modular, reusable components:
 
@@ -1533,7 +1533,7 @@ Configurations can be nested multiple times to create modular, reusable componen
 @config
 def indexing_config(hp: HP):
     # Reuse LLM config for document processing
-    llm = hp.propagate("configs/llm.py")
+    llm = hp.nest("configs/llm.py")
 
     # Indexing-specific parameters
     embedding_dim = hp.int(512, min=128, max=1024)
@@ -1548,10 +1548,10 @@ def indexing_config(hp: HP):
 @config
 def rag_config(hp: HP):
     # Reuse indexing config (which includes LLM config)
-    indexing = hp.propagate("configs/indexing.py")
+    indexing = hp.nest("configs/indexing.py")
 
     # Add retrieval configuration
-    retrieval = hp.propagate("configs/retrieval.py")
+    retrieval = hp.nest("configs/retrieval.py")
 ```
 
 ## Passing Values to Nested Configs
@@ -1559,7 +1559,7 @@ def rag_config(hp: HP):
 Use the `values` parameter to pass dependent values to nested configuration values:
 
 ```python
-retrieval = hp.propagate(
+retrieval = hp.nest(
     "configs/retrieval.py",
     values={
         "embedding_dim": indexing["embedding_dim"],
@@ -1579,15 +1579,15 @@ retrieval = hp.propagate(
 2.  **Clear Naming**
 
     ```python
-    # Use descriptive names for propagated configs
-    llm = hp.propagate("configs/llm.py", name="llm")
-    indexer = hp.propagate("configs/indexer.py", name="indexer")
+    # Use descriptive names for nested configs
+    llm = hp.nest("configs/llm.py", name="llm")
+    indexer = hp.nest("configs/indexer.py", name="indexer")
     ```
 3.  **Value Dependencies**
 
     ```python
     # Explicitly pass dependent values
-    retriever = hp.propagate(
+    retriever = hp.nest(
         "configs/retriever.py",
         values={"embedding_dim": embedder["embedding_dim"]}
     )
@@ -1716,10 +1716,9 @@ def validated_config(hp: HP):
 ```
 
 
-# advanced/propagation.md
+# advanced/nesting.md
 
-# Propagation
-
+# Nesting
 
 
 # advanced/usage-tips-best-practices.md
