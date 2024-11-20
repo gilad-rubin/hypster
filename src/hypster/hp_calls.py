@@ -16,6 +16,7 @@ from pydantic import (
 
 if TYPE_CHECKING:
     from .core import Hypster
+    from .run_history import HistoryDatabase
 
 ValidKeyType = Union[str, int, float, bool]
 OptionsType = Union[Dict[ValidKeyType, Any], List[ValidKeyType]]
@@ -299,6 +300,7 @@ class NestedCall(BaseModel):
         values: Dict[str, Any] = {},
         original_values: Dict[str, Any] = {},
         explore_mode: bool = False,
+        run_history: Optional["HistoryDatabase"] = None,
     ) -> Dict[str, Any]:
         """Execute the nest call with nested configuration handling."""
         if len(original_final_vars) > 0:
@@ -314,12 +316,22 @@ class NestedCall(BaseModel):
         nested_values = values.copy()
         nested_values.update(self._extract_nested_dict(original_values))
 
-        return config_func(
+        # Extract and add historical records with prefix before executing
+        if run_history:
+            nested_records = run_history.get_param_records(self.name)
+            for record in nested_records.values():
+                for run_records in record.run_history.get_run_records().values():
+                    for nested_record in run_records.values():
+                        config_func.run_history.add_record(nested_record)
+
+        result = config_func(
             final_vars=nested_final_vars,
             exclude_vars=nested_exclude_vars,
             values=nested_values,
             explore_mode=explore_mode,
         )
+
+        return result
 
     def _extract_nested_dict(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """Extract nested configuration using both dot notation and direct dict values."""

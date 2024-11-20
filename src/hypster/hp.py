@@ -161,6 +161,7 @@ class HP:
             values=values,
             original_values=self.values,
             explore_mode=self.explore_mode,
+            run_history=self.run_history,
         )
 
         record = NestedHistoryRecord(
