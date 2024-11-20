@@ -20,7 +20,7 @@ layout:
 
 </div>
 
-### **Hypster is a lightweight framework for defining configurations spaces to optimize ML & AI workflows.**
+### **Hypster is a lightweight framework for defining configurations functions to optimize ML & AI workflows.**
 
 ### Key Features
 
