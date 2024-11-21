@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "hypster"
-version = "0.2.33"
+version = "0.2.34"
 description = "A flexible configuration system for Python projects"
 authors = ["Gilad Rubin <me@giladrubin.com>"]
 license = "MIT"

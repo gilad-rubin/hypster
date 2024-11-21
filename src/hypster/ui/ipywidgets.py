@@ -503,25 +503,48 @@ class IPyWidgetsUI:
 
 class ResultsProxy(dict):
     def __init__(self, initial_results, handler: UIHandler):
-        super().__init__(initial_results or {})
         self._handler = handler
-        self._last_update = None  # Add timestamp tracking
+        self._last_update = None
+        self._cached_results = initial_results or {}
+        super().__init__(self._cached_results)
 
-    def __getitem__(self, key):
-        # Force update check at least every 100ms
+    def _update_if_needed(self):
         current_time = time.time()
         if self._last_update is None or (current_time - self._last_update) > 0.1:
             latest = self._handler.get_latest_results()
             if latest is not None:
-                self.update(latest)
+                self._cached_results = latest
                 self._last_update = current_time
-        return super().__getitem__(key)
+                super().clear()
+                super().update(self._cached_results)
+
+    def __getitem__(self, key):
+        self._update_if_needed()
+        return self._cached_results[key]
 
     def get(self, key, default=None):
-        latest = self._handler.get_latest_results()
-        if latest is not None:
-            self.update(latest)
-        return super().get(key, default)
+        self._update_if_needed()
+        return self._cached_results.get(key, default)
+
+    def __str__(self):
+        self._update_if_needed()
+        return str(self._cached_results)
+
+    def __repr__(self):
+        self._update_if_needed()
+        return repr(self._cached_results)
+
+    def items(self):
+        self._update_if_needed()
+        return self._cached_results.items()
+
+    def keys(self):
+        self._update_if_needed()
+        return self._cached_results.keys()
+
+    def values(self):
+        self._update_if_needed()
+        return self._cached_results.values()
 
 
 def interactive_config(config_func: Hypster, initial_values: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
