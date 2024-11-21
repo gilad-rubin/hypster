@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from .core import Hypster
     from .run_history import HistoryDatabase
 
-ValidKeyType = Union[str, int, float, bool]
-OptionsType = Union[Dict[ValidKeyType, Any], List[ValidKeyType]]
+BasicType = Union[str, int, float, bool]
+OptionsType = Union[Dict[BasicType, Any], List[BasicType]]
 NumericType = Union[StrictInt, StrictFloat]
 
 
@@ -65,14 +65,14 @@ class BaseHPCall(BaseModel):
 class StoredValue(BaseModel):
     """Value stored in run history"""
 
-    value: ValidKeyType
+    value: BasicType
     reproducible: bool
 
 
 class MultiStoredValue(BaseModel):
     """Multiple values stored in run history"""
 
-    value: List[ValidKeyType]
+    value: List[BasicType]
     reproducible: List[bool]
 
 
@@ -84,7 +84,7 @@ class BaseOptionsHPCall(BaseHPCall):
     stored_value: Optional[StoredValue | MultiStoredValue] = None
 
     @property
-    def processed_options(self) -> Dict[ValidKeyType, Any]:
+    def processed_options(self) -> Dict[BasicType, Any]:
         """Convert options to a dictionary if they are a list"""
         if isinstance(self.options, list):
             return {item: item for item in self.options}
@@ -92,7 +92,7 @@ class BaseOptionsHPCall(BaseHPCall):
 
     def validate_and_transform_value(self, value: Any) -> Tuple[Any, bool]:
         """Validate value and return transformed value with reproducibility flag"""
-        is_reproducible = isinstance(value, ValidKeyType)
+        is_reproducible = isinstance(value, BasicType)
 
         if value in self.processed_options.keys() or value in self.processed_options.values():
             return self.processed_options[value], is_reproducible
@@ -116,7 +116,7 @@ class BaseOptionsHPCall(BaseHPCall):
 class SelectCall(BaseOptionsHPCall):
     """Single-value selection call"""
 
-    default: Optional[ValidKeyType] = None
+    default: Optional[BasicType] = None
     single_value: bool = True
 
     @model_validator(mode="after")
@@ -138,7 +138,7 @@ class SelectCall(BaseOptionsHPCall):
 class MultiSelectCall(BaseOptionsHPCall):
     """Multi-value selection call"""
 
-    default: List[ValidKeyType] = Field(default_factory=list)
+    default: List[BasicType] = Field(default_factory=list)
     single_value: bool = False
 
     @model_validator(mode="after")

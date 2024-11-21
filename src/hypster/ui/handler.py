@@ -5,7 +5,7 @@ from typing import Any, Dict, Generic, List, Optional, TypeVar, Union
 from pydantic import BaseModel
 
 from ..core import Hypster
-from ..hp_calls import NumericBounds, ValidKeyType
+from ..hp_calls import BasicType, NumericBounds
 from ..run_history import NestedHistoryRecord, ParameterRecord, ParameterSource
 
 logger = logging.getLogger(__name__)
@@ -27,8 +27,8 @@ class SelectComponent(ComponentBase):
     """Selection component with options."""
 
     parameter_type: str = "select"
-    options: List[ValidKeyType]
-    value: Union[ValidKeyType, List[ValidKeyType]]
+    options: List[BasicType]
+    value: Union[BasicType, List[BasicType]]
     single_value: bool
 
 

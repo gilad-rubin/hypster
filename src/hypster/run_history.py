@@ -6,7 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from .hp_calls import NumericBounds, ValidKeyType
+from .hp_calls import BasicType, NumericBounds
 
 
 class ParameterSource(str, Enum):
@@ -27,10 +27,10 @@ class ParameterRecord(HistoryRecord):
     """Record of a parameter's value and metadata"""
 
     single_value: bool
-    default: Optional[Union[ValidKeyType, List[ValidKeyType]]] = None
-    value: Union[ValidKeyType, List[ValidKeyType]]
+    default: Optional[Union[BasicType, List[BasicType]]] = None
+    value: Union[BasicType, List[BasicType]]
     is_reproducible: Union[bool, List[bool]]
-    options: Optional[List[ValidKeyType]] = None
+    options: Optional[List[BasicType]] = None
     numeric_bounds: Optional[NumericBounds] = None
 
 

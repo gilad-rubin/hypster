@@ -5,6 +5,7 @@ from uuid import UUID
 
 from .hp_calls import (
     BaseHPCall,
+    BasicType,
     BoolInputCall,
     IntInputCall,
     MultiBoolCall,
@@ -16,10 +17,8 @@ from .hp_calls import (
     NumberInputCall,
     NumericBounds,
     NumericType,
-    OptionsType,
     SelectCall,
     TextInputCall,
-    ValidKeyType,
 )
 from .run_history import HistoryDatabase, NestedHistoryRecord, ParameterRecord, ParameterSource
 
@@ -51,10 +50,10 @@ class HP:
 
     def select(
         self,
-        options: OptionsType,
+        options: Union[Dict[BasicType, Any], List[BasicType]],
         *,
         name: Optional[str] = None,
-        default: Optional[ValidKeyType] = None,
+        default: Optional[BasicType] = None,
         options_only: bool = False,
     ) -> Any:
         call = SelectCall(name=name, options=options, default=default, options_only=options_only)
@@ -63,10 +62,10 @@ class HP:
 
     def multi_select(
         self,
-        options: OptionsType,
+        options: Union[Dict[BasicType, Any], List[BasicType]],
         *,
         name: Optional[str] = None,
-        default: Optional[List[ValidKeyType]] = [],
+        default: Optional[List[BasicType]] = [],
         options_only: bool = False,
     ) -> List[Any]:
         call = MultiSelectCall(name=name, options=options, default=default, options_only=options_only)
@@ -178,7 +177,7 @@ class HP:
         self,
         call: BaseHPCall,
         parameter_type: str,
-        options: Optional[List[ValidKeyType]] = None,
+        options: Optional[List[BasicType]] = None,
         numeric_bounds: Optional[NumericBounds] = None,
     ) -> Any:
         """Execute HP call and record its result"""
