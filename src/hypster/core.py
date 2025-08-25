@@ -217,16 +217,13 @@ class Hypster:
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):
     """
-    Save the configuration function of a Hypster instance to a file.
+    Save a Hypster configuration to a Python file, preserving external imports.
 
     Args:
-        hypster_instance (Hypster): The Hypster instance whose configuration
-            function is to be saved.
-        path (Optional[str]): The file path where the configuration should be
-            saved. If None, the configuration is saved to a file named after
-            the Hypster instance's name.
-    Raises:
-        ValueError: If the provided object is not a Hypster instance.
+        hypster_instance (Hypster): The instance to save.
+        path (str, optional): The file path where the configuration will be saved.
+                              If None, uses the instance name with .py extension.
+
     Returns:
         None
     """
@@ -255,8 +252,16 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
 
     func_source = textwrap.dedent(func_source)
 
-    # Add the import statement
-    modified_source = "from hypster import HP\n\n" + func_source
+    # Extract external imports from the function's module
+    external_imports = _extract_external_imports(hypster_instance.func)
+
+    # Build the complete source
+    import_lines = ["from hypster import HP"]
+    if external_imports:
+        import_lines.extend(external_imports)
+
+    imports_section = "\n".join(import_lines)
+    modified_source = f"{imports_section}\n\n{func_source}"
     modified_source = modified_source.rstrip("\n") + "\n"
 
     directory = os.path.dirname(path)
@@ -268,20 +273,108 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
     logger.info("Configuration saved to %s", path)
 
 
-def load(path: str) -> Hypster:
+def _extract_external_imports(func: Callable) -> List[str]:
     """
-    Loads a Python module from the specified file path and creates a Hypster instance.
+    Extract external imports from a function's module, excluding Hypster-related imports.
 
     Args:
-        path (str): The file path to the Python module to be loaded.
+        func: The function to analyze
+
+    Returns:
+        List of import statements as strings
+    """
+    import ast
+
+    try:
+        # Get the module where the function is defined
+        module = inspect.getmodule(func)
+        if module is None:
+            return []
+
+        # Get the source of the entire module
+        try:
+            module_source = inspect.getsource(module)
+        except OSError:
+            # Module source not available (built-in, etc.)
+            return []
+
+        # Parse the module to extract imports
+        tree = ast.parse(module_source)
+        imports = []
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if not _is_hypster_related(alias.name):
+                        if alias.asname:
+                            imports.append(f"import {alias.name} as {alias.asname}")
+                        else:
+                            imports.append(f"import {alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                if node.module and not _is_hypster_related(node.module):
+                    module_name = node.module
+                    names = []
+                    for alias in node.names:
+                        if alias.asname:
+                            names.append(f"{alias.name} as {alias.asname}")
+                        else:
+                            names.append(alias.name)
+
+                    if names:
+                        level_prefix = "." * (node.level or 0)
+                        imports.append(f"from {level_prefix}{module_name} import {', '.join(names)}")
+
+        return imports
+
+    except Exception as e:
+        logger.warning(f"Could not extract imports from function module: {e}")
+        return []
+
+
+def _is_hypster_related(module_name: str) -> bool:
+    """Check if a module name is related to Hypster and should be excluded."""
+    hypster_modules = {"hypster", "hypster.core", "hypster.hp", "hypster.config", "hypster.registry"}
+    return module_name in hypster_modules or module_name.startswith("hypster.")
+
+
+def load(path: str) -> Hypster:
+    """
+    Loads a Python module from the specified path and creates a Hypster instance.
+
+    Supports multiple formats:
+    - "path/to/file.py" - loads first config function from file
+    - "path/to/file.py:function_name" - loads specific function from file
+    - "module.submodule" - loads first config function from module
+    - "module.submodule:function_name" - loads specific function from module
+
+    Args:
+        path (str): The path to load, supporting various formats
 
     Returns:
         Hypster: An instance of the Hypster class containing the configuration function.
 
     Raises:
-        ValueError: If no configuration function is found in the module.
+        ValueError: If no configuration function is found
+        ImportError: If module cannot be imported
     """
-    with open(path, "r") as f:
+    # Parse the path to check for specific object notation
+    if ":" in path:
+        module_path, object_name = path.rsplit(":", 1)
+    else:
+        module_path, object_name = path, None
+
+    # Determine if this is a file path or module path
+    if module_path.endswith(".py") or "/" in module_path or "\\" in module_path:
+        # File path
+        return _load_from_file(module_path, object_name)
+    else:
+        # Module path
+        return _load_from_module(module_path, object_name)
+
+
+def _load_from_file(file_path: str, object_name: Optional[str] = None) -> Hypster:
+    """Load configuration from a file path."""
+    with open(file_path, "r") as f:
         module_source = f.read()
 
     # Create a namespace with HP already imported
@@ -290,26 +383,64 @@ def load(path: str) -> Hypster:
     # Execute the entire module
     exec(module_source, namespace)
 
-    # Find functions that take HP as a parameter
+    return _extract_config_function(namespace, object_name, file_path)
+
+
+def _load_from_module(module_path: str, object_name: Optional[str] = None) -> Hypster:
+    """Load configuration from a module path."""
+    try:
+        import importlib
+
+        module = importlib.import_module(module_path)
+        namespace = vars(module)
+        return _extract_config_function(namespace, object_name, module_path)
+    except ImportError as e:
+        raise ImportError(f"Cannot import module '{module_path}': {e}")
+
+
+def _extract_config_function(namespace: Dict[str, Any], object_name: Optional[str], source_path: str) -> Hypster:
+    """Extract configuration function from namespace."""
+    if object_name:
+        # Look for specific object
+        if object_name not in namespace:
+            raise ValueError(f"Object '{object_name}' not found in {source_path}")
+
+        obj = namespace[object_name]
+        if not callable(obj):
+            raise ValueError(f"Object '{object_name}' is not callable")
+
+        # Verify it's a config function
+        if not _is_config_function(obj):
+            raise ValueError(f"Object '{object_name}' is not a valid configuration function (must have 'hp' parameter)")
+
+        return Hypster(object_name, obj, namespace)
+
+    # Find any config function
     config_funcs = []
     for name, obj in namespace.items():
-        if callable(obj) and hasattr(obj, "__annotations__"):
-            # Check if the function has an 'hp' parameter with HP type annotation
-            if "hp" in obj.__annotations__ and obj.__annotations__["hp"] == HP:
-                config_funcs.append((name, obj))
-        elif callable(obj) and not name.startswith("_"):
-            # Fallback: check the parameter name in the function signature
-            try:
-                sig = inspect.signature(obj)
-                if "hp" in sig.parameters:
-                    config_funcs.append((name, obj))
-            except (ValueError, TypeError):
-                continue
+        if callable(obj) and not name.startswith("_") and _is_config_function(obj):
+            config_funcs.append((name, obj))
 
     if not config_funcs:
-        raise ValueError("No configuration function found in the module")
+        raise ValueError(f"No configuration function found in {source_path}")
 
     # Use the first function found
     func_name, func = config_funcs[0]
-
     return Hypster(func_name, func, namespace)
+
+
+def _is_config_function(obj: Any) -> bool:
+    """Check if an object is a valid configuration function."""
+    if not callable(obj):
+        return False
+
+    # Check for HP type annotation
+    if hasattr(obj, "__annotations__") and "hp" in obj.__annotations__:
+        return obj.__annotations__["hp"] == HP
+
+    # Fallback: check parameter name in signature
+    try:
+        sig = inspect.signature(obj)
+        return "hp" in sig.parameters
+    except (ValueError, TypeError):
+        return False

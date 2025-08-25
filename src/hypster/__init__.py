@@ -8,5 +8,6 @@ except Exception:
 from .config import config
 from .core import Hypster, load, save
 from .hp import HP
+from .registry import registry
 
-__all__ = ["config", "save", "load", "HP"]
+__all__ = ["config", "save", "load", "HP", "registry"]

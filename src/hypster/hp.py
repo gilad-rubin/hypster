@@ -148,9 +148,7 @@ class HP:
         values: Dict[str, Any] = {},
     ) -> Dict[str, Any]:
         if isinstance(config_func, (str, Path)):
-            from .core import load
-
-            config_func = load(str(config_func))
+            config_func = self._resolve_config_target(str(config_func))
 
         call = NestedCall(name=name)
         result = call.execute(
@@ -176,6 +174,60 @@ class HP:
         )
         self.run_history.add_record(record)
         return result
+
+    def _resolve_config_target(self, target: str) -> "Hypster":
+        """
+        Resolve a string target to a Hypster configuration.
+
+        Resolution order:
+        1. Check registry for exact match
+        2. If contains ":", treat as file/module path with specific object
+        3. If ends with ".py", treat as file path
+        4. Otherwise, attempt to load as module path
+
+        Args:
+            target: The target string to resolve
+
+        Returns:
+            Hypster instance
+
+        Raises:
+            ValueError: If target cannot be resolved
+        """
+        from .core import load
+        from .registry import registry
+
+        # 1. Check registry for exact match
+        if registry.contains(target):
+            return registry.get(target)
+
+        # 2. Check if it's a path/module with specific object (contains ":")
+        # 3. Check if it's a file path (ends with ".py")
+        # 4. Otherwise try as module path
+        try:
+            return load(target)
+        except (ValueError, ImportError, FileNotFoundError) as e:
+            # Provide helpful error message with resolution attempts
+            error_msg = f"Could not resolve configuration target '{target}'. "
+
+            if registry.contains(target):
+                error_msg += "Found in registry but failed to retrieve."
+            else:
+                available_keys = registry.list()
+                if available_keys:
+                    closest_matches = [key for key in available_keys if target.lower() in key.lower()]
+                    if closest_matches:
+                        error_msg += f"Not found in registry. Did you mean one of: {closest_matches}?"
+                    else:
+                        error_msg += (
+                            f"Not found in registry. Available keys: "
+                            f"{available_keys[:5]}{'...' if len(available_keys) > 5 else ''}"
+                        )
+                else:
+                    error_msg += "Not found in registry (registry is empty)."
+
+            error_msg += f" Also failed to load as file/module: {e}"
+            raise ValueError(error_msg)
 
     def _execute_call(
         self,
