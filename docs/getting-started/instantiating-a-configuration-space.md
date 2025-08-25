@@ -7,17 +7,17 @@ from hypster import config, HP
 
 @config
 def llm_config(hp: HP):
-    model_name = hp.select({"sonnet" : "claude-3-5-sonnet-20241022"
+    model_name = hp.select({"sonnet" : "claude-3-5-sonnet-20241022",
                             "haiku" : "claude-3-5-haiku-20241022"},
-                            default="haiku")
+                            default="haiku", name="model_name")
 
     if model_type == "haiku":
-        max_tokens = hp.int(256, min=0, max=2048)
+        max_tokens = hp.int(256, min=0, max=2048, name="max_tokens")
     else:
-        max_tokens = hp.int(126, min=0, max=1024)
+        max_tokens = hp.int(126, min=0, max=1024, name="max_tokens")
 
-    cache = Cache(folder=hp.text("./cache"))
-    config_dct = {"temperature" : hp.number(0, min=0, max=1),
+    cache = Cache(folder=hp.text("./cache", name="cache_folder"))
+    config_dct = {"temperature" : hp.number(0, min=0, max=1, name="temperature"),
                   "max_tokens" : max_tokens}
 
     model = Model(model_name, cache)

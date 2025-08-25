@@ -18,7 +18,7 @@ NumericType = Union[StrictInt, StrictFloat] #pydantic types
 def number(
     default: NumericType,
     *,
-    name: Optional[str] = None,
+    name: str,
     min: Optional[NumericType] = None,
     max: Optional[NumericType] = None
 ) -> NumericType
@@ -26,7 +26,7 @@ def number(
 def int(
     default: int,
     *,
-    name: Optional[str] = None,
+    name: str,
     min: Optional[int] = None,
     max: Optional[int] = None
 ) -> int
@@ -38,7 +38,7 @@ def int(
 def multi_number(
     default: List[NumericType] = [],
     *,
-    name: Optional[str] = None,
+    name: str,
     min: Optional[NumericType] = None,
     max: Optional[NumericType] = None
 ) -> List[NumericType]
@@ -46,11 +46,18 @@ def multi_number(
 def multi_int(
     default: List[int] = [],
     *,
-    name: Optional[str] = None,
+    name: str,
     min: Optional[int] = None,
     max: Optional[int] = None
 ) -> List[int]
 ```
+
+### Parameters
+
+* `default`: Default value (single value) or list of default values (multi methods)
+* `name`: Required name for the parameter (used for identification and access)
+* `min`: Optional minimum value constraint
+* `max`: Optional maximum value constraint
 
 ## Type Flexibility
 
@@ -63,7 +70,7 @@ The first argument in both methods is the default value:
 
 ```python
 # Number parameters accept both types
-temperature = hp.number(0.7, min=0, max=1) # min and max are optional
+temperature = hp.number(0.7, name="temperature", min=0, max=1) # min and max are optional
 config(values={"temperature": 0.5})  # Float OK
 config(values={"temperature": 1})    # Integer OK
 

@@ -16,7 +16,7 @@ The `select` and `multi_select` methods enable categorical parameter configurati
 def select(
     options: Union[Dict[ValidKeyType, Any], List[ValidKeyType]],
     *,
-    name: Optional[str] = None,
+    name: str,
     default: Optional[ValidKeyType] = None,
     options_only: bool = False
 ) -> Any
@@ -28,7 +28,7 @@ def select(
 def multi_select(
     options: Union[Dict[ValidKeyType, Any], List[ValidKeyType]],
     *,
-    name: Optional[str] = None,
+    name: str,
     default: List[ValidKeyType] = None,
     options_only: bool = False
 ) -> List[Any]
@@ -37,6 +37,7 @@ def multi_select(
 ### Parameters
 
 * `options`: Either a list of valid values or a dictionary mapping keys to values
+* `name`: Required name for the parameter (used for identification and access)
 * `default`: Default value(s) if none provided (single value for select, list for multi\_select)
 * `options_only`: When True, only allows values from the predefined options
 

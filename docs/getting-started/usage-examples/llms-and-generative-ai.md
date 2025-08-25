@@ -18,13 +18,13 @@ from hypster import HP, config
 
 @config
 def llm_config(hp: HP):
-    model_name = hp.select(["gpt-4o-mini", "gpt-4o"])
-    temperature = hp.number(0.0, min=0.0, max=1.0)
-    max_tokens = hp.int(256, max=2048)
+    model_name = hp.select(["gpt-4o-mini", "gpt-4o"], name="model_name")
+    temperature = hp.number(0.0, min=0.0, max=1.0, name="temperature")
+    max_tokens = hp.int(256, max=2048, name="max_tokens")
 
-def generate(prompt: str, 
-             model_name: str, 
-             temperature: float, 
+def generate(prompt: str,
+             model_name: str,
+             temperature: float,
              max_tokens: int) -> str:
     model = llm.get_model(model_name)
     return model.prompt(prompt, temperature=temperature, max_tokens=max_tokens)
@@ -35,8 +35,8 @@ os.environ["OPENAI_API_KEY"] = "..."
 # Create configurations for different use cases
 final_vars = ["model_name", "temperature", "max_tokens"]
 default_config = llm_config(final_vars=final_vars)
-creative_config = llm_config(values={"model_name": "gpt-4o", 
-                                     "temperature": 1.0}, 
+creative_config = llm_config(values={"model_name": "gpt-4o",
+                                     "temperature": 1.0},
                              final_vars=final_vars)
 
 # Example prompts

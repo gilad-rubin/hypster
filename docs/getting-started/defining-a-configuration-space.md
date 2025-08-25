@@ -21,7 +21,24 @@ This makes sure we have the `@config` decorater and `HP` class for type annotati
 def my_config(hp: HP):
 ```
 
-The function definition consists of the `@config` decorator and the signature. Including the `HP` (HyperParameter) type hint will enable IDE features like code suggestions and type checking.&#x20;
+The function definition consists of the `@config` decorator and the signature. Including the `HP` (HyperParameter) type hint will enable IDE features like code suggestions and type checking.
+
+#### Optional Registration
+
+You can optionally register your configuration in the global registry for easy reuse:
+
+```python
+@config(register="models.my_model")
+def my_config(hp: HP):
+    # Configuration body...
+```
+
+The `register` parameter allows you to:
+- **Store** configurations in a global registry with namespace organization
+- **Reuse** configurations across different parts of your application
+- **Discover** available configurations through `hp.nest()` calls
+
+Registered configurations can be accessed using `hp.nest("models.my_model")` from any other configuration. See the [Configuration Registry](../advanced/registry.md) documentation for more details.
 {% endstep %}
 
 {% step %}
@@ -32,9 +49,9 @@ The function definition consists of the `@config` decorator and the signature. I
 def my_config(hp: HP):
     from package import Class
 
-    var = hp.select(["a", "b", "c"], default="a")
-    num = hp.number(10)
-    text = hp.text("Hey!")
+    var = hp.select(["a", "b", "c"], default="a", name="var")
+    num = hp.number(10, name="num")
+    text = hp.text("Hey!", name="text")
 
     instance = Class(var=var, num=num, text=text)
 ```
@@ -46,6 +63,8 @@ Hypster comes with the following HP calls:
 * `hp.number()`and `hp.multi_number()` for [numeric values](../in-depth/hp-call-types/int-and-multi-int.md)
 * `hp.text()` and `hp.multi_text()` for [string values](../in-depth/hp-call-types/text-and-multi-text.md)
 * `hp.bool()` and `hp.multi_bool()` for [boolean values](../in-depth/hp-call-types/bool-and-multi-bool.md)
+
+**Important**: All HP method calls require a `name` parameter to identify the parameter.
 
 Please note:
 

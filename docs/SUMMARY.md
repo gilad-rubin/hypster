@@ -15,7 +15,6 @@
 
 ## In Depth
 
-* [🤖 Parameter Naming](in-depth/automatic-naming.md)
 * [🍱 HP Call Types](in-depth/hp-call-types/README.md)
   * [Selectable Types](in-depth/hp-call-types/select-and-multi-select.md)
   * [Numeric Types](in-depth/hp-call-types/int-and-multi-int.md)
@@ -26,6 +25,7 @@
 
 ## Advanced
 
+* [Configuration Registry](advanced/registry.md)
 * [Nesting](advanced/nesting.md)
 * [Usage tips / Best Practices](advanced/usage-tips-best-practices.md)
 * [Saving & Loading Configs](advanced/saving-and-loading-configs.md)

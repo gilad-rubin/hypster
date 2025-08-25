@@ -20,21 +20,21 @@ def classifier_config(hp: HP):
 
     # Define the model type choice
     model_type = hp.select(["random_forest", "hist_boost"],
-                           default="hist_boost")
+                           default="hist_boost", name="model_type")
 
     # Create the classifier based on selection
     if model_type == "hist_boost":
-        learning_rate = hp.number(0.01, min=0.001, max=0.1)
-        max_depth = hp.int(10, min=3, max=20)
+        learning_rate = hp.number(0.01, min=0.001, max=0.1, name="learning_rate")
+        max_depth = hp.int(10, min=3, max=20, name="max_depth")
 
         classifier = HistGradientBoostingClassifier(
             learning_rate=learning_rate,
             max_depth=max_depth,
         )
     else:  # model_type == "random_forest"
-        n_estimators = hp.int(100, min=10, max=500)
-        max_depth = hp.int(5, min=3, max=10)
-        bootstrap = hp.bool(default=True)
+        n_estimators = hp.int(100, min=10, max=500, name="n_estimators")
+        max_depth = hp.int(5, min=3, max=10, name="max_depth")
+        bootstrap = hp.bool(default=True, name="bootstrap")
 
         classifier = RandomForestClassifier(
             n_estimators=n_estimators,

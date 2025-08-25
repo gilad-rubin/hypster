@@ -36,7 +36,7 @@ Hypster provides several parameter types to handle different configuration needs
 
 All selectable & value-based types support:
 
-* Automatic name inference
+* Required parameter naming for identification
 * Interactive UI widgets
 * Type validation
 * Default values

@@ -8,15 +8,20 @@ Hypster provides boolean parameter configuration through `bool` and `multi_bool`
 def bool(
     default: bool,
     *,
-    name: Optional[str] = None
+    name: str
 ) -> bool
 
 def multi_bool(
     default: List[bool] = [],
     *,
-    name: Optional[str] = None
+    name: str
 ) -> List[bool]
 ```
+
+### Parameters
+
+* `default`: Default boolean value (single) or list of boolean values (multi)
+* `name`: Required name for the parameter (used for identification and access)
 
 ## Usage Examples
 
@@ -24,8 +29,8 @@ def multi_bool(
 
 ```python
 # Single boolean parameter with default
-stream = hp.bool(True)
-use_cache = hp.bool(False)
+stream = hp.bool(True, name="stream")
+use_cache = hp.bool(False, name="use_cache")
 
 # Usage
 config(values={"stream": False})

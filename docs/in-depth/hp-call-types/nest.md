@@ -10,7 +10,7 @@ Hypster enables hierarchical configuration management through the `hp.nest()` me
 def nest(
     config_func: Union[str, Path, "Hypster"],
     *,
-    name: Optional[str] = None,
+    name: str,
     final_vars: List[str] = [],
     exclude_vars: List[str] = [],
     values: Dict[str, Any] = {}
@@ -20,7 +20,7 @@ def nest(
 #### Parameters
 
 * `config_func`: Either a path to a saved configuration or a Hypster config object
-* `name`: Optional name for the nested configuration (used in dot notation)
+* `name`: Required name for the nested configuration (used in dot notation)
 * `final_vars`: List of variables that cannot be modified by parent configs
 * `exclude_vars`: List of variables to exclude from the configuration
 * `values`: Dictionary of values to override in the nested configuration
@@ -59,10 +59,10 @@ llm_config.save("configs/llm.py")
 @config
 def qa_config(hp: HP):
     # Load and nest LLM configuration
-    llm = hp.nest("configs/llm.py")
+    llm = hp.nest("configs/llm.py", name="llm")
 
     # Add QA-specific parameters
-    max_context_length = hp.int(1000, min=100, max=2000)
+    max_context_length = hp.int(1000, min=100, max=2000, name="max_context_length")
 
     # Combine LLM and QA parameters
     qa_pipeline = QAPipeline(
@@ -88,15 +88,67 @@ qa_config(values={
 
 ## Configuration Sources
 
-`hp.nest()` accepts two types of sources:
+`hp.nest()` supports multiple configuration sources with automatic resolution in the following priority order:
+
+1. **Registry Lookup** (highest priority)
+2. **File Path**
+3. **Module Import**
+4. **Direct Configuration Object**
+
+### Registry Lookup
+
+Access configurations registered in the global registry:
+
+```python
+# First register configurations
+@config(register="llm.openai")
+def openai_config(hp: HP):
+    model = hp.select(["gpt-3.5-turbo", "gpt-4"], default="gpt-3.5-turbo")
+    temperature = hp.number(0.7, min=0, max=1)
+
+@config(register="llm.anthropic")
+def anthropic_config(hp: HP):
+    model = hp.select(["claude-3-haiku", "claude-3-sonnet"], default="claude-3-haiku")
+    temperature = hp.number(0.7, min=0, max=1)
+
+# Then use in nesting
+@config
+def rag_config(hp: HP):
+    # Registry lookup - tries "llm.openai" first
+    llm = hp.nest("llm.openai", name="llm")
+
+    # Dynamic selection from registry
+    provider = hp.select(["openai", "anthropic"], default="openai", name="provider")
+    llm_dynamic = hp.nest(f"llm.{provider}", name="llm_dynamic")
+```
 
 ### Path to Configuration File
 
+Load configurations from file paths (supports `.py`, `.json`, `.yaml`):
+
 ```python
-llm = hp.nest("configs/llm.py")
+# Basic file loading
+llm = hp.nest("configs/llm.py", name="llm")
+
+# File with specific object
+embeddings = hp.nest("configs/models.py:embedding_config", name="embeddings")
+```
+
+### Module Import
+
+Import configurations from Python modules:
+
+```python
+# Import from module
+config = hp.nest("my_package.configs.llm", name="config")
+
+# Import specific object from module
+reranker = hp.nest("my_package.models:cohere_reranker", name="reranker")
 ```
 
 ### Direct Configuration Object
+
+Use pre-loaded configuration objects:
 
 ```python
 from hypster import load
@@ -105,7 +157,7 @@ from hypster import load
 llm_config = load("configs/llm.py")
 
 # Use the loaded config
-qa_config = hp.nest(llm_config)
+qa_config = hp.nest(llm_config, name="qa_config")
 ```
 
 ## Value Assignment
@@ -138,10 +190,10 @@ Configurations can be nested multiple times to create modular, reusable componen
 @config
 def indexing_config(hp: HP):
     # Reuse LLM config for document processing
-    llm = hp.nest("configs/llm.py")
+    llm = hp.nest("configs/llm.py", name="llm")
 
     # Indexing-specific parameters
-    embedding_dim = hp.int(512, min=128, max=1024)
+    embedding_dim = hp.int(512, min=128, max=1024, name="embedding_dim")
 
     # Process documents with LLM
     enriched_docs = process_documents(
@@ -153,10 +205,10 @@ def indexing_config(hp: HP):
 @config
 def rag_config(hp: HP):
     # Reuse indexing config (which includes LLM config)
-    indexing = hp.nest("configs/indexing.py")
+    indexing = hp.nest("configs/indexing.py", name="indexing")
 
     # Add retrieval configuration
-    retrieval = hp.nest("configs/retrieval.py")
+    retrieval = hp.nest("configs/retrieval.py", name="retrieval")
 ```
 
 ## Passing Values to Nested Configs
@@ -166,6 +218,7 @@ Use the `values` parameter to pass dependent values to nested configuration valu
 ```python
 retrieval = hp.nest(
     "configs/retrieval.py",
+    name="retrieval",
     values={
         "embedding_dim": indexing["embedding_dim"],
         "top_k": 5

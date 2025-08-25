@@ -8,15 +8,20 @@ Hypster provides string parameter configuration through `text` and `multi_text` 
 def text(
     default: str,
     *,
-    name: Optional[str] = None
+    name: str
 ) -> str
 
 def multi_text(
     default: List[str] = [],
     *,
-    name: Optional[str] = None
+    name: str
 ) -> List[str]
 ```
+
+### Parameters
+
+* `default`: Default text value (single) or list of text values (multi)
+* `name`: Required name for the parameter (used for identification and access)
 
 ## Usage Examples
 
@@ -24,8 +29,8 @@ def multi_text(
 
 ```python
 # Single text parameter with default
-model_name = hp.text("gpt-4")
-prompt_prefix = hp.text("You are a helpful assistant.")
+model_name = hp.text("gpt-4", name="model_name")
+prompt_prefix = hp.text("You are a helpful assistant.", name="prompt_prefix")
 
 # Usage
 config(values={"model_name": "claude-3"})
