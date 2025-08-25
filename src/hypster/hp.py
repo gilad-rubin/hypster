@@ -171,6 +171,8 @@ class HP:
             run_history=config_func.run_history,
             run_id=self.run_id,
             source=self.source,
+            final_vars=call.processed_final_vars,
+            exclude_vars=call.processed_exclude_vars,
         )
         self.run_history.add_record(record)
         return result
@@ -213,11 +215,24 @@ class HP:
 
     def get_collected_values(self) -> Dict[str, Any]:
         """Get all parameter values that were collected during execution"""
+        from .run_history import NestedHistoryRecord, ParameterRecord
+
         result = {}
         latest_records = self.run_history.get_latest_run_records()
+
         for name, record in latest_records.items():
             if isinstance(record, ParameterRecord):
-                result[name] = record.value
+                # Apply final_vars and exclude_vars filtering for regular parameters
+                if name in self.exclude_vars:
+                    continue  # Skip excluded variables
+                if not self.final_vars or name in self.final_vars:
+                    result[name] = record.value
+            elif isinstance(record, NestedHistoryRecord):
+                # Get the collected values from the nested configuration
+                # Use the final_vars and exclude_vars that were stored during execution
+                nested_hp = HP(record.final_vars, record.exclude_vars, {}, record.run_history, record.run_id, False)
+                nested_result = nested_hp.get_collected_values()
+                result[name] = nested_result
         return result
 
     def _get_potential_values(self, name: str) -> List[Any]:

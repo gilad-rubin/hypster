@@ -84,6 +84,10 @@ class Hypster:
         nested_vars = self.find_nested_vars(final_vars, self.run_history)
         final_vars = [var for var in final_vars if var not in nested_vars]
 
+        # Remove excluded vars from final_vars to avoid checking for their existence
+        if exclude_vars:
+            final_vars = [var for var in final_vars if var not in exclude_vars]
+
         if not final_vars:
             final_result = collected_values.copy()
         else:
@@ -98,12 +102,66 @@ class Hypster:
 
         # Apply exclude_vars after final_vars filtering
         if exclude_vars:
-            final_result = {k: v for k, v in final_result.items() if k not in exclude_vars}
+            final_result = self._apply_exclude_vars(final_result, exclude_vars)
+
+        # Convert dotted keys to nested dictionaries
+        final_result = self._create_nested_structure(final_result)
 
         logger.debug("Collected values: %s", collected_values)
         logger.debug("Final result after filtering: %s", final_result)
 
         return final_result
+
+    def _apply_exclude_vars(self, data: Dict[str, Any], exclude_vars: List[str]) -> Dict[str, Any]:
+        """Apply exclude_vars filtering with support for dotted notation."""
+        result = {}
+
+        for key, value in data.items():
+            should_exclude = False
+
+            # Check if this key should be excluded
+            for exclude_pattern in exclude_vars:
+                if exclude_pattern == key:
+                    # Direct match
+                    should_exclude = True
+                    break
+                elif exclude_pattern.startswith(f"{key}."):
+                    # This is a nested exclusion for this key
+                    if isinstance(value, dict):
+                        # Apply nested exclusion
+                        nested_exclude_pattern = exclude_pattern[len(key) + 1 :]  # Remove "key." prefix
+                        value = self._apply_exclude_vars(value, [nested_exclude_pattern])
+                    # Don't exclude the key itself, but continue with modified value
+                    break
+
+            if not should_exclude:
+                result[key] = value
+
+        return result
+
+    def _create_nested_structure(self, flat_dict: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert flat dictionary with dotted keys to nested structure."""
+        result = {}
+
+        for key, value in flat_dict.items():
+            if "." in key:
+                # Split the key into parts
+                parts = key.split(".")
+                current = result
+
+                # Navigate/create the nested structure
+                for part in parts[:-1]:
+                    if part not in current:
+                        current[part] = {}
+                    current = current[part]
+
+                # Set the final value
+                current[parts[-1]] = value
+            else:
+                # Simple key, just set directly
+                result[key] = value
+
+        return result
 
     def find_nested_vars(self, vars: List[str], run_history: HistoryDatabase) -> List[str]:
         """Find variables that reference nested configurations.
@@ -191,6 +249,11 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
         filtered_lines.append(line)
 
     func_source = "\n".join(filtered_lines)
+
+    # Remove leading indentation to make the function start at the left margin
+    import textwrap
+
+    func_source = textwrap.dedent(func_source)
 
     # Add the import statement
     modified_source = "from hypster import HP\n\n" + func_source

@@ -7,9 +7,9 @@ from hypster import HP, config
 def test_defaults_selections_overrides():
     @config
     def config_func(hp: HP):
-        model = hp.select(["cnn", "rnn", "transformer"], default="cnn")
-        lr = hp.number(0.001)
-        epochs = hp.number(10)
+        model = hp.select(["cnn", "rnn", "transformer"], default="cnn", name="model")
+        lr = hp.number(0.001, name="lr")
+        epochs = hp.number(10, name="epochs")
 
     # Test defaults
     result = config_func()
@@ -98,9 +98,9 @@ def test_error_cases():
 def test_final_vars():
     @config
     def config_func(hp: HP):
-        model = hp.select(["cnn", "rnn"], default="cnn")
-        lr = hp.number(0.001)
-        epochs = hp.number(10)
+        model = hp.select(["cnn", "rnn"], default="cnn", name="model")
+        lr = hp.number(0.001, name="lr")
+        epochs = hp.number(10, name="epochs")
 
     # Test partial final_vars
     result = config_func(final_vars=["model", "lr"])
@@ -129,16 +129,16 @@ def test_pythonic_api():
     @config
     def config_func(hp: HP):
         # Test conditional statements
-        dataset_size = hp.select(["small", "medium", "large"], default="medium")
+        dataset_size = hp.select(["small", "medium", "large"], default="medium", name="dataset_size")
         if dataset_size == "small":
-            model = hp.select(["simple_cnn", "small_rnn"], default="simple_cnn")
+            model = hp.select(["simple_cnn", "small_rnn"], default="simple_cnn", name="model")
         elif dataset_size == "medium":
-            model = hp.select(["resnet", "lstm"], default="lstm")
+            model = hp.select(["resnet", "lstm"], default="lstm", name="model")
         else:
-            model = hp.select(["transformer", "large_cnn"], default="transformer")
+            model = hp.select(["transformer", "large_cnn"], default="transformer", name="model")
 
         # Test loops
-        num_layers = hp.select([3, 5, 7], default=5)
+        num_layers = hp.select([3, 5, 7], default=5, name="num_layers")
         layer_sizes = []
         for i in range(num_layers):
             layer_sizes.append(hp.select([32, 64, 128], default=64, name=f"layer_{i}_size"))
@@ -147,19 +147,23 @@ def test_pythonic_api():
     result = config_func(values={"model": "resnet"})
     assert result["dataset_size"] == "medium"
     assert result["model"] in ["resnet", "lstm"]
-    assert len(result["layer_sizes"]) == 5
-    assert all(size == 64 for size in result["layer_sizes"])
+    # Check that we have the expected number of layer parameters
+    layer_params = [k for k in result.keys() if k.startswith("layer_") and k.endswith("_size")]
+    assert len(layer_params) == 5
+    assert all(result[layer_param] == 64 for layer_param in layer_params)
 
     # Test with different selections
     result = config_func(values={"dataset_size": "large", "num_layers": 3})
     assert result["dataset_size"] == "large"
     assert result["model"] in ["transformer", "large_cnn"]
-    assert len(result["layer_sizes"]) == 3
+    # Check that we have the expected number of layer parameters
+    layer_params = [k for k in result.keys() if k.startswith("layer_") and k.endswith("_size")]
+    assert len(layer_params) == 3
 
     # Test overrides for loop-generated values
     result = config_func(values={"layer_0_size": 32, "layer_1_size": 128})
-    assert result["layer_sizes"][0] == 32
-    assert result["layer_sizes"][1] == 128
+    assert result["layer_0_size"] == 32
+    assert result["layer_1_size"] == 128
 
 
 @config
@@ -176,7 +180,7 @@ def complex_config(hp: HP):
     b = func(6)
     c = TestClass("hey")
     cwd = os.getcwd()
-    nested_param = hp.select(["a", "b"], default="a")
+    nested_param = hp.select(["a", "b"], name="nested_param", default="a")
 
 
 complex_config.save("tests/helper_configs/complex_config.py")
@@ -187,23 +191,51 @@ def test_save_load_complex_module():
 
     results = complex_config()
 
-    assert results["b"] == 6
-    assert results["c"].hello == "hey"
+    # Only HP parameters are returned in the new behavior
     assert results["nested_param"] == "a"
+
+    # Test with different values
+    results = complex_config(values={"nested_param": "b"})
+    assert results["nested_param"] == "b"
+
+
+def test_multi_select_defaults_values():
+    @config
+    def config_func(hp: HP):
+        options = hp.multi_select(["option1", "option2", "option3"], name="options", default=["option1", "option2"])
+
+    # Test defaults
+    result = config_func()
+    assert result["options"] == ["option1", "option2"]
+
+    # Test selections
+    result = config_func(values={"options": ["option2", "option3"]})
+    assert result["options"] == ["option2", "option3"]
+
+    # Test overrides
+    result = config_func(values={"options": ["option1", "option3"]})
+    assert result["options"] == ["option1", "option3"]
+
+    # Test precedence: overrides > selections > defaults
+    result = config_func(values={"options": ["option2"]})
+    assert result["options"] == ["option2"]
 
 
 def test_nesting():
     @config
     def nested_config(hp: HP):
-        nested_param = hp.select(["a", "b"], default="a")
+        nested_param = hp.select(["a", "b"], name="nested_param", default="a")
 
     hypster.save(nested_config, "tests/helper_configs/nested_config.py")
 
     @config
     def main_config(hp: HP):
-        nested = hp.nest("tests/helper_configs/nested_config.py")
+        nested = hp.nest(
+            "tests/helper_configs/nested_config.py",
+            name="nested",
+        )
 
-        main_param = hp.select(["x", "y"], default="x")
+        main_param = hp.select(["x", "y"], name="main_param", default="x")
 
     # Test defaults
     result = main_config()
@@ -212,44 +244,6 @@ def test_nesting():
 
     # Test selections for nested config
     result = main_config(values={"nested.nested_param": "b"})
-    assert result["main_param"] == "x"
-    assert result["nested"]["nested_param"] == "b"
-
-    # Test overrides for both main and nested configs
-    result = main_config(values={"main_param": "y", "nested.nested_param": "b"})
-    assert result["main_param"] == "y"
-    assert result["nested"]["nested_param"] == "b"
-
-    # Test selections for nested config
-    result = main_config(values={"nested": {"nested_param": "b"}})
-    assert result["main_param"] == "x"
-    assert result["nested"]["nested_param"] == "b"
-
-    # Test overrides for both main and nested configs
-    result = main_config(values={"main_param": "y", "nested": {"nested_param": "b"}})
-    assert result["main_param"] == "y"
-    assert result["nested"]["nested_param"] == "b"
-
-
-def test_nesting():
-    @config
-    def nested_config(hp: HP):
-        nested_param = hp.select(["a", "b"], default="a")
-
-    hypster.save(nested_config, "tests/helper_configs/nested_config.py")
-
-    @config
-    def main_config(hp: HP):
-        nested = hp.nest(
-            "tests/helper_configs/nested_config.py",
-            final_vars=["nested_param"],
-            values={"nested_param": "b"},
-        )
-
-        main_param = hp.select(["x", "y"], default="x")
-
-    # Test defaults
-    result = main_config()
     assert result["main_param"] == "x"
     assert result["nested"]["nested_param"] == "b"
 
@@ -277,7 +271,7 @@ def test_nesting():
 def test_multi_select_defaults_values():
     @config
     def config_func(hp: HP):
-        options = hp.multi_select(["option1", "option2", "option3"], default=["option1", "option2"])
+        options = hp.multi_select(["option1", "option2", "option3"], name="options", default=["option1", "option2"])
 
     # Test defaults
     result = config_func()
@@ -305,6 +299,7 @@ def test_multi_select_dict_defaults_overrides_selections():
 
         options = hp.multi_select(
             {"option1": 1, "option2": 2},
+            name="options",
             default=["option1", "option2"],
         )
 
@@ -372,7 +367,7 @@ def test_multi_number_defaults_overrides_selections():
 def test_multi_select_error_cases():
     @config
     def config_func(hp: HP):
-        hp.multi_select([], default=[])
+        hp.multi_select([], name="empty_options", default=[])
 
     # Test empty options
     with pytest.raises(Exception):
@@ -383,7 +378,7 @@ def test_multi_select_error_cases():
 
         @config
         def bad_default(hp: HP):
-            hp.multi_select(["a", "b"], default=["c"])
+            hp.multi_select(["a", "b"], name="bad_default", default=["c"])
 
         bad_default()
 
@@ -391,7 +386,7 @@ def test_multi_select_error_cases():
 def test_multi_text_error_cases():
     @config
     def config_func(hp: HP):
-        hp.multi_text(default=["default"])
+        hp.multi_text(name="multi_text", default=["default"])
 
     # multi_text does not have complex validation, but we can test type enforcement if implemented.
 
@@ -399,6 +394,6 @@ def test_multi_text_error_cases():
 def test_multi_number_error_cases():
     @config
     def config_func(hp: HP):
-        hp.multi_number(default=[1, 2])
+        hp.multi_number(name="multi_number", default=[1, 2])
 
     # multi_number does not have complex validation, but we can test type enforcement if implemented.

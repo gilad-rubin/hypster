@@ -19,7 +19,13 @@ It offers minimal, intuitive pythonic syntax, supporting hierarchical and swappa
 
 ## Installation
 
-You can install Hypster using pip:
+You can install Hypster using uv:
+
+```bash
+uv add hypster
+```
+
+Or using pip:
 
 ```bash
 pip install hypster

@@ -38,6 +38,8 @@ class NestedHistoryRecord(HistoryRecord):
     """Record type for nested configurations from nest calls"""
 
     run_history: "HistoryDatabase"  # Forward reference
+    final_vars: List[str] = []
+    exclude_vars: List[str] = []
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

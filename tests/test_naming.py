@@ -88,20 +88,20 @@ def test_class_naming():
             learning_rate=hp.number(0.001, name="model.learning_rate"),
         )
 
-    # Test with defaults
+    # Test with defaults - check the nested structure created from dotted names
     result = config_func()
-    assert result["model"].model_type == "cnn"
-    assert result["model"].learning_rate == 0.001
+    assert result["model"]["model_type"] == "cnn"
+    assert result["model"]["learning_rate"] == 0.001
 
     # Test with selections
     result = config_func(values={"model.model_type": "rnn"})
-    assert result["model"].model_type == "rnn"
-    assert result["model"].learning_rate == 0.001
+    assert result["model"]["model_type"] == "rnn"
+    assert result["model"]["learning_rate"] == 0.001
 
     # Test with overrides
     result = config_func(values={"model.learning_rate": 0.01})
-    assert result["model"].model_type == "cnn"
-    assert result["model"].learning_rate == 0.01
+    assert result["model"]["model_type"] == "cnn"
+    assert result["model"]["learning_rate"] == 0.01
 
 
 def test_function_naming():
@@ -115,20 +115,20 @@ def test_function_naming():
             param2=hp.number(10, name="result.param2"),
         )
 
-    # Test with defaults
+    # Test with defaults - check the nested structure created from dotted names
     result = config_func()
-    assert result["result"][0] == "a"
-    assert result["result"][1] == 10
+    assert result["result"]["param1"] == "a"
+    assert result["result"]["param2"] == 10
 
     # Test with selections
     result = config_func(values={"result.param1": "b"})
-    assert result["result"][0] == "b"
-    assert result["result"][1] == 10
+    assert result["result"]["param1"] == "b"
+    assert result["result"]["param2"] == 10
 
     # Test with overrides
     result = config_func(values={"result.param2": 20})
-    assert result["result"][0] == "a"
-    assert result["result"][1] == 20
+    assert result["result"]["param1"] == "a"
+    assert result["result"]["param2"] == 20
 
 
 def test_disable_automatic_naming_with_explicit_names():
@@ -144,16 +144,16 @@ def test_disable_automatic_naming_with_explicit_names():
             learning_rate=hp.number(0.001, name="learning_rate"),
         )
 
-    # Test with explicit names
+    # Test with explicit names - parameters appear directly in result
     result = class_kwargs_naming()
-    assert result["model"].model_type == "cnn"
-    assert result["model"].learning_rate == 0.001
+    assert result["model_type"] == "cnn"
+    assert result["learning_rate"] == 0.001
 
     result = class_kwargs_naming(values={"model_type": "rnn"})
-    assert result["model"].model_type == "rnn"
+    assert result["model_type"] == "rnn"
 
     result = class_kwargs_naming(values={"learning_rate": 0.01})
-    assert result["model"].learning_rate == 0.01
+    assert result["learning_rate"] == 0.01
 
 
 def test_disable_automatic_naming_missing_name_error():
@@ -172,4 +172,4 @@ def test_non_constant_name():
         a = hp.select(["a", "b"], name=f"hey_{var}")
 
     results = my_config(values={"hey_a": "a"})
-    assert results["a"] == "a"
+    assert results["hey_a"] == "a"

@@ -10,8 +10,8 @@ def test_bool_with_default():
         value = hp.bool(default=True, name="param")
 
     result = config_func()
-    assert result["value"] is True
-    assert isinstance(result["value"], bool)
+    assert result["param"] is True
+    assert isinstance(result["param"], bool)
 
 
 def test_bool_without_default():
@@ -40,8 +40,8 @@ def test_bool_with_values():
         value = hp.bool(default=True, name="param")
 
     result = config_func(values={"param": False})
-    assert result["value"] is False
-    assert isinstance(result["value"], bool)
+    assert result["param"] is False
+    assert isinstance(result["param"], bool)
 
 
 def test_bool_invalid_values():
@@ -60,8 +60,8 @@ def test_multi_bool_with_default():
         values = hp.multi_bool(default=[True, False], name="param")
 
     result = config_func()
-    assert result["values"] == [True, False]
-    assert all(isinstance(x, bool) for x in result["values"])
+    assert result["param"] == [True, False]
+    assert all(isinstance(x, bool) for x in result["param"])
 
 
 def test_multi_bool_without_default():
@@ -70,7 +70,7 @@ def test_multi_bool_without_default():
         values = hp.multi_bool(name="param")
 
     results = config_func()
-    assert results["values"] == []
+    assert results["param"] == []
 
 
 def test_multi_bool_invalid_default():
@@ -89,7 +89,7 @@ def test_multi_bool_with_values():
         values = hp.multi_bool(default=[True, True], name="param")
 
     result = config_func(values={"param": [False, False]})
-    assert result["values"] == [False, False]
+    assert result["param"] == [False, False]
 
 
 def test_multi_bool_invalid_values():

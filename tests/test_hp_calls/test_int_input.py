@@ -10,8 +10,8 @@ def test_int_with_default():
         value = hp.int(default=42, name="param")
 
     result = config_func()
-    assert result["value"] == 42
-    assert isinstance(result["value"], int)
+    assert result["param"] == 42
+    assert isinstance(result["param"], int)
 
 
 def test_int_without_default():
@@ -50,8 +50,8 @@ def test_int_with_values():
         value = hp.int(default=42, name="param")
 
     result = config_func(values={"param": 100})
-    assert result["value"] == 100
-    assert isinstance(result["value"], int)
+    assert result["param"] == 100
+    assert isinstance(result["param"], int)
 
 
 def test_int_invalid_values():
@@ -69,8 +69,8 @@ def test_multi_int_with_default():
         values = hp.multi_int(default=[1, 2, 3], name="param")
 
     result = config_func()
-    assert result["values"] == [1, 2, 3]
-    assert all(isinstance(x, int) for x in result["values"])
+    assert result["param"] == [1, 2, 3]
+    assert all(isinstance(x, int) for x in result["param"])
 
 
 def test_multi_int_without_default():
@@ -79,7 +79,7 @@ def test_multi_int_without_default():
         values = hp.multi_int(name="param")
 
     results = config_func()
-    assert results["values"] == []
+    assert results["param"] == []
 
 
 def test_multi_int_invalid_default():
@@ -98,7 +98,7 @@ def test_multi_int_with_values():
         values = hp.multi_int(default=[1, 2], name="param")
 
     result = config_func(values={"param": [3, 4]})
-    assert result["values"] == [3, 4]
+    assert result["param"] == [3, 4]
 
 
 def test_multi_int_invalid_values():
@@ -126,7 +126,7 @@ def test_int_with_min():
         value = hp.int(default=5, min=0, name="param")
 
     result = config_func()
-    assert result["value"] == 5
+    assert result["param"] == 5
 
 
 def test_int_with_max():
@@ -135,7 +135,7 @@ def test_int_with_max():
         value = hp.int(default=5, max=10, name="param")
 
     result = config_func()
-    assert result["value"] == 5
+    assert result["param"] == 5
 
 
 def test_int_with_min_max():
@@ -144,7 +144,7 @@ def test_int_with_min_max():
         value = hp.int(default=5, min=0, max=10, name="param")
 
     result = config_func()
-    assert result["value"] == 5
+    assert result["param"] == 5
 
 
 def test_int_default_below_min():
@@ -192,7 +192,7 @@ def test_multi_int_with_min():
         values = hp.multi_int(default=[5, 6], min=0, name="param")
 
     result = config_func()
-    assert result["values"] == [5, 6]
+    assert result["param"] == [5, 6]
 
 
 def test_multi_int_with_max():
@@ -201,7 +201,7 @@ def test_multi_int_with_max():
         values = hp.multi_int(default=[5, 6], max=10, name="param")
 
     result = config_func()
-    assert result["values"] == [5, 6]
+    assert result["param"] == [5, 6]
 
 
 def test_multi_int_with_min_max():
@@ -210,7 +210,7 @@ def test_multi_int_with_min_max():
         values = hp.multi_int(default=[5, 6], min=0, max=10, name="param")
 
     result = config_func()
-    assert result["values"] == [5, 6]
+    assert result["param"] == [5, 6]
 
 
 def test_multi_int_default_below_min():

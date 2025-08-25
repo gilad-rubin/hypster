@@ -10,7 +10,7 @@ def test_number_with_default():
         value = hp.number(default=0.5, name="param")
 
     result = config_func()
-    assert result["value"] == 0.5
+    assert result["param"] == 0.5
 
 
 def test_number_without_default():
@@ -39,7 +39,7 @@ def test_number_with_values():
         value = hp.number(default=0.5, name="param")
 
     result = config_func(values={"param": 1.5})
-    assert result["value"] == 1.5
+    assert result["param"] == 1.5
 
 
 def test_number_with_values_different_type():
@@ -48,7 +48,7 @@ def test_number_with_values_different_type():
         value = hp.number(default=0.5, name="param")
 
     result = config_func(values={"param": 1})  # this should work fine :)
-    assert result["value"] == 1
+    assert result["param"] == 1
 
 
 def test_number_invalid_values():
@@ -67,7 +67,7 @@ def test_multi_number_with_default():
         values = hp.multi_number(default=[1.0, 2.0], name="param")
 
     result = config_func()
-    assert result["values"] == [1.0, 2.0]
+    assert result["param"] == [1.0, 2.0]
 
 
 def test_multi_number_without_default():
@@ -76,7 +76,7 @@ def test_multi_number_without_default():
         values = hp.multi_number(name="param")
 
     result = config_func()
-    assert result["values"] == []
+    assert result["param"] == []
 
 
 def test_multi_number_invalid_default():
@@ -95,7 +95,7 @@ def test_multi_number_with_values():
         values = hp.multi_number(default=[1.0, 2.0], name="param")
 
     result = config_func(values={"param": [3.0, 4.0]})
-    assert result["values"] == [3.0, 4.0]
+    assert result["param"] == [3.0, 4.0]
 
 
 def test_multi_number_with_values():
@@ -104,7 +104,7 @@ def test_multi_number_with_values():
         values = hp.multi_number(default=[], name="param")
 
     result = config_func(values={"param": [3, 4.0]})
-    assert result["values"] == [3, 4.0]
+    assert result["param"] == [3, 4.0]
 
 
 def test_multi_number_invalid_values_type():
@@ -132,7 +132,7 @@ def test_number_with_min():
         value = hp.number(default=0.5, min=0.0, name="param")
 
     result = config_func()
-    assert result["value"] == 0.5
+    assert result["param"] == 0.5
 
 
 def test_number_with_max():
@@ -141,7 +141,7 @@ def test_number_with_max():
         value = hp.number(default=0.5, max=1.0, name="param")
 
     result = config_func()
-    assert result["value"] == 0.5
+    assert result["param"] == 0.5
 
 
 def test_number_with_min_max():
@@ -150,7 +150,7 @@ def test_number_with_min_max():
         value = hp.number(default=0.5, min=0.0, max=1.0, name="param")
 
     result = config_func()
-    assert result["value"] == 0.5
+    assert result["param"] == 0.5
 
 
 def test_number_default_below_min():
@@ -198,7 +198,7 @@ def test_multi_number_with_min():
         values = hp.multi_number(default=[0.5, 0.6], min=0.0, name="param")
 
     result = config_func()
-    assert result["values"] == [0.5, 0.6]
+    assert result["param"] == [0.5, 0.6]
 
 
 def test_multi_number_with_max():
@@ -207,7 +207,7 @@ def test_multi_number_with_max():
         values = hp.multi_number(default=[0.5, 0.6], max=1.0, name="param")
 
     result = config_func()
-    assert result["values"] == [0.5, 0.6]
+    assert result["param"] == [0.5, 0.6]
 
 
 def test_multi_number_with_min_max():
@@ -216,7 +216,7 @@ def test_multi_number_with_min_max():
         values = hp.multi_number(default=[0.5, 0.6], min=0.0, max=1.0, name="param")
 
     result = config_func()
-    assert result["values"] == [0.5, 0.6]
+    assert result["param"] == [0.5, 0.6]
 
 
 def test_multi_number_default_below_min():

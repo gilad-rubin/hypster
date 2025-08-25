@@ -83,6 +83,13 @@ class BaseOptionsHPCall(BaseHPCall):
     options_only: bool = False
     stored_value: Optional[StoredValue | MultiStoredValue] = None
 
+    @model_validator(mode="after")
+    def validate_options(self) -> "BaseOptionsHPCall":
+        """Validate that options is not empty"""
+        if not self.processed_options:
+            raise HPCallError(self.name, "Options cannot be empty")
+        return self
+
     @property
     def processed_options(self) -> Dict[BasicType, Any]:
         """Convert options to a dictionary if they are a list"""
@@ -131,7 +138,8 @@ class SelectCall(BaseOptionsHPCall):
             raise HPCallError(self.name, "Expected single value, got a list")
 
         processed_value, is_reproducible = self.validate_and_transform_value(value)
-        self.stored_value = StoredValue(value=value if is_reproducible else str(value), reproducible=is_reproducible)
+        stored_value = processed_value if is_reproducible else str(processed_value)
+        self.stored_value = StoredValue(value=stored_value, reproducible=is_reproducible)
         return processed_value
 
 
@@ -160,7 +168,7 @@ class MultiSelectCall(BaseOptionsHPCall):
         for item in value:
             processed_value, is_reproducible = self.validate_and_transform_value(item)
             results.append(processed_value)
-            stored_values.append(item if is_reproducible else str(item))
+            stored_values.append(processed_value if is_reproducible else str(processed_value))
             reproducible.append(is_reproducible)
 
         self.stored_value = MultiStoredValue(value=stored_values, reproducible=reproducible)
@@ -289,6 +297,8 @@ class NestedCall(BaseModel):
     """Handles nested configuration nesting."""
 
     name: str
+    processed_final_vars: List[str] = []
+    processed_exclude_vars: List[str] = []
 
     def execute(
         self,
@@ -308,10 +318,15 @@ class NestedCall(BaseModel):
         else:
             nested_final_vars = final_vars
 
+        # Combine both original exclude_vars (with prefix processing) and local exclude_vars
+        nested_exclude_vars = []
         if len(original_exclude_vars) > 0:
-            nested_exclude_vars = self._process_final_vars(original_exclude_vars)
-        else:
-            nested_exclude_vars = exclude_vars
+            nested_exclude_vars.extend(self._process_final_vars(original_exclude_vars))
+        nested_exclude_vars.extend(exclude_vars)
+
+        # Store the processed values for later use
+        self.processed_final_vars = nested_final_vars
+        self.processed_exclude_vars = nested_exclude_vars
 
         nested_values = values.copy()
         nested_values.update(self._extract_nested_dict(original_values))

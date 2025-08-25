@@ -10,7 +10,7 @@ def test_text_with_default():
         value = hp.text(default="hello", name="param")
 
     result = config_func()
-    assert result["value"] == "hello"
+    assert result["param"] == "hello"
 
 
 def test_text_without_default():
@@ -39,7 +39,7 @@ def test_text_with_values():
         value = hp.text(default="hello", name="param")
 
     result = config_func(values={"param": "world"})
-    assert result["value"] == "world"
+    assert result["param"] == "world"
 
 
 def test_text_invalid_values():
@@ -58,7 +58,7 @@ def test_multi_text_with_default():
         values = hp.multi_text(default=["a", "b"], name="param")
 
     result = config_func()
-    assert result["values"] == ["a", "b"]
+    assert result["param"] == ["a", "b"]
 
 
 def test_multi_text_without_default():
@@ -67,7 +67,7 @@ def test_multi_text_without_default():
         values = hp.multi_text(name="param")
 
     results = config_func()
-    assert results["values"] == []
+    assert results["param"] == []
 
 
 def test_multi_text_invalid_default():
@@ -86,7 +86,7 @@ def test_multi_text_with_values():
         values = hp.multi_text(default=["a", "b"], name="param")
 
     result = config_func(values={"param": ["c", "d"]})
-    assert result["values"] == ["c", "d"]
+    assert result["param"] == ["c", "d"]
 
 
 def test_multi_text_invalid_values():

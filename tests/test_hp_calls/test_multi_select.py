@@ -10,7 +10,7 @@ def test_multi_select_valid_options_list():
         values = hp.multi_select(["a", "b", "c"], default=["a", "b"], name="param")
 
     result = config_func()
-    assert result["values"] == ["a", "b"]
+    assert result["param"] == ["a", "b"]
 
 
 def test_multi_select_valid_options_dict():
@@ -19,7 +19,7 @@ def test_multi_select_valid_options_dict():
         values = hp.multi_select({"k1": "v1", "k2": "v2", "k3": "v3"}, default=["k1", "k2"], name="param")
 
     result = config_func()
-    assert result["values"] == ["v1", "v2"]
+    assert result["param"] == ["v1", "v2"]
 
 
 def test_multi_select_invalid_options_empty():
@@ -49,7 +49,7 @@ def test_multi_select_valid_default_from_options_list():
         values = hp.multi_select(["a", "b", "c"], default=["b", "c"], name="param")
 
     result = config_func()
-    assert result["values"] == ["b", "c"]
+    assert result["param"] == ["b", "c"]
 
 
 def test_multi_select_valid_default_from_options_dict():
@@ -58,7 +58,7 @@ def test_multi_select_valid_default_from_options_dict():
         values = hp.multi_select({"k1": "v1", "k2": "v2", "k3": "v3"}, default=["k2", "k3"], name="param")
 
     result = config_func()
-    assert result["values"] == ["v2", "v3"]
+    assert result["param"] == ["v2", "v3"]
 
 
 def test_multi_select_invalid_default_not_in_options_list():
@@ -87,7 +87,7 @@ def test_multi_select_empty_default_list():
         values = hp.multi_select(["a", "b", "c"], default=[], name="param")
 
     result = config_func()
-    assert result["values"] == []
+    assert result["param"] == []
 
 
 def test_multi_select_empty_default_dict():
@@ -96,7 +96,7 @@ def test_multi_select_empty_default_dict():
         values = hp.multi_select({"k1": "v1", "k2": "v2"}, default=[], name="param")
 
     result = config_func()
-    assert result["values"] == []
+    assert result["param"] == []
 
 
 # Selection behavior with list options
@@ -106,7 +106,7 @@ def test_multi_select_with_list():
         values = hp.multi_select(["a", "b", "c"], default=["a"], name="param")
 
     result = config_func(values={"param": ["b", "c"]})
-    assert result["values"] == ["b", "c"]
+    assert result["param"] == ["b", "c"]
 
 
 # Selection behavior with dict options
@@ -116,7 +116,7 @@ def test_multi_select_with_dict():
         values = hp.multi_select({"k1": "v1", "k2": "v2", "k3": "v3"}, default=["k1"], name="param")
 
     result = config_func(values={"param": ["k2", "k3"]})
-    assert result["values"] == ["v2", "v3"]
+    assert result["param"] == ["v2", "v3"]
 
 
 def test_multi_select_invalid_selection_type():
@@ -135,7 +135,7 @@ def test_multi_select_with_options_only():
 
     # Should work with valid values
     result = config_func(values={"param": ["b", "c"]})
-    assert result["values"] == ["b", "c"]
+    assert result["param"] == ["b", "c"]
 
     # Should fail with invalid values
     with pytest.raises(Exception):

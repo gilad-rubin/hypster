@@ -15,10 +15,10 @@ def test_select_valid_options_list():
 def test_select_valid_options_dict():
     @config
     def config_func(hp: HP):
-        value = hp.select({"k1": 3, "k2": 4.2}, default="k1")
+        value = hp.select({"k1": 3, "k2": 4.2}, default="k1", name="param")
 
     result = config_func()
-    assert result["value"] == 3
+    assert result["param"] == 3
 
 
 def test_select_invalid_options_empty():
@@ -48,7 +48,7 @@ def test_select_valid_default_from_options_list():
         value = hp.select(["a", "b", "c"], default="b", name="param")
 
     result = config_func()
-    assert result["value"] == "b"
+    assert result["param"] == "b"
 
 
 def test_select_valid_default_from_options_dict():
@@ -57,7 +57,7 @@ def test_select_valid_default_from_options_dict():
         value = hp.select({"k1": "v1", "k2": "v2"}, default="k2", name="param")
 
     result = config_func()
-    assert result["value"] == "v2"
+    assert result["param"] == "v2"
 
 
 def test_select_invalid_default_not_in_options_list():
@@ -86,7 +86,7 @@ def test_select_with_list():
         value = hp.select(["a", "b", "c"], default="a", name="param")
 
     result = config_func(values={"param": "b"})
-    assert result["value"] == "b"
+    assert result["param"] == "b"
 
 
 def test_select_with_dict():
@@ -95,7 +95,7 @@ def test_select_with_dict():
         value = hp.select({"k1": "v1", "k2": "v2"}, default="k1", name="param")
 
     result = config_func(values={"param": "k2"})
-    assert result["value"] == "v2"
+    assert result["param"] == "v2"
 
 
 def test_select_without_values():
@@ -104,7 +104,7 @@ def test_select_without_values():
         value = hp.select(["a", "b", "c"], default="a", name="param")
 
     result = config_func()
-    assert result["value"] == "a"
+    assert result["param"] == "a"
 
 
 def test_invalid_dict_key_types():
@@ -122,7 +122,7 @@ def test_invalid_list_value_types():
 
         @config
         def invalid_list_values(hp: HP):
-            var = hp.select([complex(1, 2)])
+            var = hp.select([complex(1, 2)], name="param")
 
         invalid_list_values()
 
@@ -132,7 +132,7 @@ def test_select_missing_default():
 
         @config
         def missing_default(hp: HP):
-            hp.select(["a", "b"])
+            hp.select(["a", "b"], name="param")
 
         missing_default()
 
@@ -140,8 +140,8 @@ def test_select_missing_default():
 def test_select_with_options_only():
     @config
     def config_func(hp: HP):
-        value = hp.select(["a", "b", "c"], default="a", options_only=True)
-        value2 = hp.select({"k1": 4, "k2": 2}, default="k1", options_only=True)
+        value = hp.select(["a", "b", "c"], default="a", options_only=True, name="value")
+        value2 = hp.select({"k1": 4, "k2": 2}, default="k1", options_only=True, name="value2")
 
     # Should work with values
     result = config_func(values={"value": "b"})

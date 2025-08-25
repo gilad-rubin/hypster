@@ -41,6 +41,12 @@ layout:
 {% step %}
 #### Install Hypster
 
+Using uv (recommended):
+```bash
+uv add hypster
+```
+
+Or using pip:
 ```bash
 pip install hypster
 ```
@@ -118,6 +124,12 @@ Hypster is a lightweight package, mainly dependent on `Pydantic` for type-checki
 
 {% tabs %}
 {% tab title="Basic Installation" %}
+Using uv (recommended):
+```bash
+uv add hypster
+```
+
+Or using pip:
 ```bash
 pip install hypster
 ```
@@ -130,6 +142,12 @@ Dependencies:
 {% tab title="Interactive Jupyter UI" %}
 Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
 
+Using uv:
+```bash
+uv add 'hypster[jupyter]'
+```
+
+Or using pip:
 ```bash
 pip install hypster[jupyter]
 ```
@@ -143,6 +161,12 @@ Dependencies:
 {% tab title="Development" %}
 Interested in **contributing to Hypster?** Go ahead and install the full development suite using:
 
+Using uv:
+```bash
+uv add 'hypster[dev]'
+```
+
+Or using pip:
 ```bash
 pip install hypster[dev]
 ```
@@ -173,20 +197,42 @@ print(hypster.__version__)
 
 If you encounter any installation issues:
 
-1. Ensure your pip is up to date:
+1. Ensure your package manager is up to date:
 
+Using uv:
+```bash
+uv self update
+```
+
+Or using pip:
 ```bash
 pip install -U pip
 ```
 
 2. Ensure `hypster` is up to date
 
+Using uv:
+```bash
+uv add --upgrade hypster
+```
+
+Or using pip:
 ```bash
 pip install -U hypster
 ```
 
-2. For Jupyter-related issues, make sure Jupyter is properly installed:
+3. For Jupyter-related issues, make sure Jupyter is properly installed:
 
+Using uv:
+```bash
+# For JupyterLab
+uv add jupyterlab
+
+# Or 'classic' Jupyter Notebook
+uv add notebook
+```
+
+Or using pip:
 ```bash
 # For JupyterLab
 pip install -U jupyterlab
