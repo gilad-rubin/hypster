@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import time
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, Optional, Union
 
@@ -239,7 +238,7 @@ class IPyBooleanComponent(IPyComponent):
         for i, value in enumerate(self.component.value):
             widget = widgets.Checkbox(
                 value=value,
-                description=f"{self.component.label}[{i}]",
+                description=f"{self.component.label}",
                 style={"description_width": "initial"},
             )
             widget.observe(
@@ -502,49 +501,33 @@ class IPyWidgetsUI:
 
 
 class ResultsProxy(dict):
-    def __init__(self, initial_results, handler: UIHandler):
+    def __init__(self, handler: UIHandler):
         self._handler = handler
-        self._last_update = None
-        self._cached_results = initial_results or {}
-        super().__init__(self._cached_results)
-
-    def _update_if_needed(self):
-        current_time = time.time()
-        if self._last_update is None or (current_time - self._last_update) > 0.1:
-            latest = self._handler.get_latest_results()
-            if latest is not None:
-                self._cached_results = latest
-                self._last_update = current_time
-                super().clear()
-                super().update(self._cached_results)
+        super().__init__()
 
     def __getitem__(self, key):
-        self._update_if_needed()
-        return self._cached_results[key]
-
-    def get(self, key, default=None):
-        self._update_if_needed()
-        return self._cached_results.get(key, default)
+        latest = self._handler.get_latest_results()
+        if latest is None:
+            raise KeyError(key)
+        return latest[key]
 
     def __str__(self):
-        self._update_if_needed()
-        return str(self._cached_results)
+        return str(self._handler.get_latest_results())
 
     def __repr__(self):
-        self._update_if_needed()
-        return repr(self._cached_results)
+        return repr(self._handler.get_latest_results())
 
     def items(self):
-        self._update_if_needed()
-        return self._cached_results.items()
+        latest = self._handler.get_latest_results()
+        return latest.items() if latest is not None else []
 
     def keys(self):
-        self._update_if_needed()
-        return self._cached_results.keys()
+        latest = self._handler.get_latest_results()
+        return latest.keys() if latest is not None else []
 
     def values(self):
-        self._update_if_needed()
-        return self._cached_results.values()
+        latest = self._handler.get_latest_results()
+        return latest.values() if latest is not None else []
 
 
 def interactive_config(config_func: Hypster, initial_values: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -552,11 +535,8 @@ def interactive_config(config_func: Hypster, initial_values: Optional[Dict[str, 
     handler = create_ui_handler(config_func=config_func, initial_values=initial_values)
     ui = IPyWidgetsUI(ui_handler=handler)
 
-    # Store the original results object
-    results = handler.get_latest_results()
-
-    # Create a proxy dict that will update itself
-    proxy_results = ResultsProxy(results, handler)
+    # Create a simple proxy that always gets the latest results
+    proxy_results = ResultsProxy(handler)
     ui.display()
     return proxy_results
 
