@@ -6,7 +6,7 @@ from hypster import HP, config
 def test_select_valid_options_list():
     @config
     def config_func(hp: HP):
-        value = hp.select(["a", 2, False, 4.5], default=2)
+        value = hp.select(["a", 2, False, 4.5], name="value", default=2)
 
     result = config_func()
     assert result["value"] == 2

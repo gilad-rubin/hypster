@@ -6,9 +6,9 @@ from hypster import HP, config, save
 def test_basic_snapshot():
     @config
     def basic_config(hp: HP):
-        model = hp.select(["cnn", "rnn"], default="cnn")
-        lr = hp.number(0.001)
-        epochs = hp.number(10)
+        model = hp.select(["cnn", "rnn"], name="model", default="cnn")
+        lr = hp.number(0.001, name="lr")
+        epochs = hp.number(10, name="epochs")
 
     # Run with default values
     result1 = basic_config()
@@ -25,8 +25,8 @@ def test_basic_snapshot():
 def test_nested_snapshot():
     @config
     def nested_config(hp: HP):
-        optimizer = hp.select(["adam", "sgd"], default="adam")
-        lr = hp.number(0.001)
+        optimizer = hp.select(["adam", "sgd"], name="optimizer", default="adam")
+        lr = hp.number(0.001, name="lr")
 
     save(nested_config, "tests/helper_configs/nested_config.py")
 
@@ -34,9 +34,9 @@ def test_nested_snapshot():
     def main_config(hp: HP):
         from hypster import load
 
-        model = hp.select(["cnn", "rnn"], default="cnn")
+        model = hp.select(["cnn", "rnn"], name="model", default="cnn")
         nested_config = load("tests/helper_configs/nested_config.py")
-        nested_inputs = hp.nest(nested_config)
+        nested_inputs = hp.nest(nested_config, name="nested_inputs")
 
     # Run with some values
     result1 = main_config(final_vars=["model", "nested_inputs"], values={"nested_inputs.optimizer": "sgd"})
@@ -53,8 +53,8 @@ def test_nested_snapshot():
 def test_multi_select_snapshot():
     @config
     def multi_select_config(hp: HP):
-        frameworks = hp.multi_select(["pytorch", "tensorflow", "jax"], default=["pytorch"])
-        batch_size = hp.number(32)
+        frameworks = hp.multi_select(["pytorch", "tensorflow", "jax"], name="frameworks", default=["pytorch"])
+        batch_size = hp.number(32, name="batch_size")
 
     # Run with some values
     result1 = multi_select_config(values={"frameworks": ["pytorch", "tensorflow"]})
@@ -71,11 +71,11 @@ def test_multi_select_snapshot():
 def test_conditional_snapshot():
     @config
     def conditional_config(hp: HP):
-        model = hp.select(["cnn", "rnn"], default="cnn")
+        model = hp.select(["cnn", "rnn"], name="model", default="cnn")
         if model == "cnn":
-            filters = hp.number(64)
+            filters = hp.number(64, name="filters")
         else:
-            units = hp.number(128)
+            units = hp.number(128, name="units")
 
     # Run with CNN selection
     result_cnn = conditional_config(values={"model": "cnn"})
@@ -97,8 +97,8 @@ def test_conditional_snapshot():
 def test_snapshot_with_text():
     @config
     def text_config(hp: HP):
-        model = hp.select(["cnn", "rnn"], default="cnn")
-        name = hp.text("default_model")
+        model = hp.select(["cnn", "rnn"], name="model", default="cnn")
+        name = hp.text("default_model", name="name")
 
     # Run with some values and values
     result1 = text_config(values={"model": "rnn", "name": "custom_rnn"})
@@ -115,8 +115,8 @@ def test_snapshot_with_text():
 def test_snapshot_history():
     @config
     def history_config(hp: HP):
-        model = hp.select(["cnn", "rnn", "transformer"], default="cnn")
-        lr = hp.number(0.001)
+        model = hp.select(["cnn", "rnn", "transformer"], name="model", default="cnn")
+        lr = hp.number(0.001, name="lr")
 
     # Run multiple times with different values
     history_config(values={"model": "cnn"})

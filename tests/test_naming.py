@@ -6,8 +6,8 @@ from hypster import HP, config
 def test_variable_naming():
     @config
     def config_func(hp: HP):
-        var1 = hp.select(["a", "b"], default="a")
-        var2 = hp.number(10)
+        var1 = hp.select(["a", "b"], name="var1", default="a")
+        var2 = hp.number(10, name="var2")
 
     # Test with defaults
     result = config_func()
@@ -29,8 +29,8 @@ def test_dict_naming():
     @config
     def config_func(hp: HP):
         config = {
-            "model_type": hp.select(["cnn", "rnn"], default="cnn"),
-            "learning_rate": hp.number(0.001),
+            "model_type": hp.select(["cnn", "rnn"], name="config.model_type", default="cnn"),
+            "learning_rate": hp.number(0.001, name="config.learning_rate"),
         }
 
     # Test with defaults
@@ -54,8 +54,8 @@ def test_nested_naming():
     def config_func(hp: HP):
         outer = {
             "inner": {
-                "deep": hp.select(["x", "y"], default="x"),
-                "value": hp.number(5),
+                "deep": hp.select(["x", "y"], name="outer.inner.deep", default="x"),
+                "value": hp.number(5, name="outer.inner.value"),
             }
         }
 
@@ -84,8 +84,8 @@ def test_class_naming():
                 self.learning_rate = learning_rate
 
         model = ModelConfig(
-            model_type=hp.select(["cnn", "rnn"], default="cnn"),
-            learning_rate=hp.number(0.001),
+            model_type=hp.select(["cnn", "rnn"], name="model.model_type", default="cnn"),
+            learning_rate=hp.number(0.001, name="model.learning_rate"),
         )
 
     # Test with defaults
@@ -111,8 +111,8 @@ def test_function_naming():
             return param1, param2
 
         result = inner_func(
-            param1=hp.select(["a", "b"], default="a"),
-            param2=hp.number(10),
+            param1=hp.select(["a", "b"], name="result.param1", default="a"),
+            param2=hp.number(10, name="result.param2"),
         )
 
     # Test with defaults
@@ -132,7 +132,7 @@ def test_function_naming():
 
 
 def test_disable_automatic_naming_with_explicit_names():
-    @config(inject_names=False)
+    @config
     def class_kwargs_naming(hp: HP):
         class ModelConfig:
             def __init__(self, model_type, learning_rate):
@@ -149,7 +149,7 @@ def test_disable_automatic_naming_with_explicit_names():
     assert result["model"].model_type == "cnn"
     assert result["model"].learning_rate == 0.001
 
-    result = class_kwargs_naming(values={"model_type": "rnn", "param": "option2"})
+    result = class_kwargs_naming(values={"model_type": "rnn"})
     assert result["model"].model_type == "rnn"
 
     result = class_kwargs_naming(values={"learning_rate": 0.01})
@@ -157,7 +157,7 @@ def test_disable_automatic_naming_with_explicit_names():
 
 
 def test_disable_automatic_naming_missing_name_error():
-    @config(inject_names=False)
+    @config
     def no_injection_config(hp: HP):
         a = hp.select(["a", "b"])  # This should raise an error
 

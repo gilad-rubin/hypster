@@ -52,7 +52,7 @@ class HP:
         self,
         options: Union[Dict[BasicType, Any], List[BasicType]],
         *,
-        name: Optional[str] = None,
+        name: str,
         default: Optional[BasicType] = None,
         options_only: bool = False,
     ) -> Any:
@@ -64,10 +64,12 @@ class HP:
         self,
         options: Union[Dict[BasicType, Any], List[BasicType]],
         *,
-        name: Optional[str] = None,
-        default: Optional[List[BasicType]] = [],
+        name: str,
+        default: Optional[List[BasicType]] = None,
         options_only: bool = False,
     ) -> List[Any]:
+        if default is None:
+            default = []
         call = MultiSelectCall(name=name, options=options, default=default, options_only=options_only)
         options_keys = list(call.processed_options.keys())
         return self._execute_call(call=call, parameter_type="multi_select", options=options_keys)
@@ -76,7 +78,7 @@ class HP:
         self,
         default: NumericType,
         *,
-        name: Optional[str] = None,
+        name: str,
         min: Optional[NumericType] = None,
         max: Optional[NumericType] = None,
     ) -> NumericType:
@@ -88,7 +90,7 @@ class HP:
         self,
         default: List[NumericType] = [],
         *,
-        name: Optional[str] = None,
+        name: str,
         min: Optional[NumericType] = None,
         max: Optional[NumericType] = None,
     ) -> List[NumericType]:
@@ -100,7 +102,7 @@ class HP:
         self,
         default: int,
         *,
-        name: Optional[str] = None,
+        name: str,
         min: Optional[int] = None,
         max: Optional[int] = None,
     ) -> int:
@@ -112,7 +114,7 @@ class HP:
         self,
         default: List[int] = [],
         *,
-        name: Optional[str] = None,
+        name: str,
         min: Optional[int] = None,
         max: Optional[int] = None,
     ) -> List[int]:
@@ -120,19 +122,19 @@ class HP:
         call = MultiIntCall(name=name, default=default, bounds=bounds)
         return self._execute_call(call=call, parameter_type="multi_int", numeric_bounds=bounds)
 
-    def text(self, default: str, *, name: Optional[str] = None) -> str:
+    def text(self, default: str, *, name: str) -> str:
         call = TextInputCall(name=name, default=default)
         return self._execute_call(call=call, parameter_type="text")
 
-    def multi_text(self, default: List[str] = [], *, name: Optional[str] = None) -> List[str]:
+    def multi_text(self, default: List[str] = [], *, name: str) -> List[str]:
         call = MultiTextCall(name=name, default=default)
         return self._execute_call(call=call, parameter_type="multi_text")
 
-    def bool(self, default: bool, *, name: Optional[str] = None) -> bool:
+    def bool(self, default: bool, *, name: str) -> bool:
         call = BoolInputCall(name=name, default=default)
         return self._execute_call(call=call, parameter_type="bool")
 
-    def multi_bool(self, default: List[bool] = [], *, name: Optional[str] = None) -> List[bool]:
+    def multi_bool(self, default: List[bool] = [], *, name: str) -> List[bool]:
         call = MultiBoolCall(name=name, default=default)
         return self._execute_call(call=call, parameter_type="multi_bool")
 
@@ -140,7 +142,7 @@ class HP:
         self,
         config_func: Union[str, Path, "Hypster"],
         *,
-        name: Optional[str] = None,
+        name: str,
         final_vars: List[str] = [],
         exclude_vars: List[str] = [],
         values: Dict[str, Any] = {},
@@ -207,6 +209,15 @@ class HP:
             source=self.source,
         )
         self.run_history.add_record(record)
+        return result
+
+    def get_collected_values(self) -> Dict[str, Any]:
+        """Get all parameter values that were collected during execution"""
+        result = {}
+        latest_records = self.run_history.get_latest_run_records()
+        for name, record in latest_records.items():
+            if isinstance(record, ParameterRecord):
+                result[name] = record.value
         return result
 
     def _get_potential_values(self, name: str) -> List[Any]:

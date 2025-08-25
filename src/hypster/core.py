@@ -1,17 +1,11 @@
+import inspect
 import logging
 import os
-import textwrap
-import types
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
-from .ast_analyzer import (
-    collect_hp_calls,
-    inject_names_to_source_code,
-)
 from .hp import HP
 from .run_history import HistoryDatabase, InMemoryHistory
-from .utils import find_hp_function_body_and_name, remove_function_signature
 
 # Correct logging configuration
 # logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -19,25 +13,19 @@ logger = logging.getLogger(__name__)
 
 
 class Hypster:
-    def __init__(self, name, source_code: str, namespace: Dict[str, Any], inject_names: bool = True):
+    def __init__(self, name: str, func: Callable, namespace: Dict[str, Any]):
         """
         Initialize a Hypster instance.
 
         Args:
             name (str): The name of the Hypster instance.
-            source_code (str): The source code to be executed.
+            func (Callable): The configuration function.
             namespace (Dict[str, Any]): The namespace for execution.
-            inject_names (bool, optional): Whether to inject names into the source code. Defaults to True.
         """
         self.name = name
-        self.source_code = source_code
+        self.func = func
         self.namespace = namespace
         self.run_history: HistoryDatabase = InMemoryHistory()
-        self.hp_calls = collect_hp_calls(self.source_code)
-
-        self.modified_source = (
-            inject_names_to_source_code(self.source_code, self.hp_calls) if inject_names else self.source_code
-        )
 
     def __call__(
         self,
@@ -54,32 +42,68 @@ class Hypster:
             run_id=uuid.uuid4(),
             explore_mode=explore_mode,
         )
-        result = self._execute_function(hp, self.modified_source)
+        result = self._execute_function(hp)
         return result
 
-    def _execute_function(self, hp: HP, modified_source: str) -> Dict[str, Any]:
+    def _execute_function(self, hp: HP) -> Dict[str, Any]:
         """
-        Execute the modified source code with the given HP instance.
+        Execute the function directly with the given HP instance.
 
         Args:
             hp (HP): The HP instance for values management.
-            modified_source (str): The modified source code to execute.
 
         Returns:
             Dict[str, Any]: The instantiated config.
         """
+        # Execute the function directly - the HP object will collect the parameter values
+        self.func(hp)
 
-        # Create a new namespace with the original namespace and add the 'hp' object to it
-        exec_namespace = self.namespace.copy()
-        exec_namespace["hp"] = hp
-
-        # Execute the modified function body in this namespace
-        body_wo_signature = remove_function_signature(modified_source)
-        function_body = textwrap.dedent(body_wo_signature)
-        exec(function_body, exec_namespace)
+        # Get the collected values from the HP object
+        collected_values = hp.get_collected_values()
 
         # Process and filter the results
-        return self._process_results(exec_namespace, hp.final_vars, hp.exclude_vars)
+        return self._process_collected_values(collected_values, hp.final_vars, hp.exclude_vars)
+
+    def _process_collected_values(
+        self, collected_values: Dict[str, Any], final_vars: List[str], exclude_vars: List[str]
+    ) -> Dict[str, Any]:
+        """
+        Process and filter the collected values from HP execution.
+
+        Args:
+            collected_values (Dict[str, Any]): Values collected from HP parameter calls.
+            final_vars (List[str]): List of variables to include in the final result.
+            exclude_vars (List[str]): List of variables to exclude from the final result.
+
+        Returns:
+            Dict[str, Any]: The processed and filtered results.
+
+        Raises:
+            ValueError: If any variable in final_vars does not exist in the collected values.
+        """
+        nested_vars = self.find_nested_vars(final_vars, self.run_history)
+        final_vars = [var for var in final_vars if var not in nested_vars]
+
+        if not final_vars:
+            final_result = collected_values.copy()
+        else:
+            non_existent_vars = set(final_vars) - set(collected_values.keys())
+            if non_existent_vars:
+                raise ValueError(
+                    "The following variables specified in final_vars "
+                    "do not exist in the configuration: "
+                    f"{', '.join(non_existent_vars)}"
+                )
+            final_result = {k: collected_values[k] for k in final_vars}
+
+        # Apply exclude_vars after final_vars filtering
+        if exclude_vars:
+            final_result = {k: v for k, v in final_result.items() if k not in exclude_vars}
+
+        logger.debug("Collected values: %s", collected_values)
+        logger.debug("Final result after filtering: %s", final_result)
+
+        return final_result
 
     def find_nested_vars(self, vars: List[str], run_history: HistoryDatabase) -> List[str]:
         """Find variables that reference nested configurations.
@@ -104,54 +128,6 @@ class Hypster:
 
         return nested_vars
 
-    def _process_results(
-        self, namespace: Dict[str, Any], final_vars: List[str], exclude_vars: List[str]
-    ) -> Dict[str, Any]:
-        """
-        Process and filter the execution results.
-
-        Args:
-            namespace (Dict[str, Any]): The namespace after execution.
-            final_vars (List[str]): List of variables to include in the final result.
-            exclude_vars (List[str]): List of variables to exclude from the final result.
-
-        Returns:
-            Dict[str, Any]: The processed and filtered results.
-
-        Raises:
-            ValueError: If any variable in final_vars does not exist in the configuration.
-        """
-
-        filtered_locals = {
-            k: v
-            for k, v in namespace.items()
-            if k != "hp" and not k.startswith("__") and not isinstance(v, (types.ModuleType, types.FunctionType, type))
-        }
-
-        nested_vars = self.find_nested_vars(final_vars, self.run_history)
-        final_vars = [var for var in final_vars if var not in nested_vars]
-
-        if not final_vars:
-            final_result = {k: v for k, v in filtered_locals.items() if not k.startswith("_")}
-        else:
-            non_existent_vars = set(final_vars) - set(filtered_locals.keys())
-            if non_existent_vars:
-                raise ValueError(
-                    "The following variables specified in final_vars "
-                    "do not exist in the configuration: "
-                    f"{', '.join(non_existent_vars)}"
-                )
-            final_result = {k: filtered_locals[k] for k in final_vars}
-
-        # Apply exclude_vars after final_vars filtering
-        if exclude_vars:
-            final_result = {k: v for k, v in final_result.items() if k not in exclude_vars}
-
-        logger.debug("Captured locals: %s", filtered_locals)
-        logger.debug("Final result after filtering: %s", final_result)
-
-        return final_result
-
     def save(self, path: Optional[str] = None):
         """
         Save the current object to a file.
@@ -171,25 +147,28 @@ class Hypster:
         return self.run_history.get_latest_run_records(flattened=True)
 
     def get_snapshots(self) -> List[Dict[str, Any]]:
-        return self.run_history.get_run_records(flattened=True)
+        # Access the concrete InMemoryHistory method directly to use the Optional[str] signature
+        from .run_history import InMemoryHistory
+
+        if isinstance(self.run_history, InMemoryHistory):
+            return self.run_history.get_run_records(run_id=None, flattened=True)
+        else:
+            # Fallback for other implementations
+            return []
 
 
 def save(hypster_instance: Hypster, path: Optional[str] = None):
     """
-    Save the configuration of a Hypster instance to a file.
-    This function extracts the configuration function from the provided
-    Hypster instance's source code and writes it to a specified file. If no
-    path is provided, the configuration is saved to a file named after the
-    Hypster instance's name with a .py extension.
+    Save the configuration function of a Hypster instance to a file.
+
     Args:
         hypster_instance (Hypster): The Hypster instance whose configuration
-            is to be saved.
+            function is to be saved.
         path (Optional[str]): The file path where the configuration should be
             saved. If None, the configuration is saved to a file named after
             the Hypster instance's name.
     Raises:
-        ValueError: If the provided object is not a Hypster instance or if no
-            configuration function is found in the module.
+        ValueError: If the provided object is not a Hypster instance.
     Returns:
         None
     """
@@ -199,16 +178,23 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
     if path is None:
         path = f"{hypster_instance.name}.py"
 
-    result = find_hp_function_body_and_name(hypster_instance.source_code)
+    # Get the source code of the function
+    func_source = inspect.getsource(hypster_instance.func)
 
-    if result is None:
-        raise ValueError("No configuration function found in the module")
+    # Remove the @config decorator if present
+    lines = func_source.split("\n")
+    filtered_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("@config") or stripped.startswith("@"):
+            continue  # Skip decorator lines
+        filtered_lines.append(line)
 
-    func_name, hp_func_source = result
+    func_source = "\n".join(filtered_lines)
 
-    modified_source = "from hypster import HP\n\n\n" + hp_func_source
-    modified_source = modified_source.rstrip("\n")
-    modified_source = modified_source + "\n"
+    # Add the import statement
+    modified_source = "from hypster import HP\n\n" + func_source
+    modified_source = modified_source.rstrip("\n") + "\n"
 
     directory = os.path.dirname(path)
     if directory and not os.path.exists(directory):
@@ -219,19 +205,18 @@ def save(hypster_instance: Hypster, path: Optional[str] = None):
     logger.info("Configuration saved to %s", path)
 
 
-def load(path: str, inject_names=True) -> Hypster:
+def load(path: str) -> Hypster:
     """
-    Loads a Python module from the specified file path, executes it, and retrieves a configuration function.
+    Loads a Python module from the specified file path and creates a Hypster instance.
+
     Args:
         path (str): The file path to the Python module to be loaded.
-        inject_names (bool, optional): If True, injects names into the namespace. Defaults to True.
 
     Returns:
-        Hypster: An instance of the Hypster class containing the configuration function and its context.
+        Hypster: An instance of the Hypster class containing the configuration function.
 
     Raises:
-        ValueError: If no configuration function is found in the module or
-                    if the function cannot be retrieved from the namespace.
+        ValueError: If no configuration function is found in the module.
     """
     with open(path, "r") as f:
         module_source = f.read()
@@ -242,19 +227,26 @@ def load(path: str, inject_names=True) -> Hypster:
     # Execute the entire module
     exec(module_source, namespace)
 
-    # Find the configuration function
-    result = find_hp_function_body_and_name(module_source)
+    # Find functions that take HP as a parameter
+    config_funcs = []
+    for name, obj in namespace.items():
+        if callable(obj) and hasattr(obj, "__annotations__"):
+            # Check if the function has an 'hp' parameter with HP type annotation
+            if "hp" in obj.__annotations__ and obj.__annotations__["hp"] == HP:
+                config_funcs.append((name, obj))
+        elif callable(obj) and not name.startswith("_"):
+            # Fallback: check the parameter name in the function signature
+            try:
+                sig = inspect.signature(obj)
+                if "hp" in sig.parameters:
+                    config_funcs.append((name, obj))
+            except (ValueError, TypeError):
+                continue
 
-    if result is None:
+    if not config_funcs:
         raise ValueError("No configuration function found in the module")
 
-    # Unpack the function name and body from the result
-    func_name, config_body = result
+    # Use the first function found
+    func_name, func = config_funcs[0]
 
-    # Retrieve the function object from the namespace
-    func = namespace.get(func_name)
-
-    if func is None:
-        raise ValueError(f"Could not find the function {func_name} in the loaded module")
-
-    return Hypster(func_name, config_body, namespace, inject_names)
+    return Hypster(func_name, func, namespace)

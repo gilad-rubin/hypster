@@ -1,6 +1,10 @@
-from importlib.metadata import version
+try:
+    from importlib.metadata import version
 
-__version__ = version(__name__)
+    __version__ = version(__name__)
+except Exception:
+    __version__ = "dev"
+
 from .config import config
 from .core import Hypster, load, save
 from .hp import HP

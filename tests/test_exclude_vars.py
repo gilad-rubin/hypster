@@ -4,9 +4,9 @@ from hypster import HP, config
 def test_basic_exclude_vars():
     @config
     def config_func(hp: HP):
-        model = hp.select(["cnn", "rnn"], default="cnn")
-        lr = hp.number(0.001)
-        epochs = hp.number(10)
+        model = hp.select(["cnn", "rnn"], name="model", default="cnn")
+        lr = hp.number(0.001, name="lr")
+        epochs = hp.number(10, name="epochs")
 
     # Test excluding single variable
     result = config_func(exclude_vars=["lr"])
@@ -30,9 +30,9 @@ def test_basic_exclude_vars():
 def test_exclude_vars_with_final_vars():
     @config
     def config_func(hp: HP):
-        model = hp.select(["cnn", "rnn"], default="cnn")
-        lr = hp.number(0.001)
-        epochs = hp.number(10)
+        model = hp.select(["cnn", "rnn"], name="model", default="cnn")
+        lr = hp.number(0.001, name="lr")
+        epochs = hp.number(10, name="epochs")
 
     # Test final_vars and exclude_vars together
     result = config_func(final_vars=["model", "lr", "epochs"], exclude_vars=["lr"])
@@ -44,15 +44,15 @@ def test_exclude_vars_with_final_vars():
 def test_exclude_vars_with_nesting():
     @config
     def nested_config(hp: HP):
-        nested_param = hp.select(["a", "b"], default="a")
-        nested_number = hp.number(1.0)
+        nested_param = hp.select(["a", "b"], name="nested_param", default="a")
+        nested_number = hp.number(1.0, name="nested_number")
 
     nested_config.save("tests/helper_configs/nested_config.py")
 
     @config
     def main_config(hp: HP):
         nested = hp.nest("tests/helper_configs/nested_config.py", name="nested")
-        main_param = hp.select(["x", "y"], default="x")
+        main_param = hp.select(["x", "y"], name="main_param", default="x")
 
     # Test excluding nested variables with dot notation
     result = main_config(exclude_vars=["nested.nested_number"])
@@ -75,22 +75,22 @@ def test_exclude_vars_with_nesting():
 def test_exclude_vars_with_nested_nesting():
     @config
     def deep_nested_config(hp: HP):
-        deep_param = hp.select(["deep1", "deep2"], default="deep1")
-        deep_number = hp.number(2.0)
+        deep_param = hp.select(["deep1", "deep2"], name="deep_param", default="deep1")
+        deep_number = hp.number(2.0, name="deep_number")
 
     deep_nested_config.save("tests/helper_configs/deep_nested_config.py")
 
     @config
     def middle_config(hp: HP):
         deep = hp.nest("tests/helper_configs/deep_nested_config.py", name="deep")
-        middle_param = hp.select(["mid1", "mid2"], default="mid1")
+        middle_param = hp.select(["mid1", "mid2"], name="middle_param", default="mid1")
 
     middle_config.save("tests/helper_configs/middle_config.py")
 
     @config
     def main_config(hp: HP):
         middle = hp.nest("tests/helper_configs/middle_config.py", name="middle")
-        main_param = hp.select(["x", "y"], default="x")
+        main_param = hp.select(["x", "y"], name="main_param", default="x")
 
     # Test excluding deeply nested variables
     result = main_config(exclude_vars=["middle.deep.deep_number"])
@@ -109,9 +109,9 @@ def test_exclude_vars_with_nested_nesting():
 def test_exclude_vars_in_nest_call():
     @config
     def nested_config(hp: HP):
-        nested_param = hp.select(["a", "b"], default="a")
-        nested_number = hp.number(1.0)
-        extra_param = hp.select(["x", "y"], default="x")
+        nested_param = hp.select(["a", "b"], name="nested_param", default="a")
+        nested_number = hp.number(1.0, name="nested_number")
+        extra_param = hp.select(["x", "y"], name="extra_param", default="x")
 
     nested_config.save("tests/helper_configs/nested_config.py")
 
@@ -122,7 +122,7 @@ def test_exclude_vars_in_nest_call():
             name="nested",
             exclude_vars=["extra_param"],  # Exclude within nest call
         )
-        main_param = hp.select(["x", "y"], default="x")
+        main_param = hp.select(["x", "y"], name="main_param", default="x")
 
     # Test excluding variables in nest call
     result = main_config()
