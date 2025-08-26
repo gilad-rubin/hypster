@@ -9,3 +9,4 @@ dist*
 helper_configs/
 *-checkpoint.ipynb
 playground/
+.github/copilot-instructions.md
