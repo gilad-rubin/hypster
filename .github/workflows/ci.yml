@@ -18,7 +18,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install project and dev deps
-        run: uv sync --dev
+        run: uv pip install -e ".[dev]"
 
       - name: Ruff format (check)
         run: uv run ruff format --check .
