@@ -1,91 +1,145 @@
-import ast
-import logging
-import textwrap
-from typing import Optional, Tuple
+"""Utilities for error messages, similarity matching, and validation."""
 
-# logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-logger = logging.getLogger(__name__)
+import inspect
+from difflib import SequenceMatcher
+from typing import Any, Callable, Dict, List, Tuple
 
 
-# TODO: consider moving these functions to ast_analyzer
-def get_hp_function_node(tree: ast.Module) -> Optional[ast.FunctionDef]:
+def suggest_similar_names(unknown: str, known: List[str], threshold: float = 0.6) -> List[Tuple[str, float]]:
+    """Find similar parameter names with similarity scores."""
+    suggestions = []
+    for name in known:
+        similarity = SequenceMatcher(None, unknown.lower(), name.lower()).ratio()
+        if similarity >= threshold:
+            suggestions.append((name, similarity))
+
+    # Sort by similarity score (highest first)
+    suggestions.sort(key=lambda x: x[1], reverse=True)
+    return suggestions
+
+
+def format_error_with_suggestions(
+    unknown_params: Dict[str, Any], suggestions: Dict[str, List[str]], reachability: Dict[str, str]
+) -> str:
     """
-    Finds the first function with 'hp' in its signature in the given abstract syntax tree.
-
-    :param tree: The abstract syntax tree to search in
-    :return: The function definition node with 'hp' in its signature
-    :raises ValueError: If no function with 'hp' is found, or if multiple functions \
-    with 'hp' are found or if there's a function with 'hp' and another argument
+    Format helpful error messages distinguishing between:
+    - Typos (similar names exist)
+    - Unreachable parameters (exist but not in current conditional path)
+    - Truly unknown parameters
     """
-    hp_functions = []
+    lines = ["Unknown or unreachable parameters:"]
 
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
-            has_hp = False
-            has_other_args = False
-            for arg in node.args.args:
-                if arg.arg == "hp":
-                    has_hp = True
-                elif arg.arg != "self":  # Ignore 'self' for methods
-                    has_other_args = True
+    for param, value in unknown_params.items():
+        if param in suggestions and suggestions[param]:
+            # Typo suggestion
+            similar = suggestions[param][0]  # Take the best suggestion
+            lines.append(f"  - '{param}': Did you mean '{similar}'?")
+        elif param in reachability:
+            # Unreachable parameter
+            lines.append(f"  - '{param}': This parameter exists but is only reachable when {reachability[param]}")
+        else:
+            # Truly unknown
+            lines.append(f"  - '{param}': Unknown parameter")
 
-            if has_hp:
-                if has_other_args:
-                    raise ValueError(f"Function '{node.name}' has 'hp' and other arguments in its signature.")
-                hp_functions.append(node)
-
-    if len(hp_functions) > 1:
-        raise ValueError("Multiple functions with 'hp' in their signatures found.")
-    elif len(hp_functions) == 0:
-        raise ValueError("No function with 'hp' in its signature found.")
-
-    return hp_functions[0]
+    return "\n".join(lines)
 
 
-def find_hp_function_body_and_name(source_code: str) -> Optional[Tuple[str, str]]:
-    dedented_source = textwrap.dedent(source_code)
-    tree = ast.parse(dedented_source)
-
-    function_node = get_hp_function_node(tree)
-
-    if function_node is None:
-        return None
-
-    # Ensure that both function_name and function_body are strings
-    function_name = function_node.name if isinstance(function_node.name, str) else None
-    function_body = ast.get_source_segment(dedented_source, function_node)
-
-    # If function_body or function_name is None, return None
-    if function_name is None or function_body is None:
-        return None
-
-    return function_name, function_body
-
-
-def remove_function_signature(source: str) -> str:
-    lines = source.split("\n")
-    for i, line in enumerate(lines):
-        if line.strip().endswith(":"):
-            return "\n".join(lines[i + 1 :])
-    raise ValueError("Could not find function signature")
-
-
-def query_combinations(combinations, query):
+def merge_nested_dicts(dotted: Dict[str, Any], nested: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     """
-    Filter combinations based on the provided query.
-
-    Args:
-    combinations (list): List of dictionaries, each representing a combination of hyperparameters.
-    query (dict): Dictionary of key-value pairs to filter the combinations.
-
-    Returns:
-    list: Filtered list of combinations that match the query criteria.
+    Merge dotted keys and nested dicts (nested takes precedence).
+    Returns merged dict and list of conflict warnings.
     """
+    result = dotted.copy()
+    warnings = []
 
-    def match_combination(combination, query):
-        for key, value in query.items():
-            if key not in combination or combination[key] != value:
-                return False
-        return True
+    # Convert dotted notation to nested structure
+    expanded: Dict[str, Any] = {}
+    for key, value in dotted.items():
+        parts = key.split(".")
+        current = expanded
+        for part in parts[:-1]:
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+        current[parts[-1]] = value
 
-    return [comb for comb in combinations if match_combination(comb, query)]
+    # Merge with nested dict (nested takes precedence)
+    def merge_recursive(base: Dict[str, Any], override: Dict[str, Any], path: str = "") -> None:
+        for key, value in override.items():
+            full_key = f"{path}.{key}" if path else key
+            if key in base:
+                if isinstance(base[key], dict) and isinstance(value, dict):
+                    merge_recursive(base[key], value, full_key)
+                else:
+                    warnings.append(
+                        f"Parameter '{full_key}' specified in both dotted and nested format, using nested value"
+                    )
+                    base[key] = value
+            else:
+                base[key] = value
+
+    merge_recursive(expanded, nested)
+    return expanded, warnings
+
+
+def validate_config_func_signature(func: Callable) -> None:
+    """
+    Validate that func has hp: HP as first parameter.
+    Raises ValueError with helpful message if not.
+    """
+    try:
+        sig = inspect.signature(func)
+        params = list(sig.parameters.values())
+
+        if not params:
+            raise ValueError(
+                f"Configuration function '{func.__name__}' must have 'hp: HP' as first parameter. "
+                f"Got: {func.__name__}() - no parameters"
+            )
+
+        first_param = params[0]
+        if first_param.name != "hp":
+            raise ValueError(
+                f"Configuration function '{func.__name__}' first param must be named 'hp'. Got: {first_param.name}"
+            )
+
+        # Check type annotation if present
+        if first_param.annotation != inspect.Parameter.empty:
+            # Get the type annotation string representation
+            annotation_str = str(first_param.annotation)
+            if "HP" not in annotation_str:
+                raise ValueError(
+                    f"Configuration function '{func.__name__}' first parameter must be typed as 'hp: HP'. "
+                    f"Got: hp: {annotation_str}"
+                )
+
+    except Exception as e:
+        if isinstance(e, ValueError):
+            raise
+        raise ValueError(f"Error validating configuration function '{func.__name__}': {str(e)}")
+
+
+def flatten_dict(d: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
+    """Flatten a nested dictionary into dotted notation."""
+    items: List[Tuple[str, Any]] = []
+    for k, v in d.items():
+        new_key = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
+def unflatten_dict(d: Dict[str, Any], sep: str = ".") -> Dict[str, Any]:
+    """Convert dotted notation dictionary to nested structure."""
+    result: Dict[str, Any] = {}
+    for key, value in d.items():
+        parts = key.split(sep)
+        current = result
+        for part in parts[:-1]:
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+        current[parts[-1]] = value
+    return result

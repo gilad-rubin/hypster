@@ -1,34 +1,64 @@
-[tool.poetry]
+[project]
 name = "hypster"
-version = "0.2.34"
+version = "0.3.1"
 description = "A flexible configuration system for Python projects"
-authors = ["Gilad Rubin <me@giladrubin.com>"]
-license = "MIT"
+authors = [
+    {name = "Gilad Rubin", email = "me@giladrubin.com"}
+]
+license = {text = "MIT"}
 readme = "README.md"
-repository = "https://github.com/gilad-rubin/hypster"
+requires-python = ">=3.10"
 keywords = ["configuration", "ai", "machine-learning"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
 
-[tool.poetry.dependencies]
-python = "^3.10"
-pydantic = "^2.0.0"
-ipywidgets = { version = ">=8.0.0", optional = true }
+dependencies = []
 
-[tool.poetry.extras]
-jupyter = ["ipywidgets"]
-dev = ["pytest", "ruff", "mypy", "ipywidgets"]
+[project.optional-dependencies]
+jupyter = ["ipywidgets>=8.0.0"]
+optuna = ["optuna>=3.6"]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=4.0",
+    "coverage[toml]>=7.0",
+    "ruff>=0.1.0",
+    "mypy>=0.950",
+    "pre-commit>=3.0",
+    "ipywidgets>=8.0.0",
+]
 
-[tool.poetry.dev-dependencies]
-pytest = "^6.0"
-ruff = "^0.1.0"
-mypy = "^0.950"
+[project.urls]
+Homepage = "https://github.com/gilad-rubin/hypster"
+Repository = "https://github.com/gilad-rubin/hypster"
+Issues = "https://github.com/gilad-rubin/hypster/issues"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.mypy]
 ignore_missing_imports = true
 strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+exclude = "src/hypster/hp\\.pyi$"
+mypy_path = "src"
+explicit_package_bases = true
+follow_imports = "skip"
+disable_error_code = [
+  "attr-defined",
+  "no-untyped-def",
+]
 
 [tool.ruff]
 line-length = 120
@@ -43,3 +73,19 @@ known-first-party = ["hypster"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --cov=hypster --cov-report=term-missing:skip-covered --cov-report=xml"
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hypster"]
+include = ["hypster/py.typed"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/hypster/py.typed"]
+
+[dependency-groups]
+dev = [
+    "pytest-codspeed>=4.0.0",
+]

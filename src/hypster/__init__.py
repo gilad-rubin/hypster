@@ -1,8 +1,6 @@
-from importlib.metadata import version
+"""Hypster v2 - Explicit, typed Python configuration management."""
 
-__version__ = version(__name__)
-from .config import config
-from .core import Hypster, load, save
+from .core import ConfigFunc, instantiate
 from .hp import HP
 
-__all__ = ["config", "save", "load", "HP"]
+__all__ = ["HP", "instantiate", "ConfigFunc"]

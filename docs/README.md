@@ -14,6 +14,13 @@ layout:
 
 # 👋 Welcome
 
+> [!WARNING]
+>
+> Hypster is in preview and is not ready for production use.
+>
+> We're working hard to make Hypster stable and feature-complete, but until then, expect to encounter bugs,
+> missing features, and occasional breaking changes.
+
 <div data-full-width="false">
 
 <figure><picture><source srcset=".gitbook/assets/hypster_text_white_text.png" media="(prefers-color-scheme: dark)"><img src=".gitbook/assets/hypster_with_text (1).png" alt=""></picture><figcaption></figcaption></figure>
@@ -26,7 +33,7 @@ layout:
 
 * :snake: **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
 * :nesting\_dolls: **Hierarchical Configurations**: Support for nested and swappable configurations
-* :triangular\_ruler: **Type Safety**: Built-in type hints and validation using [`Pydantic`](https://github.com/pydantic/pydantic)
+* :triangular\_ruler: **Type Safety**: Built-in type hints and validation
 * :package: **Portability**: Easy serialization and loading of configurations
 * :test\_tube: **Experiment Ready**: Built-in support for hyperparameter optimization
 * :video\_game: **Interactive UI**: Jupyter widgets integration for interactive parameter selection
@@ -40,6 +47,12 @@ layout:
 #### Install Hypster
 
 ```bash
+uv add hypster
+```
+
+Or using pip:
+
+```bash
 pip install hypster
 ```
 {% endstep %}
@@ -48,13 +61,13 @@ pip install hypster
 #### Define a configuration space
 
 ```python
-from hypster import config, HP
+from hypster import HP
 
 
-@config
 def llm_config(hp: HP):
-    model_name = hp.select(["gpt-4o-mini", "gpt-4o"])
-    temperature = hp.number(0.0, min=0.0, max=1.0)
+    model_name = hp.select(["gpt-5", "claude-sonnet-4-0", "gemini-2.5-flash"], name="model_name")
+    temperature = hp.float(0.0, name="temperature", min=0.0, max=1.0)
+    return {"model_name": model_name, "temperature": temperature}
 ```
 {% endstep %}
 
@@ -62,7 +75,9 @@ def llm_config(hp: HP):
 #### Instantiate your configuration
 
 ```python
-results = my_config(values={"model" : "gpt-4o", "temperature" : 1.0})
+from hypster import instantiate
+
+cfg = instantiate(llm_config, values={"model_name": "gpt-5", "temperature": 0.7})
 ```
 {% endstep %}
 
@@ -81,7 +96,7 @@ def generate(prompt: str, model_name: str, temperature: float) -> str:
 #### Execute!
 
 ```python
-generate(prompt="What is Hypster?", **results)
+generate(prompt="What is Hypster?", **cfg)
 ```
 {% endstep %}
 {% endstepper %}
