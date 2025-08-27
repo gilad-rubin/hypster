@@ -1,19 +1,33 @@
 # 🖥️ Installation
 
-Hypster is a lightweight package, mainly dependent on `Pydantic` for type-checking.
+Hypster is a lightweight package with minimal dependencies.
 
 {% tabs %}
-{% tab title="Basic Installation" %}
+{% tab title="Basic Installation (uv)" %}
+```bash
+uv add hypster
+```
+{% endtab %}
+
+{% tab title="Basic Installation (pip)" %}
 ```bash
 pip install hypster
+```
+{% endtab %}
+
+{% tab title="Interactive Jupyter UI (uv)" %}
+Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
+
+```bash
+uv add "hypster[jupyter]"
 ```
 
 Dependencies:
 
-* [Pydantic](https://github.com/pydantic/pydantic)
+* [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
 {% endtab %}
 
-{% tab title="Interactive Jupyter UI" %}
+{% tab title="Interactive Jupyter UI (pip)" %}
 Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
 
 ```bash
@@ -22,18 +36,33 @@ pip install hypster[jupyter]
 
 Dependencies:
 
-* [Pydantic](https://github.com/pydantic/pydantic)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
 {% endtab %}
 
-{% tab title="Development" %}
+{% tab title="Development (uv)" %}
+Interested in **contributing to Hypster?** Go ahead and install the full development suite using:
+
+```bash
+uv add "hypster[dev]"
+```
+
+Dependencies:
+
+* [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
+* [ruff](https://github.com/astral-sh/ruff)
+* [mypy](https://github.com/python/mypy)
+* [pytest](https://github.com/pytest-dev/pytest)
+{% endtab %}
+
+{% tab title="Development (pip)" %}
 Interested in **contributing to Hypster?** Go ahead and install the full development suite using:
 
 ```bash
 pip install hypster[dev]
 ```
 
-* [Pydantic](https://github.com/pydantic/pydantic)
+Dependencies:
+
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
 * [ruff](https://github.com/astral-sh/ruff)
 * [mypy](https://github.com/python/mypy)
@@ -59,6 +88,32 @@ print(hypster.__version__)
 
 If you encounter any installation issues:
 
+### With uv (recommended):
+
+1. Ensure uv is up to date:
+
+```bash
+uv self update
+```
+
+2. Ensure `hypster` is up to date
+
+```bash
+uv add --upgrade hypster
+```
+
+3. For Jupyter-related issues, make sure Jupyter is properly installed:
+
+```bash
+# For JupyterLab
+uv add jupyterlab
+
+# Or 'classic' Jupyter Notebook
+uv add notebook
+```
+
+### With pip:
+
 1. Ensure your pip is up to date:
 
 ```bash
@@ -71,7 +126,7 @@ pip install -U pip
 pip install -U hypster
 ```
 
-2. For Jupyter-related issues, make sure Jupyter is properly installed:
+3. For Jupyter-related issues, make sure Jupyter is properly installed:
 
 ```bash
 # For JupyterLab

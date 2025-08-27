@@ -28,7 +28,7 @@ layout:
 
 * :snake: **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
 * :nesting\_dolls: **Hierarchical Configurations**: Support for nested and swappable configurations
-* :triangular\_ruler: **Type Safety**: Built-in type hints and validation using [`Pydantic`](https://github.com/pydantic/pydantic)
+* :triangular\_ruler: **Type Safety**: Built-in type hints and validation
 * :package: **Portability**: Easy serialization and loading of configurations
 * :test\_tube: **Experiment Ready**: Built-in support for hyperparameter optimization
 * :video\_game: **Interactive UI**: Jupyter widgets integration for interactive parameter selection
@@ -40,6 +40,12 @@ layout:
 {% stepper %}
 {% step %}
 #### Install Hypster
+
+```bash
+uv add hypster
+```
+
+Or using pip:
 
 ```bash
 pip install hypster
@@ -114,20 +120,34 @@ Hypster takes care of these challenges by providing a simple way to define confi
 
 # 🖥️ Installation
 
-Hypster is a lightweight package, mainly dependent on `Pydantic` for type-checking.
+Hypster is a lightweight package with minimal dependencies.
 
 {% tabs %}
-{% tab title="Basic Installation" %}
+{% tab title="Basic Installation (uv)" %}
+```bash
+uv add hypster
+```
+{% endtab %}
+
+{% tab title="Basic Installation (pip)" %}
 ```bash
 pip install hypster
+```
+{% endtab %}
+
+{% tab title="Interactive Jupyter UI (uv)" %}
+Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
+
+```bash
+uv add "hypster[jupyter]"
 ```
 
 Dependencies:
 
-* [Pydantic](https://github.com/pydantic/pydantic)
+* [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
 {% endtab %}
 
-{% tab title="Interactive Jupyter UI" %}
+{% tab title="Interactive Jupyter UI (pip)" %}
 Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
 
 ```bash
@@ -136,7 +156,6 @@ pip install hypster[jupyter]
 
 Dependencies:
 
-* [Pydantic](https://github.com/pydantic/pydantic)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
 {% endtab %}
 
@@ -147,7 +166,8 @@ Interested in **contributing to Hypster?** Go ahead and install the full develop
 pip install hypster[dev]
 ```
 
-* [Pydantic](https://github.com/pydantic/pydantic)
+Dependencies:
+
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
 * [ruff](https://github.com/astral-sh/ruff)
 * [mypy](https://github.com/python/mypy)

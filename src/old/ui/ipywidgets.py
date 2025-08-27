@@ -10,7 +10,8 @@ try:
     from IPython.display import HTML, display
 except ImportError:
     raise ImportError(
-        "ipywidgets is required for interactive configuration. Please install with: `pip install hypster[jupyter]`"
+        "ipywidgets is required for interactive configuration. "
+        "Please install with: `uv add 'hypster[jupyter]'` or `pip install hypster[jupyter]`"
     )
 
 

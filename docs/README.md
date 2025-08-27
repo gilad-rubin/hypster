@@ -26,7 +26,7 @@ layout:
 
 * :snake: **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
 * :nesting\_dolls: **Hierarchical Configurations**: Support for nested and swappable configurations
-* :triangular\_ruler: **Type Safety**: Built-in type hints and validation using [`Pydantic`](https://github.com/pydantic/pydantic)
+* :triangular\_ruler: **Type Safety**: Built-in type hints and validation
 * :package: **Portability**: Easy serialization and loading of configurations
 * :test\_tube: **Experiment Ready**: Built-in support for hyperparameter optimization
 * :video\_game: **Interactive UI**: Jupyter widgets integration for interactive parameter selection
@@ -38,6 +38,12 @@ layout:
 {% stepper %}
 {% step %}
 #### Install Hypster
+
+```bash
+uv add hypster
+```
+
+Or using pip:
 
 ```bash
 pip install hypster
