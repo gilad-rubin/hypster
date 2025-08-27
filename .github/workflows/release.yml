@@ -6,7 +6,6 @@ on:
       - "v*"
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
@@ -25,3 +24,4 @@ jobs:
           packages-dir: dist
           verbose: true
           skip-existing: true
+          password: ${{ secrets.PYPI_API_TOKEN }}
