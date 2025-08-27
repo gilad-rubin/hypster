@@ -16,7 +16,7 @@ def test_unknown_parameter_error() -> None:
 
     # Typo in parameter name
     with pytest.raises(ValueError, match="Did you mean 'learning_rate'"):
-        instantiate(config, values={"lerning_rate": 0.05})
+        instantiate(config, values={"lerning_rate": 0.05}, on_unknown="raise")
 
 
 def test_unknown_or_unreachable_parameter_error() -> None:
@@ -34,8 +34,8 @@ def test_unknown_or_unreachable_parameter_error() -> None:
 
     # Try to set rf parameter when logistic is selected
     # This should fail as unknown or unreachable since n_trees wasn't encountered
-    with pytest.raises(ValueError, match="Unknown or unreachable.*n_trees"):
-        instantiate(config, values={"n_trees": 200})
+    with pytest.raises(ValueError, match=r"Unknown or unreachable parameters:\s*- 'n_trees'"):
+        instantiate(config, values={"n_trees": 200}, on_unknown="raise")
 
 
 def test_type_mismatch_with_context() -> None:

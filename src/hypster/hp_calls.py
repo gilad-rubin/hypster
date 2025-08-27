@@ -75,7 +75,7 @@ class FloatValidator(ParameterValidator):
 
     def validate_value(self, value: Any, param_path: str, strict: bool = False) -> float:
         if isinstance(value, int):
-            if strict:
+            if strict or "." in param_path:
                 raise HPCallError(
                     param_path,
                     f"expected float but got int ({value}). " f"Please provide a float value like {float(value)}",

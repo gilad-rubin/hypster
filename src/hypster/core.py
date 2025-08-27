@@ -1,7 +1,7 @@
 """The Core API for instantiating configurations."""
 
 import warnings
-from typing import Any, Callable, Dict, Optional, Tuple, TypeVar
+from typing import Any, Callable, Dict, Literal, Optional, Tuple, TypeVar
 
 from .hp import HP
 from .hp_calls import HPCallError
@@ -16,7 +16,7 @@ def instantiate(
     values: Optional[Dict[str, Any]] = None,
     args: Tuple[Any, ...] = (),
     kwargs: Optional[Dict[str, Any]] = None,
-    on_unknown: str = "warn",
+    on_unknown: Literal["warn", "raise", "ignore"] = "warn",
 ) -> T:
     """
     Execute a config function with the given values.

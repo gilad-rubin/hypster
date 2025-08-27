@@ -1,6 +1,7 @@
 """The HP Parameter Interface."""
 
-from typing import Any, Callable, Dict, List, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .hp_calls import (
     BoolValidator,
@@ -14,6 +15,32 @@ from .hp_calls import (
 from .utils import unflatten_dict
 
 
+@dataclass(frozen=True)
+class OptionsAdapter:
+    """Helper to normalize options and defaults for select/multi_select."""
+
+    options: Union[List[Any], Dict[Any, Any]]
+    options_only: bool
+
+    def keys_and_map(self) -> Tuple[List[Any], Dict[Any, Any]]:
+        if isinstance(self.options, dict):
+            option_keys = list(self.options.keys())
+            option_map = self.options
+        else:
+            option_keys = list(self.options)
+            option_map = {k: k for k in option_keys}
+        return option_keys, option_map
+
+    def resolve_default(self, explicit_default: Optional[Any]) -> Optional[Any]:
+        if explicit_default is not None:
+            return explicit_default
+        if isinstance(self.options, dict):
+            # First key if available
+            return next(iter(self.options.keys()), None)
+        # First item if available
+        return self.options[0] if self.options else None
+
+
 class HP:
     """The HP parameter interface for configuration functions."""
 
@@ -23,6 +50,7 @@ class HP:
         self.exploration_tracker = exploration_tracker  # Optional, only for explore mode
         self.namespace_stack: List[str] = []  # For nested name prefixes
         self.called_params: set[str] = set()  # Track called parameter names
+        self.nested_scopes: set[str] = set()  # Track names that have been nested
 
     def _get_full_param_path(self, name: str) -> str:
         """Get full parameter path including namespace stack."""
@@ -70,261 +98,139 @@ class HP:
         if full_path in self.called_params:
             raise HPCallError(full_path, "has already been defined")
 
-    # Single-value parameters (all require name for overrides)
-    def int(
-        self, default: int, *, name: str, min: Optional[int] = None, max: Optional[int] = None, strict: bool = False
-    ) -> int:
-        """Integer parameter with optional bounds validation."""
-        validator = IntValidator()
-        full_path = self._get_full_param_path(name)
+    # --- Common handlers ---
+    def _validate_name(self, name: Optional[str], full_path: str) -> None:
+        """Manual name validation for calls that don't use a validator for naming."""
+        if name is None:
+            raise HPCallError(full_path, "requires 'name' for overrides")
 
-        validator.validate_name(name, full_path)
-        self._validate_name_not_called(name)
-
-        # Track this parameter as called
-        self.called_params.add(full_path)
-
-        value, found = self._get_value_for_param(name)
-        if found:
-            validated_value = validator.validate_value(value, full_path, strict=strict)
-        else:
-            validated_value = validator.validate_value(default, full_path, strict=strict)
-
-        # Validate bounds
-        if min is not None or max is not None:
-            validator.validate_bounds(validated_value, min, max, full_path)
-
-        return validated_value
-
-    def float(
+    def _handle_single_value(
         self,
-        default: float,
         *,
+        default: Any,
         name: str,
-        min: Optional[float] = None,
-        max: Optional[float] = None,
+        validator: Any,
+        supports_strict: bool = False,
         strict: bool = False,
-    ) -> float:
-        """Float parameter with optional bounds validation."""
-        validator = FloatValidator()
+        min: Optional[Union[int, float]] = None,
+        max: Optional[Union[int, float]] = None,
+        track_called: bool = False,
+        use_validator_name: bool = True,
+    ) -> Any:
         full_path = self._get_full_param_path(name)
 
-        validator.validate_name(name, full_path)
-        self._validate_name_not_called(name)
+        # Validate name (either via validator or manual message)
+        if use_validator_name:
+            validator.validate_name(name, full_path)
+        else:
+            self._validate_name(name, full_path)
 
-        # Track this parameter as called
-        self.called_params.add(full_path)
+        self._validate_name_not_called(name)
+        if track_called:
+            self.called_params.add(full_path)
 
         value, found = self._get_value_for_param(name)
         if found:
-            validated_value = validator.validate_value(value, full_path, strict=strict)
+            if supports_strict:
+                validated_value = validator.validate_value(value, full_path, strict=strict)
+            else:
+                validated_value = validator.validate_value(value, full_path)
         else:
-            validated_value = validator.validate_value(default, full_path, strict=strict)
+            if supports_strict:
+                validated_value = validator.validate_value(default, full_path, strict=strict)
+            else:
+                validated_value = validator.validate_value(default, full_path)
 
-        # Validate bounds
-        if min is not None or max is not None:
+        # Bounds validation if applicable
+        if (min is not None or max is not None) and hasattr(validator, "validate_bounds"):
             validator.validate_bounds(validated_value, min, max, full_path)
 
         return validated_value
 
-    def text(self, default: str, *, name: str) -> str:
-        """Text parameter."""
-        validator = TextValidator()
+    def _handle_multi_value(
+        self,
+        *,
+        default: List[Any],
+        name: str,
+        element_validator: Any,
+        supports_strict: bool = False,
+        strict: bool = False,
+        min: Optional[Union[int, float]] = None,
+        max: Optional[Union[int, float]] = None,
+    ) -> List[Any]:
         full_path = self._get_full_param_path(name)
 
-        validator.validate_name(name, full_path)
+        # Multi-value calls use manual name validation (to preserve message)
+        self._validate_name(name, full_path)
         self._validate_name_not_called(name)
-
-        # Track this parameter as called
         self.called_params.add(full_path)
 
-        value, found = self._get_value_for_param(name)
-        if found:
-            return validator.validate_value(value, full_path)
-        else:
-            return validator.validate_value(default, full_path)
-
-    def bool(self, default: bool, *, name: str) -> bool:
-        """Boolean parameter."""
-        validator = BoolValidator()
-        full_path = self._get_full_param_path(name)
-
-        validator.validate_name(name, full_path)
-        self._validate_name_not_called(name)
+        multi_validator = MultiValidator(element_validator)
 
         value, found = self._get_value_for_param(name)
         if found:
-            return validator.validate_value(value, full_path)
+            if supports_strict:
+                validated_values = multi_validator.validate_value(value, full_path, strict=strict)
+            else:
+                validated_values = multi_validator.validate_value(value, full_path)
         else:
-            return validator.validate_value(default, full_path)
+            if supports_strict:
+                validated_values = multi_validator.validate_value(default, full_path, strict=strict)
+            else:
+                validated_values = multi_validator.validate_value(default, full_path)
 
-    def select(
+        if min is not None or max is not None:
+            multi_validator.validate_bounds(validated_values, min, max, full_path)
+
+        return validated_values
+
+    def _handle_select_single(
         self,
-        options: Union[List[Any], Dict[Any, Any]],
         *,
+        options: Union[List[Any], Dict[Any, Any]],
         name: str,
         default: Optional[Any] = None,
         options_only: bool = False,
     ) -> Any:
-        """Selection parameter from options."""
         validator = SelectValidator()
         full_path = self._get_full_param_path(name)
 
         validator.validate_name(name, full_path)
         self._validate_name_not_called(name)
+        self.called_params.add(full_path)
 
-        # Handle dict options - convert to list of keys for validation
-        if isinstance(options, dict):
-            option_keys = list(options.keys())
-            option_map = options
-        else:
-            option_keys = options
-            option_map = {k: k for k in options}
-
-        # Determine the actual default value
-        if default is None:
-            if isinstance(options, dict):
-                actual_default = list(options.keys())[0] if options else None
-            else:
-                actual_default = options[0] if options else None
-        else:
-            actual_default = default
+        adapter = OptionsAdapter(options=options, options_only=options_only)
+        option_keys, option_map = adapter.keys_and_map()
+        actual_default = adapter.resolve_default(default)
 
         value, found = self._get_value_for_param(name)
         if found:
             validated_key = validator.validate_value(value, option_keys, options_only, full_path)
-            # Return mapped value for dict options
-            if isinstance(options, dict):
-                return option_map.get(validated_key, validated_key)
-            return validated_key
+            return option_map.get(validated_key, validated_key)
         else:
-            # Use default
             if actual_default is not None:
                 validated_key = validator.validate_value(actual_default, option_keys, options_only, full_path)
-                # Return mapped value for dict options
-                if isinstance(options, dict):
-                    return option_map.get(validated_key, validated_key)
-                return validated_key
+                return option_map.get(validated_key, validated_key)
             return None
 
-    # Multi-value parameters
-    def multi_int(
+    def _handle_select_multi(
         self,
-        default: List[int],
         *,
-        name: str,
-        min: Optional[int] = None,
-        max: Optional[int] = None,
-        strict: bool = False,
-    ) -> List[int]:
-        """Multi-integer parameter with optional bounds validation."""
-        validator = MultiValidator(IntValidator())
-        full_path = self._get_full_param_path(name)
-
-        # Validate name
-        if name is None:
-            raise HPCallError(full_path, "requires 'name' for overrides")
-        self._validate_name_not_called(name)
-
-        value, found = self._get_value_for_param(name)
-        if found:
-            validated_values = validator.validate_value(value, full_path, strict=strict)
-        else:
-            validated_values = validator.validate_value(default, full_path, strict=strict)
-
-        # Validate bounds for each element
-        if min is not None or max is not None:
-            validator.validate_bounds(validated_values, min, max, full_path)
-
-        return validated_values
-
-    def multi_float(
-        self,
-        default: List[float],
-        *,
-        name: str,
-        min: Optional[float] = None,
-        max: Optional[float] = None,
-        strict: bool = False,
-    ) -> List[float]:
-        """Multi-float parameter with optional bounds validation."""
-        validator = MultiValidator(FloatValidator())
-        full_path = self._get_full_param_path(name)
-
-        # Validate name
-        if name is None:
-            raise HPCallError(full_path, "requires 'name' for overrides")
-        self._validate_name_not_called(name)
-
-        value, found = self._get_value_for_param(name)
-        if found:
-            validated_values = validator.validate_value(value, full_path, strict=strict)
-        else:
-            validated_values = validator.validate_value(default, full_path, strict=strict)
-
-        # Validate bounds for each element
-        if min is not None or max is not None:
-            validator.validate_bounds(validated_values, min, max, full_path)
-
-        return validated_values
-
-    def multi_text(self, default: List[str], *, name: str) -> List[str]:
-        """Multi-text parameter."""
-        validator = MultiValidator(TextValidator())
-        full_path = self._get_full_param_path(name)
-
-        # Validate name
-        if name is None:
-            raise HPCallError(full_path, "requires 'name' for overrides")
-        self._validate_name_not_called(name)
-
-        value, found = self._get_value_for_param(name)
-        if found:
-            return validator.validate_value(value, full_path)
-        else:
-            return validator.validate_value(default, full_path)
-
-    def multi_bool(self, default: List[bool], *, name: str) -> List[bool]:
-        """Multi-boolean parameter."""
-        validator = MultiValidator(BoolValidator())
-        full_path = self._get_full_param_path(name)
-
-        # Validate name
-        if name is None:
-            raise HPCallError(full_path, "requires 'name' for overrides")
-        self._validate_name_not_called(name)
-
-        value, found = self._get_value_for_param(name)
-        if found:
-            return validator.validate_value(value, full_path)
-        else:
-            return validator.validate_value(default, full_path)
-
-    def multi_select(
-        self,
         options: Union[List[Any], Dict[Any, Any]],
-        *,
         name: str,
         default: Optional[List[Any]] = None,
         options_only: bool = False,
     ) -> List[Any]:
-        """Multi-selection parameter from options."""
         validator = SelectValidator()
         full_path = self._get_full_param_path(name)
 
         validator.validate_name(name, full_path)
         self._validate_name_not_called(name)
+        self.called_params.add(full_path)
 
-        # Handle dict options
-        if isinstance(options, dict):
-            option_keys = list(options.keys())
-            option_map = options
-        else:
-            option_keys = options
-            option_map = {k: k for k in options}
-
-        # Determine the actual default value
-        actual_default = default or []
+        adapter = OptionsAdapter(options=options, options_only=options_only)
+        option_keys, option_map = adapter.keys_and_map()
+        actual_default = list(default or [])
 
         value, found = self._get_value_for_param(name)
         if found:
@@ -336,21 +242,92 @@ class HP:
                 validated_key = validator.validate_value(item, option_keys, options_only, f"{full_path}[{i}]")
                 validated_keys.append(validated_key)
 
-            # Return mapped values for dict options
-            if isinstance(options, dict):
-                return [option_map.get(k, k) for k in validated_keys]
-            return validated_keys
+            return [option_map.get(k, k) for k in validated_keys]
         else:
-            # Use default
             validated_keys = []
             for i, item in enumerate(actual_default):
                 validated_key = validator.validate_value(item, option_keys, options_only, f"{full_path}[{i}]")
                 validated_keys.append(validated_key)
 
-            # Return mapped values for dict options
-            if isinstance(options, dict):
-                return [option_map.get(k, k) for k in validated_keys]
-            return validated_keys
+            return [option_map.get(k, k) for k in validated_keys]
+
+    # --- Executor structures ---
+    @dataclass(frozen=True)
+    class SingleValueSpec:
+        name: str
+        default: Any
+        validator: Any
+        supports_strict: bool = False
+        strict: bool = False
+        min: Optional[Union[int, float]] = None
+        max: Optional[Union[int, float]] = None
+        track_called: bool = False
+        use_validator_name: bool = True
+
+    @dataclass(frozen=True)
+    class MultiValueSpec:
+        name: str
+        default: List[Any]
+        element_validator: Any
+        supports_strict: bool = False
+        strict: bool = False
+        min: Optional[Union[int, float]] = None
+        max: Optional[Union[int, float]] = None
+
+    @dataclass(frozen=True)
+    class SelectSingleSpec:
+        name: str
+        options: Union[List[Any], Dict[Any, Any]]
+        default: Optional[Any] = None
+        options_only: bool = False
+
+    @dataclass(frozen=True)
+    class SelectMultiSpec:
+        name: str
+        options: Union[List[Any], Dict[Any, Any]]
+        default: Optional[List[Any]] = None
+        options_only: bool = False
+
+    # --- Unified executors ---
+    def _execute_single(self, spec: "HP.SingleValueSpec") -> Any:
+        return self._handle_single_value(
+            default=spec.default,
+            name=spec.name,
+            validator=spec.validator,
+            supports_strict=spec.supports_strict,
+            strict=spec.strict,
+            min=spec.min,
+            max=spec.max,
+            track_called=spec.track_called,
+            use_validator_name=spec.use_validator_name,
+        )
+
+    def _execute_multi(self, spec: "HP.MultiValueSpec") -> List[Any]:
+        return self._handle_multi_value(
+            default=spec.default,
+            name=spec.name,
+            element_validator=spec.element_validator,
+            supports_strict=spec.supports_strict,
+            strict=spec.strict,
+            min=spec.min,
+            max=spec.max,
+        )
+
+    def _execute_select_single(self, spec: "HP.SelectSingleSpec") -> Any:
+        return self._handle_select_single(
+            options=spec.options,
+            name=spec.name,
+            default=spec.default,
+            options_only=spec.options_only,
+        )
+
+    def _execute_select_multi(self, spec: "HP.SelectMultiSpec") -> List[Any]:
+        return self._handle_select_multi(
+            options=spec.options,
+            name=spec.name,
+            default=spec.default,
+            options_only=spec.options_only,
+        )
 
     # Composition
     def nest(
@@ -371,6 +348,13 @@ class HP:
         if name is None:
             raise HPCallError(full_path, "requires 'name' for nesting")
 
+        # Disallow nesting under a prefix that already has parameters defined by the parent
+        # but allow repeated nesting with the same name to surface duplicate param errors later
+        if name not in self.nested_scopes:
+            for existing in self.called_params:
+                if existing.startswith(full_path + ".") or existing == full_path:
+                    raise HPCallError(full_path, f"prefix '{name}' reserved")
+
         # Validate function signature
         validate_config_func_signature(child)
 
@@ -384,6 +368,10 @@ class HP:
                 nested_key = key[len(prefix) :]
                 nested_values[nested_key] = value
 
+        # If an explicit nested dict is provided under the name key, it overrides dotted keys
+        if name in self.values and isinstance(self.values[name], dict):
+            nested_values.update(self.values[name])
+
         # Merge with explicit values if provided
         if values:
             nested_values.update(values)
@@ -392,6 +380,10 @@ class HP:
         nested_hp = HP(nested_values)
         nested_hp.namespace_stack = self.namespace_stack + [name]
         nested_hp.called_params = self.called_params  # Share called_params tracking
+
+        # Mark that we've nested under this name
+        self.nested_scopes.add(name)
+        self.called_params.add(full_path)
 
         # Prepare arguments
         kwargs = kwargs or {}
@@ -402,12 +394,9 @@ class HP:
         # Track nested parameters in parent's called_params
         nested_params = list(nested_hp.called_params)  # Create a copy to avoid iteration issues
         for param in nested_params:
-            # Check if the parameter is already a fully qualified path or just a local name
             if "." in param:
-                # It's already a fully qualified nested parameter, add it as-is
                 self.called_params.add(param)
             else:
-                # It's a local parameter from the nested function, prefix it
                 full_nested_param = f"{full_path}.{param}"
                 self.called_params.add(full_nested_param)
 
@@ -440,3 +429,185 @@ class HP:
             result[key] = value
 
         return result
+
+
+# --- Public API methods attached after class definition to avoid built-in name linting ---
+
+
+def HP_int(
+    self: HP,
+    default: int,
+    *,
+    name: str,
+    min: Optional[int] = None,
+    max: Optional[int] = None,
+    strict: bool = False,
+) -> int:
+    """Integer parameter with optional bounds validation."""
+    spec = HP.SingleValueSpec(
+        name=name,
+        default=default,
+        validator=IntValidator(),
+        supports_strict=True,
+        strict=strict,
+        min=min,
+        max=max,
+        track_called=True,
+        use_validator_name=True,
+    )
+    return self._execute_single(spec)
+
+
+def HP_float(
+    self: HP,
+    default: float,
+    *,
+    name: str,
+    min: Optional[float] = None,
+    max: Optional[float] = None,
+    strict: bool = False,
+) -> float:
+    """Float parameter with optional bounds validation."""
+    spec = HP.SingleValueSpec(
+        name=name,
+        default=default,
+        validator=FloatValidator(),
+        supports_strict=True,
+        strict=strict,
+        min=min,
+        max=max,
+        track_called=True,
+        use_validator_name=True,
+    )
+    return self._execute_single(spec)
+
+
+def HP_text(self: HP, default: str, *, name: str) -> str:
+    """Text parameter."""
+    spec = HP.SingleValueSpec(
+        name=name,
+        default=default,
+        validator=TextValidator(),
+        supports_strict=False,
+        track_called=True,
+        use_validator_name=True,
+    )
+    return self._execute_single(spec)
+
+
+def HP_bool(self: HP, default: bool, *, name: str) -> bool:
+    """Boolean parameter."""
+    spec = HP.SingleValueSpec(
+        name=name,
+        default=default,
+        validator=BoolValidator(),
+        supports_strict=False,
+        track_called=True,
+        use_validator_name=True,
+    )
+    return self._execute_single(spec)
+
+
+def HP_select(
+    self: HP,
+    options: Union[List[Any], Dict[Any, Any]],
+    *,
+    name: str,
+    default: Optional[Any] = None,
+    options_only: bool = False,
+) -> Any:
+    """Selection parameter from options."""
+    spec = HP.SelectSingleSpec(name=name, options=options, default=default, options_only=options_only)
+    return self._execute_select_single(spec)
+
+
+def HP_multi_int(
+    self: HP,
+    default: List[int],
+    *,
+    name: str,
+    min: Optional[int] = None,
+    max: Optional[int] = None,
+    strict: bool = False,
+) -> List[int]:
+    """Multi-integer parameter with optional bounds validation."""
+    spec = HP.MultiValueSpec(
+        name=name,
+        default=default,
+        element_validator=IntValidator(),
+        supports_strict=True,
+        strict=strict,
+        min=min,
+        max=max,
+    )
+    return self._execute_multi(spec)
+
+
+def HP_multi_float(
+    self: HP,
+    default: List[float],
+    *,
+    name: str,
+    min: Optional[float] = None,
+    max: Optional[float] = None,
+    strict: bool = False,
+) -> List[float]:
+    """Multi-float parameter with optional bounds validation."""
+    spec = HP.MultiValueSpec(
+        name=name,
+        default=default,
+        element_validator=FloatValidator(),
+        supports_strict=True,
+        strict=strict,
+        min=min,
+        max=max,
+    )
+    return self._execute_multi(spec)
+
+
+def HP_multi_text(self: HP, default: List[str], *, name: str) -> List[str]:
+    """Multi-text parameter."""
+    spec = HP.MultiValueSpec(
+        name=name,
+        default=default,
+        element_validator=TextValidator(),
+        supports_strict=False,
+    )
+    return self._execute_multi(spec)
+
+
+def HP_multi_bool(self: HP, default: List[bool], *, name: str) -> List[bool]:
+    """Multi-boolean parameter."""
+    spec = HP.MultiValueSpec(
+        name=name,
+        default=default,
+        element_validator=BoolValidator(),
+        supports_strict=False,
+    )
+    return self._execute_multi(spec)
+
+
+def HP_multi_select(
+    self: HP,
+    options: Union[List[Any], Dict[Any, Any]],
+    *,
+    name: str,
+    default: Optional[List[Any]] = None,
+    options_only: bool = False,
+) -> List[Any]:
+    """Multi-selection parameter from options."""
+    spec = HP.SelectMultiSpec(name=name, options=options, default=default, options_only=options_only)
+    return self._execute_select_multi(spec)
+
+
+# Attach methods to class (preserve public API names without declaring inside the class body)
+setattr(HP, "int", HP_int)
+setattr(HP, "float", HP_float)
+setattr(HP, "text", HP_text)
+setattr(HP, "bool", HP_bool)
+setattr(HP, "select", HP_select)
+setattr(HP, "multi_int", HP_multi_int)
+setattr(HP, "multi_float", HP_multi_float)
+setattr(HP, "multi_text", HP_multi_text)
+setattr(HP, "multi_bool", HP_multi_bool)
+setattr(HP, "multi_select", HP_multi_select)
