@@ -1,226 +1,442 @@
-import logging
-from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
-from uuid import UUID
+"""The HP Parameter Interface."""
+
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from .hp_calls import (
-    BaseHPCall,
-    BasicType,
-    BoolInputCall,
-    IntInputCall,
-    MultiBoolCall,
-    MultiIntCall,
-    MultiNumberCall,
-    MultiSelectCall,
-    MultiTextCall,
-    NestedCall,
-    NumberInputCall,
-    NumericBounds,
-    NumericType,
-    SelectCall,
-    TextInputCall,
+    BoolValidator,
+    FloatValidator,
+    HPCallError,
+    IntValidator,
+    MultiValidator,
+    SelectValidator,
+    TextValidator,
 )
-from .run_history import HistoryDatabase, NestedHistoryRecord, ParameterRecord, ParameterSource
-
-if TYPE_CHECKING:
-    from .core import Hypster
-
-logger = logging.getLogger(__name__)
-MAX_POTENTIAL_VALUES = 5
+from .utils import unflatten_dict
 
 
 class HP:
-    def __init__(
+    """The HP parameter interface for configuration functions."""
+
+    def __init__(self, values: Dict[str, Any], exploration_tracker: Optional[Any] = None):
+        """HP is created by instantiate() - users don't instantiate directly."""
+        self.values = values or {}
+        self.exploration_tracker = exploration_tracker  # Optional, only for explore mode
+        self.namespace_stack: List[str] = []  # For nested name prefixes
+        self.called_params: set[str] = set()  # Track called parameter names
+
+    def _get_full_param_path(self, name: str) -> str:
+        """Get full parameter path including namespace stack."""
+        if self.namespace_stack:
+            return ".".join(self.namespace_stack + [name])
+        return name
+
+    def _make_full_path(self, name: str) -> str:
+        """Make full path for parameter name validation."""
+        return self._get_full_param_path(name)
+
+    def _get_value_for_param(self, name: str) -> tuple[Any, bool]:
+        """Get value for parameter, returns (value, found)."""
+        # Check for exact match with just the name first (for nested contexts)
+        if name in self.values:
+            return self.values[name], True
+
+        # Then check with full path
+        full_path = self._get_full_param_path(name)
+        if full_path in self.values:
+            return self.values[full_path], True
+
+        # Check for nested structure
+        nested_values = unflatten_dict(self.values)
+        try:
+            current = nested_values
+            for part in full_path.split("."):
+                current = current[part]
+            return current, True
+        except (KeyError, TypeError):
+            pass
+
+        # Try with just the name in nested structure
+        try:
+            current = nested_values
+            for part in name.split("."):
+                current = current[part]
+            return current, True
+        except (KeyError, TypeError):
+            return None, False
+
+    def _validate_name_not_called(self, name: str) -> None:
+        """Validate that this parameter name hasn't been called before."""
+        full_path = self._make_full_path(name)
+        if full_path in self.called_params:
+            raise HPCallError(full_path, "has already been defined")
+
+    # Single-value parameters (all require name for overrides)
+    def int(
+        self, default: int, *, name: str, min: Optional[int] = None, max: Optional[int] = None, strict: bool = False
+    ) -> int:
+        """Integer parameter with optional bounds validation."""
+        validator = IntValidator()
+        full_path = self._get_full_param_path(name)
+
+        validator.validate_name(name, full_path)
+        self._validate_name_not_called(name)
+
+        # Track this parameter as called
+        self.called_params.add(full_path)
+
+        value, found = self._get_value_for_param(name)
+        if found:
+            validated_value = validator.validate_value(value, full_path, strict=strict)
+        else:
+            validated_value = validator.validate_value(default, full_path, strict=strict)
+
+        # Validate bounds
+        if min is not None or max is not None:
+            validator.validate_bounds(validated_value, min, max, full_path)
+
+        return validated_value
+
+    def float(
         self,
-        final_vars: List[str],
-        exclude_vars: List[str],
-        values: Dict[str, Any],
-        run_history: HistoryDatabase,
-        run_id: UUID,
-        explore_mode: bool = False,
-    ):
-        self.final_vars = final_vars
-        self.exclude_vars = exclude_vars
-        self.values = values
-        self.run_history = run_history
-        self.run_id = run_id
-        self.explore_mode = explore_mode
-        self.source = ParameterSource.UI if explore_mode else ParameterSource.USER
-        logger.info(f"Initialized HP with explore_mode: {explore_mode}")
+        default: float,
+        *,
+        name: str,
+        min: Optional[float] = None,
+        max: Optional[float] = None,
+        strict: bool = False,
+    ) -> float:
+        """Float parameter with optional bounds validation."""
+        validator = FloatValidator()
+        full_path = self._get_full_param_path(name)
+
+        validator.validate_name(name, full_path)
+        self._validate_name_not_called(name)
+
+        # Track this parameter as called
+        self.called_params.add(full_path)
+
+        value, found = self._get_value_for_param(name)
+        if found:
+            validated_value = validator.validate_value(value, full_path, strict=strict)
+        else:
+            validated_value = validator.validate_value(default, full_path, strict=strict)
+
+        # Validate bounds
+        if min is not None or max is not None:
+            validator.validate_bounds(validated_value, min, max, full_path)
+
+        return validated_value
+
+    def text(self, default: str, *, name: str) -> str:
+        """Text parameter."""
+        validator = TextValidator()
+        full_path = self._get_full_param_path(name)
+
+        validator.validate_name(name, full_path)
+        self._validate_name_not_called(name)
+
+        # Track this parameter as called
+        self.called_params.add(full_path)
+
+        value, found = self._get_value_for_param(name)
+        if found:
+            return validator.validate_value(value, full_path)
+        else:
+            return validator.validate_value(default, full_path)
+
+    def bool(self, default: bool, *, name: str) -> bool:
+        """Boolean parameter."""
+        validator = BoolValidator()
+        full_path = self._get_full_param_path(name)
+
+        validator.validate_name(name, full_path)
+        self._validate_name_not_called(name)
+
+        value, found = self._get_value_for_param(name)
+        if found:
+            return validator.validate_value(value, full_path)
+        else:
+            return validator.validate_value(default, full_path)
 
     def select(
         self,
-        options: Union[Dict[BasicType, Any], List[BasicType]],
+        options: Union[List[Any], Dict[Any, Any]],
         *,
-        name: Optional[str] = None,
-        default: Optional[BasicType] = None,
+        name: str,
+        default: Optional[Any] = None,
         options_only: bool = False,
     ) -> Any:
-        call = SelectCall(name=name, options=options, default=default, options_only=options_only)
-        options_keys = list(call.processed_options.keys())
-        return self._execute_call(call=call, parameter_type="select", options=options_keys)
+        """Selection parameter from options."""
+        validator = SelectValidator()
+        full_path = self._get_full_param_path(name)
+
+        validator.validate_name(name, full_path)
+        self._validate_name_not_called(name)
+
+        # Handle dict options - convert to list of keys for validation
+        if isinstance(options, dict):
+            option_keys = list(options.keys())
+            option_map = options
+        else:
+            option_keys = options
+            option_map = {k: k for k in options}
+
+        # Determine the actual default value
+        if default is None:
+            if isinstance(options, dict):
+                actual_default = list(options.keys())[0] if options else None
+            else:
+                actual_default = options[0] if options else None
+        else:
+            actual_default = default
+
+        value, found = self._get_value_for_param(name)
+        if found:
+            validated_key = validator.validate_value(value, option_keys, options_only, full_path)
+            # Return mapped value for dict options
+            if isinstance(options, dict):
+                return option_map.get(validated_key, validated_key)
+            return validated_key
+        else:
+            # Use default
+            if actual_default is not None:
+                validated_key = validator.validate_value(actual_default, option_keys, options_only, full_path)
+                # Return mapped value for dict options
+                if isinstance(options, dict):
+                    return option_map.get(validated_key, validated_key)
+                return validated_key
+            return None
+
+    # Multi-value parameters
+    def multi_int(
+        self,
+        default: List[int],
+        *,
+        name: str,
+        min: Optional[int] = None,
+        max: Optional[int] = None,
+        strict: bool = False,
+    ) -> List[int]:
+        """Multi-integer parameter with optional bounds validation."""
+        validator = MultiValidator(IntValidator())
+        full_path = self._get_full_param_path(name)
+
+        # Validate name
+        if name is None:
+            raise HPCallError(full_path, "requires 'name' for overrides")
+        self._validate_name_not_called(name)
+
+        value, found = self._get_value_for_param(name)
+        if found:
+            validated_values = validator.validate_value(value, full_path, strict=strict)
+        else:
+            validated_values = validator.validate_value(default, full_path, strict=strict)
+
+        # Validate bounds for each element
+        if min is not None or max is not None:
+            validator.validate_bounds(validated_values, min, max, full_path)
+
+        return validated_values
+
+    def multi_float(
+        self,
+        default: List[float],
+        *,
+        name: str,
+        min: Optional[float] = None,
+        max: Optional[float] = None,
+        strict: bool = False,
+    ) -> List[float]:
+        """Multi-float parameter with optional bounds validation."""
+        validator = MultiValidator(FloatValidator())
+        full_path = self._get_full_param_path(name)
+
+        # Validate name
+        if name is None:
+            raise HPCallError(full_path, "requires 'name' for overrides")
+        self._validate_name_not_called(name)
+
+        value, found = self._get_value_for_param(name)
+        if found:
+            validated_values = validator.validate_value(value, full_path, strict=strict)
+        else:
+            validated_values = validator.validate_value(default, full_path, strict=strict)
+
+        # Validate bounds for each element
+        if min is not None or max is not None:
+            validator.validate_bounds(validated_values, min, max, full_path)
+
+        return validated_values
+
+    def multi_text(self, default: List[str], *, name: str) -> List[str]:
+        """Multi-text parameter."""
+        validator = MultiValidator(TextValidator())
+        full_path = self._get_full_param_path(name)
+
+        # Validate name
+        if name is None:
+            raise HPCallError(full_path, "requires 'name' for overrides")
+        self._validate_name_not_called(name)
+
+        value, found = self._get_value_for_param(name)
+        if found:
+            return validator.validate_value(value, full_path)
+        else:
+            return validator.validate_value(default, full_path)
+
+    def multi_bool(self, default: List[bool], *, name: str) -> List[bool]:
+        """Multi-boolean parameter."""
+        validator = MultiValidator(BoolValidator())
+        full_path = self._get_full_param_path(name)
+
+        # Validate name
+        if name is None:
+            raise HPCallError(full_path, "requires 'name' for overrides")
+        self._validate_name_not_called(name)
+
+        value, found = self._get_value_for_param(name)
+        if found:
+            return validator.validate_value(value, full_path)
+        else:
+            return validator.validate_value(default, full_path)
 
     def multi_select(
         self,
-        options: Union[Dict[BasicType, Any], List[BasicType]],
+        options: Union[List[Any], Dict[Any, Any]],
         *,
-        name: Optional[str] = None,
-        default: Optional[List[BasicType]] = [],
+        name: str,
+        default: Optional[List[Any]] = None,
         options_only: bool = False,
     ) -> List[Any]:
-        call = MultiSelectCall(name=name, options=options, default=default, options_only=options_only)
-        options_keys = list(call.processed_options.keys())
-        return self._execute_call(call=call, parameter_type="multi_select", options=options_keys)
+        """Multi-selection parameter from options."""
+        validator = SelectValidator()
+        full_path = self._get_full_param_path(name)
 
-    def number(
-        self,
-        default: NumericType,
-        *,
-        name: Optional[str] = None,
-        min: Optional[NumericType] = None,
-        max: Optional[NumericType] = None,
-    ) -> NumericType:
-        bounds = NumericBounds(min_val=min, max_val=max) if (min is not None or max is not None) else None
-        call = NumberInputCall(name=name, default=default, bounds=bounds)
-        return self._execute_call(call=call, parameter_type="number", numeric_bounds=bounds)
+        validator.validate_name(name, full_path)
+        self._validate_name_not_called(name)
 
-    def multi_number(
-        self,
-        default: List[NumericType] = [],
-        *,
-        name: Optional[str] = None,
-        min: Optional[NumericType] = None,
-        max: Optional[NumericType] = None,
-    ) -> List[NumericType]:
-        bounds = NumericBounds(min_val=min, max_val=max) if (min is not None or max is not None) else None
-        call = MultiNumberCall(name=name, default=default, bounds=bounds)
-        return self._execute_call(call=call, parameter_type="multi_number", numeric_bounds=bounds)
+        # Handle dict options
+        if isinstance(options, dict):
+            option_keys = list(options.keys())
+            option_map = options
+        else:
+            option_keys = options
+            option_map = {k: k for k in options}
 
-    def int(
-        self,
-        default: int,
-        *,
-        name: Optional[str] = None,
-        min: Optional[int] = None,
-        max: Optional[int] = None,
-    ) -> int:
-        bounds = NumericBounds(min_val=min, max_val=max) if (min is not None or max is not None) else None
-        call = IntInputCall(name=name, default=default, bounds=bounds)
-        return self._execute_call(call=call, parameter_type="int", numeric_bounds=bounds)
+        # Determine the actual default value
+        actual_default = default or []
 
-    def multi_int(
-        self,
-        default: List[int] = [],
-        *,
-        name: Optional[str] = None,
-        min: Optional[int] = None,
-        max: Optional[int] = None,
-    ) -> List[int]:
-        bounds = NumericBounds(min_val=min, max_val=max) if (min is not None or max is not None) else None
-        call = MultiIntCall(name=name, default=default, bounds=bounds)
-        return self._execute_call(call=call, parameter_type="multi_int", numeric_bounds=bounds)
+        value, found = self._get_value_for_param(name)
+        if found:
+            if not isinstance(value, list):
+                raise HPCallError(full_path, f"expected list but got {type(value).__name__} ({value})")
 
-    def text(self, default: str, *, name: Optional[str] = None) -> str:
-        call = TextInputCall(name=name, default=default)
-        return self._execute_call(call=call, parameter_type="text")
+            validated_keys = []
+            for i, item in enumerate(value):
+                validated_key = validator.validate_value(item, option_keys, options_only, f"{full_path}[{i}]")
+                validated_keys.append(validated_key)
 
-    def multi_text(self, default: List[str] = [], *, name: Optional[str] = None) -> List[str]:
-        call = MultiTextCall(name=name, default=default)
-        return self._execute_call(call=call, parameter_type="multi_text")
+            # Return mapped values for dict options
+            if isinstance(options, dict):
+                return [option_map.get(k, k) for k in validated_keys]
+            return validated_keys
+        else:
+            # Use default
+            validated_keys = []
+            for i, item in enumerate(actual_default):
+                validated_key = validator.validate_value(item, option_keys, options_only, f"{full_path}[{i}]")
+                validated_keys.append(validated_key)
 
-    def bool(self, default: bool, *, name: Optional[str] = None) -> bool:
-        call = BoolInputCall(name=name, default=default)
-        return self._execute_call(call=call, parameter_type="bool")
+            # Return mapped values for dict options
+            if isinstance(options, dict):
+                return [option_map.get(k, k) for k in validated_keys]
+            return validated_keys
 
-    def multi_bool(self, default: List[bool] = [], *, name: Optional[str] = None) -> List[bool]:
-        call = MultiBoolCall(name=name, default=default)
-        return self._execute_call(call=call, parameter_type="multi_bool")
-
+    # Composition
     def nest(
         self,
-        config_func: Union[str, Path, "Hypster"],
+        child: Callable,
         *,
-        name: Optional[str] = None,
-        final_vars: List[str] = [],
-        exclude_vars: List[str] = [],
-        values: Dict[str, Any] = {},
-    ) -> Dict[str, Any]:
-        if isinstance(config_func, (str, Path)):
-            from .core import load
-
-            config_func = load(str(config_func))
-
-        call = NestedCall(name=name)
-        result = call.execute(
-            config_func,
-            final_vars=final_vars,
-            original_final_vars=self.final_vars,
-            exclude_vars=exclude_vars,
-            original_exclude_vars=self.exclude_vars,
-            values=values,
-            original_values=self.values,
-            explore_mode=self.explore_mode,
-            run_history=self.run_history,
-        )
-
-        record = NestedHistoryRecord(
-            name=name,
-            parameter_type="nest",
-            run_history=config_func.run_history,
-            run_id=self.run_id,
-            source=self.source,
-        )
-        self.run_history.add_record(record)
-        return result
-
-    def _execute_call(
-        self,
-        call: BaseHPCall,
-        parameter_type: str,
-        options: Optional[List[BasicType]] = None,
-        numeric_bounds: Optional[NumericBounds] = None,
+        name: str,
+        values: Optional[Dict[str, Any]] = None,
+        args: tuple = (),
+        kwargs: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        """Execute HP call and record its result"""
-        logger.debug(f"Added {parameter_type}Call: {call.name}")
+        """Nest another configuration function."""
+        from .utils import validate_config_func_signature
 
-        potential_values = self._get_potential_values(call.name) if self.explore_mode else []
+        full_path = self._get_full_param_path(name)
 
-        result = call.execute(values=self.values, potential_values=potential_values, explore_mode=self.explore_mode)
+        # Validate name
+        if name is None:
+            raise HPCallError(full_path, "requires 'name' for nesting")
 
-        if parameter_type in ("select", "multi_select"):
-            value = call.stored_value.value
-            is_reproducible = call.stored_value.reproducible
-        else:
-            value = result
-            is_reproducible = True
+        # Validate function signature
+        validate_config_func_signature(child)
 
-        record = ParameterRecord(
-            name=call.name,
-            parameter_type=parameter_type,
-            single_value=call.single_value,
-            default=call.default,
-            value=value,
-            is_reproducible=is_reproducible,
-            options=options,
-            numeric_bounds=numeric_bounds,
-            run_id=self.run_id,
-            source=self.source,
-        )
-        self.run_history.add_record(record)
+        # Prepare nested values by filtering with name prefix
+        nested_values = {}
+        prefix = name + "."  # Use just the name, not the full path
+
+        # Extract nested values from main values dict
+        for key, value in self.values.items():
+            if key.startswith(prefix):
+                nested_key = key[len(prefix) :]
+                nested_values[nested_key] = value
+
+        # Merge with explicit values if provided
+        if values:
+            nested_values.update(values)
+
+        # Create new HP instance for nested call with namespace
+        nested_hp = HP(nested_values)
+        nested_hp.namespace_stack = self.namespace_stack + [name]
+        nested_hp.called_params = self.called_params  # Share called_params tracking
+
+        # Prepare arguments
+        kwargs = kwargs or {}
+
+        # Call the nested function
+        result = child(nested_hp, *args, **kwargs)
+
+        # Track nested parameters in parent's called_params
+        nested_params = list(nested_hp.called_params)  # Create a copy to avoid iteration issues
+        for param in nested_params:
+            # Check if the parameter is already a fully qualified path or just a local name
+            if "." in param:
+                # It's already a fully qualified nested parameter, add it as-is
+                self.called_params.add(param)
+            else:
+                # It's a local parameter from the nested function, prefix it
+                full_nested_param = f"{full_path}.{param}"
+                self.called_params.add(full_nested_param)
+
         return result
 
-    def _get_potential_values(self, name: str) -> List[Any]:
-        records_dict = self.run_history.get_param_records(name)
-        # Extract just the records, ignoring the run_ids
-        records = list(records_dict.values())
-        potential_values = list(
-            dict.fromkeys(  # remove duplicates
-                record.value
-                for record in reversed(records)  # LIFO
-                if isinstance(record, ParameterRecord)
-                and (
-                    record.is_reproducible if isinstance(record.is_reproducible, bool) else all(record.is_reproducible)
-                )
-            )
-        )[:MAX_POTENTIAL_VALUES]
-        return potential_values
+    # Helpers
+    def collect(
+        self, locals_dict: Dict[str, Any], include: Optional[List[str]] = None, exclude: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
+        """Helper to collect local variables, excluding HP-related ones."""
+        result = {}
+
+        # Default exclusions
+        default_exclude = {"hp", "self", "__builtins__", "__name__", "__doc__"}
+        exclude_set = set(exclude or []) | default_exclude
+
+        for key, value in locals_dict.items():
+            # Skip private/dunder variables
+            if key.startswith("_"):
+                continue
+
+            # Apply include filter if specified
+            if include is not None and key not in include:
+                continue
+
+            # Apply exclude filter
+            if key in exclude_set:
+                continue
+
+            result[key] = value
+
+        return result

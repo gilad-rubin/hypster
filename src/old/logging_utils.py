@@ -52,7 +52,7 @@ def configure_logging(level: int = logging.INFO) -> logging.Logger:
 
     # Set the handler for the logger
     logger.addHandler(handler)
-    #logger.setLevel(level)
+    # logger.setLevel(level)
     logger.setLevel(logging.WARNING)
 
     return logger
