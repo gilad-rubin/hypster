@@ -1,17 +1,21 @@
 """The Core API for instantiating configurations."""
 
 import warnings
-from typing import Any, Callable, Dict, Literal, Optional, Tuple, TypeVar
+from typing import Any, Dict, Literal, Optional, Protocol, Tuple, TypeVar
 
 from .hp import HP
 from .hp_calls import HPCallError
 from .utils import suggest_similar_names, validate_config_func_signature
 
-T = TypeVar("T")
+T = TypeVar("T", covariant=True)
+
+
+class ConfigFunc(Protocol[T]):
+    def __call__(self, hp: HP, *args: Any, **kwargs: Any) -> T: ...
 
 
 def instantiate(
-    func: Callable[..., T],
+    func: ConfigFunc[T],
     *,
     values: Optional[Dict[str, Any]] = None,
     args: Tuple[Any, ...] = (),

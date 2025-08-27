@@ -1,0 +1,12 @@
+[run]
+branch = true
+source = ["hypster"]
+
+[report]
+show_missing = true
+skip_empty = true
+precision = 2
+fail_under = 85
+
+[xml]
+output = "coverage.xml"

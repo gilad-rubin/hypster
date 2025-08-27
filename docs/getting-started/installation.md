@@ -27,6 +27,20 @@ Dependencies:
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
 {% endtab %}
 
+{% tab title="Hyperparameter Optimization (uv)" %}
+Install Hypster with Optuna extras:
+
+```bash
+uv add 'hypster[optuna]'
+```
+
+Or add Optuna directly:
+
+```bash
+uv add optuna
+```
+{% endtab %}
+
 {% tab title="Interactive Jupyter UI (pip)" %}
 Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
 

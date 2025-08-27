@@ -131,7 +131,7 @@ class MultiValidator:
     def __init__(self, element_validator: ParameterValidator):
         self.element_validator = element_validator
 
-    def validate_value(self, value: Any, param_path: str, **kwargs) -> List[Any]:
+    def validate_value(self, value: Any, param_path: str, **kwargs: Any) -> List[Any]:
         if not isinstance(value, list):
             raise HPCallError(param_path, f"expected list but got {type(value).__name__} ({value})")
 

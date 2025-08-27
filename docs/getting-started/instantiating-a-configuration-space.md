@@ -1,103 +1,45 @@
 # ⚡ Instantiating a Config Function
 
-In this section, we'll use the following configuration function:
+Use `instantiate(func, values=...)` to execute your configuration function with optional overrides.
 
 ```python
-from hypster import config, HP
+from hypster import instantiate
 
-@config
-def llm_config(hp: HP):
-    model_name = hp.select({"sonnet" : "claude-3-5-sonnet-20241022"
-                            "haiku" : "claude-3-5-haiku-20241022"},
-                            default="haiku")
-
-    if model_type == "haiku":
-        max_tokens = hp.int(256, min=0, max=2048)
-    else:
-        max_tokens = hp.int(126, min=0, max=1024)
-
-    cache = Cache(folder=hp.text("./cache"))
-    config_dct = {"temperature" : hp.number(0, min=0, max=1),
-                  "max_tokens" : max_tokens}
-
-    model = Model(model_name, cache)
-```
-
-## Instantiation Rules
-
-### Default Values
-
-Parameters use their default values when not specified:
-
-```python
-config = llm_config()
-# equivalent to {"model_name" : "haiku", "max_tokens" = 256, "cache.folder" : "./cache"), ...
-```
-
-### Conditional Logic
-
-Values must respect the configuration's conditional logic:
-
-```python
-# Valid: haiku model allows up to 2048 tokens
-config = llm_config(values={
-    "model_name": "haiku",
-    "max_tokens": 2000
+result = instantiate(model_cfg, values={
+    "kind": "rf",
+    "n_estimators": 200,
+    "max_depth": 12.5,
 })
-
-# Invalid: sonnet model only allows up to 1024 tokens
-config = llm_config(values={
-    "model_name": "sonnet",
-    "max_tokens": 2000  # Will raise error
-})
+# => {"model": ("rf", 200, 12.5)}
 ```
 
-### Numeric Bounds Validation
+## Unknown parameters
 
-Numeric parameters undergo bounds validation, if specified:
+Control how unknown or conditionally unreachable values are handled via `on_unknown`:
+- `on_unknown="warn"` (default): issue a warning and continue
+- `on_unknown="raise"`: raise a `ValueError`
+- `on_unknown="ignore"`: silently ignore
 
 ```python
-# These will raise validation errors:
-config = llm_config(values={
-    "config_dct.temperature": 1.5,  # Exceeds max=1
-    "max_tokens": -10               # Below min=0
-})
+instantiate(model_cfg, values={"n_trees": 200}, on_unknown="warn")
 ```
 
-## Variable Selection Methods
+## Dotted keys vs nested dicts
 
-To ensure we pass only the required variables, we have two filtering approaches:
+See In Depth → Values & Overrides for how to pass nested overrides and precedence.
 
-1. **Include specific variables using `final_vars`**:
+## Passing args/kwargs to nested configs
+
+When using `hp.nest`, you can pass `args=`/`kwargs=` to the child function; these are forwarded at call time.
 
 ```python
-config = my_config(final_vars=["model", "config_dict"], values={...})
-run("Hello", **config)
-```
 
-Use `final_vars` when you need only a few specific variables
+def child(hp: HP, multiplier: int, offset: int = 0) -> int:
+    base = hp.int(5, name="base")
+    return base * multiplier + offset
 
-{% hint style="info" %}
-When `final_vars` is empty, all variables are returned (except those in `exclude_vars`)
-{% endhint %}
 
-2. **Exclude unwanted variables using `exclude_vars`**:
-
-```python
-config = my_config(exclude_vars=["cache", "temp_data"], values={...})
-run("Hello", **config)
-```
-
-Choose `exclude_vars` when you have many variables to keep and little to filter out.
-
-## Available Parameter Types
-
-Each parameter type has specific validation and behavior rules. See each section for more details:
-
-### HP Call Types
-
-* [**select & multi\_select**](../in-depth/hp-call-types/select-and-multi-select.md) - For categorical choices
-* [**int, number & multi\_int, multi\_number**](../in-depth/hp-call-types/int-and-multi-int.md) - For numeric values
-* [**bool & multi\_bool**](../in-depth/hp-call-types/bool-and-multi-bool.md) - For boolean values
-* [**text & multi\_text**](../in-depth/hp-call-types/text-and-multi-text.md) - For string values
-* [**nest**](../in-depth/hp-call-types/nest.md) - For nested configurations
+def parent(hp: HP):
+    calc1 = hp.nest(child, name="calc1", args=(2,))
+    calc2 = hp.nest(child, name="calc2", args=(3,), kwargs={"offset": 10})
+    return {"calc1": calc1, "calc2": calc2}

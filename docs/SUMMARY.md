@@ -15,7 +15,7 @@
 
 ## In Depth
 
-* [🤖 Parameter Naming](in-depth/automatic-naming.md)
+* [🔧 Values & Overrides](in-depth/values-and-overrides.md)
 * [🍱 HP Call Types](in-depth/hp-call-types/README.md)
   * [Selectable Types](in-depth/hp-call-types/select-and-multi-select.md)
   * [Numeric Types](in-depth/hp-call-types/int-and-multi-int.md)
@@ -43,6 +43,7 @@
 
 * [Hamilton & HyperNodes](integrations/hamilton.md)
 * [Haystack](integrations/haystack.md)
+* [Optuna](integrations/optuna.md)
 
 ## Philosophy
 

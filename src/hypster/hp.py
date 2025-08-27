@@ -1,7 +1,7 @@
 """The HP Parameter Interface."""
 
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
 
 from .hp_calls import (
     BoolValidator,
@@ -13,6 +13,9 @@ from .hp_calls import (
     TextValidator,
 )
 from .utils import unflatten_dict
+
+if TYPE_CHECKING:  # only for type hints; avoid runtime imports
+    from .hpo.types import HpoCategorical, HpoFloat, HpoInt
 
 
 @dataclass(frozen=True)
@@ -442,6 +445,7 @@ def HP_int(
     min: Optional[int] = None,
     max: Optional[int] = None,
     strict: bool = False,
+    hpo_spec: "HpoInt | None" = None,
 ) -> int:
     """Integer parameter with optional bounds validation."""
     spec = HP.SingleValueSpec(
@@ -466,6 +470,7 @@ def HP_float(
     min: Optional[float] = None,
     max: Optional[float] = None,
     strict: bool = False,
+    hpo_spec: "HpoFloat | None" = None,
 ) -> float:
     """Float parameter with optional bounds validation."""
     spec = HP.SingleValueSpec(
@@ -515,6 +520,7 @@ def HP_select(
     name: str,
     default: Optional[Any] = None,
     options_only: bool = False,
+    hpo_spec: "HpoCategorical | None" = None,
 ) -> Any:
     """Selection parameter from options."""
     spec = HP.SelectSingleSpec(name=name, options=options, default=default, options_only=options_only)

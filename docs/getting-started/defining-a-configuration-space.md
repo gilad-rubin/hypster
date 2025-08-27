@@ -1,73 +1,94 @@
 # 🚀 Defining of A Config Function
 
-A hypster `config` function is the heart of this framework. It requires of 3 main components:
+A Hypster configuration function is a regular Python function. It receives `hp: HP` as its first parameter and returns whatever your code needs (a dict, an object, etc.).
 
 {% stepper %}
 {% step %}
 ### Imports
 
 ```python
-from hypster import config, HP
+from hypster import HP, instantiate
 ```
 
-This makes sure we have the `@config` decorater and `HP` class for type annotation.
+This makes sure you have the `HP` class for the first parameter and `instantiate(...)` to execute your config.
 {% endstep %}
 
 {% step %}
 ### Signature
 
 ```python
-@config
 def my_config(hp: HP):
+    ...
 ```
 
-The function definition consists of the `@config` decorator and the signature. Including the `HP` (HyperParameter) type hint will enable IDE features like code suggestions and type checking.&#x20;
+- The first parameter must be named `hp` and typed as `HP` for IDE autocomplete and validation.
+- You can add more parameters (e.g., knobs) as long as `hp` is first: `def my_config(hp: HP, *, env: str = "dev")`.
 {% endstep %}
 
 {% step %}
 ### Body
 
+Define parameters using `hp.*` and return the values you need. Use normal Python control flow for conditionals.
+
 ```python
-@config
-def my_config(hp: HP):
-    from package import Class
+from hypster import HP
 
-    var = hp.select(["a", "b", "c"], default="a")
-    num = hp.number(10)
-    text = hp.text("Hey!")
 
-    instance = Class(var=var, num=num, text=text)
+def model_cfg(hp: HP):
+    # Categorical choice (list form)
+    model_name = hp.select(["gpt-5", "claude-sonnet-4-0", "gemini-2.5-flash"], name="model_name")
+
+    # Numeric parameters
+    temperature = hp.float(0.2, name="temperature", min=0.0, max=1.0)
+    max_tokens = hp.int(256, name="max_tokens", min=0, max=4096)
+
+    # Conditional logic
+    if model_name == "gpt-5":
+        # Extra knob only for gpt-5
+        top_p = hp.float(1.0, name="top_p", min=0.1, max=1.0)
+        return {"model_name": model_name, "temperature": temperature, "max_tokens": max_tokens, "top_p": top_p}
+
+    return {"model_name": model_name, "temperature": temperature, "max_tokens": max_tokens}
 ```
 
 Hypster comes with the following HP calls:
 
-* `hp.select()` and `hp.multi_select()` for [categorical choices](../in-depth/hp-call-types/select-and-multi-select.md)
-* `hp.int()` and `hp.multi_int()` for [integer values](../in-depth/hp-call-types/int-and-multi-int.md)
-* `hp.number()`and `hp.multi_number()` for [numeric values](../in-depth/hp-call-types/int-and-multi-int.md)
-* `hp.text()` and `hp.multi_text()` for [string values](../in-depth/hp-call-types/text-and-multi-text.md)
-* `hp.bool()` and `hp.multi_bool()` for [boolean values](../in-depth/hp-call-types/bool-and-multi-bool.md)
-
-Please note:
+- `hp.select()` and `hp.multi_select()` for [categorical choices](../in-depth/hp-call-types/select-and-multi-select.md)
+- `hp.int()` and `hp.multi_int()` for [integer values](../in-depth/hp-call-types/int-and-multi-int.md)
+- `hp.float()` and `hp.multi_float()` for [numeric values](../in-depth/hp-call-types/int-and-multi-int.md)
+- `hp.text()` and `hp.multi_text()` for [string values](../in-depth/hp-call-types/text-and-multi-text.md)
+- `hp.bool()` and `hp.multi_bool()` for [boolean values](../in-depth/hp-call-types/bool-and-multi-bool.md)
+- `hp.nest()` for [nested configurations](../in-depth/hp-call-types/nest.md)
 
 {% hint style="warning" %}
-**All imports must be defined inside the body of the function.** This enables the portability of hypster's configuration object.
+Import libraries you need inside the function body when portability matters (so the config can be executed in isolation).
 {% endhint %}
 
 {% hint style="info" %}
-**No return statement is allowed (nor needed)**. This enables [selecting the variables](selecting-output-variables.md) we want to retrieve upon instantiation using `final_vars` and `exclude_vars`
+Return exactly what your downstream code needs. You can also gather outputs from locals using `hp.collect(locals(), include=[...])`.
 {% endhint %}
 {% endstep %}
 
 {% step %}
 ### Instantiation
 
-Now that we've created a configuration space/function - we can instantiate it using:
+Execute your configuration and override parameters using `values=`. See "Values & Overrides" for dotted vs nested overrides and precedence.
 
 ```python
-my_config(final_vars=["instance"], values={"var" : "b"})
+from hypster import instantiate
+
+cfg = instantiate(
+    model_cfg,
+    values={
+        "model_name": "gpt-5",
+        "temperature": 0.5,
+        "max_tokens": 1024,
+    },
+)
+# cfg -> {"model_name": "gpt-5", "temperature": 0.5, "max_tokens": 1024}
 ```
 
-Congratulations! :tada: You've created and instantiated your first Hypster config.
+Control unknown or unreachable values via `on_unknown`: `"warn"` (default), `"raise"`, or `"ignore"`.
 {% endstep %}
 {% endstepper %}
 

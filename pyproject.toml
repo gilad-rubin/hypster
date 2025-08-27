@@ -1,6 +1,6 @@
 [project]
 name = "hypster"
-version = "0.3.0"
+version = "0.3.1"
 description = "A flexible configuration system for Python projects"
 authors = [
     {name = "Gilad Rubin", email = "me@giladrubin.com"}
@@ -23,10 +23,14 @@ dependencies = []
 
 [project.optional-dependencies]
 jupyter = ["ipywidgets>=8.0.0"]
+optuna = ["optuna>=3.6"]
 dev = [
     "pytest>=6.0",
+    "pytest-cov>=4.0",
+    "coverage[toml]>=7.0",
     "ruff>=0.1.0",
     "mypy>=0.950",
+    "pre-commit>=3.0",
     "ipywidgets>=8.0.0",
 ]
 
@@ -42,6 +46,19 @@ build-backend = "hatchling.build"
 [tool.mypy]
 ignore_missing_imports = true
 strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+exclude = "src/hypster/hp\\.pyi$"
+mypy_path = "src"
+explicit_package_bases = true
+follow_imports = "skip"
+disable_error_code = [
+  "attr-defined",
+  "no-untyped-def",
+]
 
 [tool.ruff]
 line-length = 120
@@ -56,3 +73,19 @@ known-first-party = ["hypster"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --cov=hypster --cov-report=term-missing:skip-covered --cov-report=xml"
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hypster"]
+include = ["hypster/py.typed"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/hypster/py.typed"]
+
+[dependency-groups]
+dev = [
+    "pytest-codspeed>=4.0.0",
+]

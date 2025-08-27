@@ -5,17 +5,50 @@
   </picture>
 </p>
 
-</p>
-<p align="center">
-  <span style="font-size: 18px;">
-    <a href="https://gilad-rubin.gitbook.io/hypster">[Documentation]</a> |
-    <a href="https://gilad-rubin.gitbook.io/hypster/getting-started/installation">[Installation]</a> |
-    <a href="#quick-start">[Quick Start]</a>
-  </span>
+
+<div align="center">
+  <div>
+    <a href="https://gilad-rubin.gitbook.io/hypster"><strong>Docs</strong></a> ·
+    <a href="https://github.com/gilad-rubin/hypster/issues/new?template=bug_report.md"><strong>Report Bug</strong></a> ·
+    <a href="https://github.com/gilad-rubin/hypster/issues/new?template=feature_request.md"><strong>Feature Request</strong></a> ·
+    <a href="https://github.com/gilad-rubin/hypster/blob/hypster-v2/CHANGELOG.md"><strong>Changelog</strong></a> ·
+    <a href="https://github.com/gilad-rubin/hypster/issues?q=is%3Aopen+label%3Aroadmap"><strong>Roadmap</strong></a>
+  </div>
+</div>
+
 </p>
 
-**`Hypster`** is a lightweight configuration system for AI & Machine Learning projects.
-It offers minimal, intuitive pythonic syntax, supporting hierarchical and swappable configurations.
+<p align="center">
+  <a href="https://deepwiki.com/gilad-rubin/hypster" style="text-decoration:none;display:inline-block">
+    <img src="https://img.shields.io/badge/chat%20with%20our%20AI%20docs-%E2%86%92-72A1FF?style=for-the-badge&logo=readthedocs&logoColor=white"
+         alt="chat with our AI docs" width="220">
+  </a>
+
+</p>
+<p align="center">
+  <a href="https://github.com/gilad-rubin/hypster/actions/workflows/ci.yml?query=branch%3Ahypster-v2"><img src="https://github.com/gilad-rubin/hypster/actions/workflows/ci.yml/badge.svg?branch=hypster-v2" alt="CI"/></a>
+  <a href="https://codecov.io/gh/gilad-rubin/hypster"><img src="https://codecov.io/gh/gilad-rubin/hypster/branch/hypster-v2/graph/badge.svg" alt="codecov"/></a>
+  <a href="https://pypi.org/project/hypster/"><img src="https://img.shields.io/pypi/v/hypster.svg" alt="PyPI version"/></a>
+  <a href="https://pypi.org/project/hypster/"><img src="https://img.shields.io/pypi/pyversions/hypster.svg" alt="Python versions"/></a>
+  <a href="https://gilad-rubin.gitbook.io/hypster"><img src="https://img.shields.io/badge/docs-gitbook-blue" alt="Docs"/></a>
+  <a href="https://deepwiki.com/gilad-rubin/hypster"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"/></a>
+  <a href="https://codspeed.io/gilad-rubin/hypster"><img src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" alt="CodSpeed"/></a>
+</p>
+
+<p align="center">
+  <em>
+    Hypster is a Pythonic framework for defining <b>conditional & hierarchical configuration spaces</b> to build and
+    optimize <b>AI/ML workflows</b>. It enables <b>swappable components</b>, <b>safe overrides</b>, and is
+    <b>HPO‑ready</b> out of the box.
+  </em>
+</p>
+
+> [!WARNING]
+>
+> Hypster is in active development and not yet battle-tested in production.
+>
+> If you’re gaining value and want to promote it to production, please reach out!
 
 ## Installation
 
@@ -23,6 +56,8 @@ You can install Hypster using uv:
 
 ```bash
 uv add hypster
+# optional HPO backend
+uv add 'hypster[optuna]'
 ```
 
 Or using pip:
@@ -33,30 +68,43 @@ pip install hypster
 
 ## Quick Start
 
-Here's a simple example of how to use Hypster:
+Define a configuration function and instantiate it with overrides:
 
 ```python
-from hypster import HP, config
+from hypster import HP, instantiate
 
-@config
-def my_config(hp: HP):
-    chunking_strategy = hp.select(['paragraph', 'semantic', 'fixed'], default='paragraph')
 
-    llm_model = hp.select({'haiku': 'claude-3-haiku-20240307',
-                           'sonnet': 'claude-3-5-sonnet-20240620',
-                           'gpt-4o-mini': 'gpt-4o-mini'}, default='gpt-4o-mini')
+def model_cfg(hp: HP):
+    kind = hp.select(["rf", "lr"], name="kind")
+    if kind == "rf":
+        n = hp.int(100, name="n_estimators", min=50, max=300)
+        d = hp.float(10.0, name="max_depth", min=2.0, max=30.0)
+        return {"model": ("rf", n, d)}
+    C = hp.float(1.0, name="C", min=1e-5, max=10.0)
+    solver = hp.select(["lbfgs", "saga"], name="solver")
+    return {"model": ("lr", C, solver)}
 
-    llm_config = {'temperature': hp.number(0),
-                  'max_tokens': hp.number(64)}
-
-    system_prompt = hp.text('You are a helpful assistant. Answer with one word only')
+cfg = instantiate(model_cfg, values={"kind": "rf", "n_estimators": 200, "max_depth": 12.5})
 ```
 
-Now we can instantiate the configs with our values:
+### HPO with Optuna (optional)
 
 ```python
-results = my_config(final_vars=["chunking_strategy", "llm_config", "llm_model"],
-                    values={"llm_model" : "haiku", "llm_config.temperature" : 0.5})
+import optuna
+from hypster.hpo.types import HpoInt, HpoFloat, HpoCategorical
+from hypster.hpo.optuna import suggest_values
+
+
+def objective(trial: optuna.Trial) -> float:
+    values = suggest_values(trial, config=model_cfg)
+    model = instantiate(model_cfg, values=values)
+    X, y = make_classification(
+        n_samples=400, n_features=20, n_informative=10, random_state=42
+    )
+    return cross_val_score(model, X, y, cv=3, n_jobs=-1).mean()
+
+study = optuna.create_study(direction="maximize")
+study.optimize(objective, n_trials=30)
 ```
 
 ## Inspiration
