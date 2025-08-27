@@ -53,7 +53,7 @@ def merge_nested_dicts(dotted: Dict[str, Any], nested: Dict[str, Any]) -> Tuple[
     warnings = []
 
     # Convert dotted notation to nested structure
-    expanded = {}
+    expanded: Dict[str, Any] = {}
     for key, value in dotted.items():
         parts = key.split(".")
         current = expanded
@@ -72,7 +72,7 @@ def merge_nested_dicts(dotted: Dict[str, Any], nested: Dict[str, Any]) -> Tuple[
                     merge_recursive(base[key], value, full_key)
                 else:
                     warnings.append(
-                        f"Parameter '{full_key}' specified in both dotted and nested format, " "using nested value"
+                        f"Parameter '{full_key}' specified in both dotted and nested format, using nested value"
                     )
                     base[key] = value
             else:
@@ -100,7 +100,7 @@ def validate_config_func_signature(func: Callable) -> None:
         first_param = params[0]
         if first_param.name != "hp":
             raise ValueError(
-                f"Configuration function '{func.__name__}' first param must be named 'hp'. " f"Got: {first_param.name}"
+                f"Configuration function '{func.__name__}' first param must be named 'hp'. Got: {first_param.name}"
             )
 
         # Check type annotation if present
@@ -121,7 +121,7 @@ def validate_config_func_signature(func: Callable) -> None:
 
 def flatten_dict(d: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dict[str, Any]:
     """Flatten a nested dictionary into dotted notation."""
-    items = []
+    items: List[Tuple[str, Any]] = []
     for k, v in d.items():
         new_key = f"{parent_key}{sep}{k}" if parent_key else k
         if isinstance(v, dict):
@@ -133,7 +133,7 @@ def flatten_dict(d: Dict[str, Any], parent_key: str = "", sep: str = ".") -> Dic
 
 def unflatten_dict(d: Dict[str, Any], sep: str = ".") -> Dict[str, Any]:
     """Convert dotted notation dictionary to nested structure."""
-    result = {}
+    result: Dict[str, Any] = {}
     for key, value in d.items():
         parts = key.split(sep)
         current = result

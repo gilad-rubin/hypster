@@ -35,8 +35,7 @@ class ParameterValidator:
             if max_val is not None:
                 raise HPCallError(
                     param_path,
-                    f"value {value} is below minimum bound {min_val}. "
-                    f"Value must be in range [{min_val}, {max_val}]",
+                    f"value {value} is below minimum bound {min_val}. Value must be in range [{min_val}, {max_val}]",
                 )
             else:
                 raise HPCallError(param_path, f"value {value} is below minimum bound {min_val}")
@@ -45,7 +44,7 @@ class ParameterValidator:
             if min_val is not None:
                 raise HPCallError(
                     param_path,
-                    f"value {value} exceeds maximum bound {max_val}. " f"Value must be in range [{min_val}, {max_val}]",
+                    f"value {value} exceeds maximum bound {max_val}. Value must be in range [{min_val}, {max_val}]",
                 )
             else:
                 raise HPCallError(param_path, f"value {value} exceeds maximum bound {max_val}")
@@ -78,7 +77,7 @@ class FloatValidator(ParameterValidator):
             if strict or "." in param_path:
                 raise HPCallError(
                     param_path,
-                    f"expected float but got int ({value}). " f"Please provide a float value like {float(value)}",
+                    f"expected float but got int ({value}). Please provide a float value like {float(value)}",
                 )
             return float(value)
         if not isinstance(value, float):
@@ -119,7 +118,7 @@ class SelectValidator:
             # Show available options
             options_str = ", ".join(repr(o) for o in options[:5])
             if len(options) > 5:
-                options_str += f", ... ({len(options)-5} more)"
+                options_str += f", ... ({len(options) - 5} more)"
             raise HPCallError(param_path, f"'{value}' not in allowed options. Available: [{options_str}]")
         # Note: if options_only=False, any value is allowed
         return value
