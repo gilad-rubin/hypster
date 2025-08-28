@@ -21,7 +21,7 @@ jobs:
         run: uv venv
 
       - name: Install project and dev deps
-        run: uv pip install -e ".[dev]"
+        run: uv pip install -e ".[dev,optuna]"
 
       - name: Ruff format (check)
         run: uv run ruff format --check .
