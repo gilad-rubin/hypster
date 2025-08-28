@@ -78,11 +78,8 @@ known-first-party = ["hypster"]
 addopts = "-ra --cov=hypster --cov-report=term-missing:skip-covered --cov-report=xml"
 testpaths = ["tests"]
 
-[tool.hatch.build]
-sources = ["src"]
-
 [tool.hatch.build.targets.wheel]
-packages = ["hypster"]
+packages = ["src/hypster"]
 
 [tool.hatch.build.targets.sdist]
 include = [
