@@ -11,3 +11,4 @@ helper_configs/
 playground/
 .github/copilot-instructions.md
 docs_v2/*
+.specstory/*
