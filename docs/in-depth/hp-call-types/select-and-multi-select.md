@@ -125,6 +125,50 @@ Dictionary form is recommended when working with:
 * Long string values: `{"haiku": "claude-3-haiku-20240307"}`
 * Precise numeric values: `{"small": 1.524322}`
 * Object references: `{"rf": RandomForest(n_estimators=100)}`
+* None values: `{"none": None}`
+* Complex objects like tuples: `{"small": (1, 2)}`
+
+#### Special Value Examples
+
+Dictionary form enables you to define None values and complex objects that cannot be easily represented in list form:
+
+```python
+from hypster import HP, instantiate
+
+def nlp_config(hp: HP):
+    # None values - useful for optional parameters
+    tokenizer = hp.select({
+        "none": None,
+        "basic": "basic_tokenizer",
+        "advanced": "advanced_tokenizer"
+    }, name="tokenizer", default="none")
+    
+    # N-gram ranges as tuples
+    ngram_range = hp.select({
+        "unigram": (1, 1),
+        "bigram": (1, 2), 
+        "trigram": (1, 3)
+    }, name="ngram_range", default="bigram")
+    
+    # Complex objects like lists or dicts
+    model_params = hp.select({
+        "small": {"layers": 2, "units": [64, 32]},
+        "large": {"layers": 4, "units": [256, 128, 64, 32]}
+    }, name="model_params", default="small")
+    
+    return {
+        "tokenizer": tokenizer,
+        "ngram_range": ngram_range,
+        "model_params": model_params
+    }
+
+# Usage examples
+cfg1 = instantiate(nlp_config)
+# cfg1 -> {"tokenizer": None, "ngram_range": (1, 2), "model_params": {"layers": 2, "units": [64, 32]}}
+
+cfg2 = instantiate(nlp_config, values={"tokenizer": "advanced", "ngram_range": "trigram"})
+# cfg2 -> {"tokenizer": "advanced_tokenizer", "ngram_range": (1, 3), "model_params": {"layers": 2, "units": [64, 32]}}
+```
 
 ## Default Values
 
