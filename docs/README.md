@@ -1,5 +1,6 @@
 ---
 layout:
+  width: default
   title:
     visible: true
   description:
@@ -10,24 +11,19 @@ layout:
     visible: true
   pagination:
     visible: true
+  metadata:
+    visible: true
 ---
 
 # 👋 Welcome
 
-> [!WARNING]
->
-> Hypster is in preview and is not ready for production use.
->
-> We're working hard to make Hypster stable and feature-complete, but until then, expect to encounter bugs,
-> missing features, and occasional breaking changes.
-
-<div data-full-width="false">
-
-<figure><picture><source srcset=".gitbook/assets/hypster_text_white_text.png" media="(prefers-color-scheme: dark)"><img src=".gitbook/assets/hypster_with_text (1).png" alt=""></picture><figcaption></figcaption></figure>
-
-</div>
+<div data-full-width="false"><figure><picture><source srcset=".gitbook/assets/hypster_text_white_text.png" media="(prefers-color-scheme: dark)"><img src=".gitbook/assets/hypster_with_text (1).png" alt=""></picture><figcaption></figcaption></figure></div>
 
 ### **Hypster is a lightweight framework for defining configurations functions to optimize ML & AI workflows.**
+
+> Hypster is in preview and is not ready for production use.
+>
+> We're working hard to make Hypster stable and feature-complete, but until then, expect to encounter bugs, missing features, and occasional breaking changes.
 
 ### Key Features
 
@@ -38,13 +34,13 @@ layout:
 * :test\_tube: **Experiment Ready**: Built-in support for hyperparameter optimization
 * :video\_game: **Interactive UI**: Jupyter widgets integration for interactive parameter selection
 
-> Show your support by giving us a [star](https://github.com/gilad-rubin/hypster)! ⭐&#x20;
+> Show your support by giving us a [star](https://github.com/gilad-rubin/hypster)! ⭐
 
 ### How Does it work?
 
 {% stepper %}
 {% step %}
-#### Install Hypster
+**Install Hypster**
 
 ```bash
 uv add hypster
@@ -58,7 +54,7 @@ pip install hypster
 {% endstep %}
 
 {% step %}
-#### Define a configuration space
+**Define a configuration space**
 
 ```python
 from hypster import HP
@@ -72,7 +68,7 @@ def llm_config(hp: HP):
 {% endstep %}
 
 {% step %}
-#### Instantiate your configuration
+**Instantiate your configuration**
 
 ```python
 from hypster import instantiate
@@ -82,7 +78,7 @@ cfg = instantiate(llm_config, values={"model_name": "gpt-5", "temperature": 0.7}
 {% endstep %}
 
 {% step %}
-#### Define an execution function
+**Define an execution function**
 
 ```python
 def generate(prompt: str, model_name: str, temperature: float) -> str:
@@ -93,7 +89,7 @@ def generate(prompt: str, model_name: str, temperature: float) -> str:
 {% endstep %}
 
 {% step %}
-#### Execute!
+**Execute!**
 
 ```python
 generate(prompt="What is Hypster?", **cfg)
@@ -103,7 +99,7 @@ generate(prompt="What is Hypster?", **cfg)
 
 ## Discover Hypster
 
-<table data-view="cards"><thead><tr><th></th><th></th><th></th><th data-hidden data-card-cover data-type="files"></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Getting Started</strong></td><td>How to create &#x26; instantiate Hypster configs</td><td></td><td><a href=".gitbook/assets/Group 4 (5).png">Group 4 (5).png</a></td><td><a href="getting-started/installation.md">installation.md</a></td></tr><tr><td><strong>Tutorials</strong></td><td>Step-by-step guides for ML &#x26; Generative AI use-cases </td><td></td><td><a href=".gitbook/assets/Group 53.png">Group 53.png</a></td><td><a href="getting-started/usage-examples/">usage-examples</a></td></tr><tr><td><strong>Best Practices</strong></td><td>How to make the most out of Hypster</td><td></td><td><a href=".gitbook/assets/Group 26.png">Group 26.png</a></td><td><a href="in-depth/basic-best-practices.md">basic-best-practices.md</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th></th><th></th><th></th><th data-hidden data-card-cover data-type="files"></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Getting Started</strong></td><td>How to create &#x26; instantiate Hypster configs</td><td></td><td><a href=".gitbook/assets/Group 4 (5).png">Group 4 (5).png</a></td><td><a href="getting-started/installation.md">installation.md</a></td></tr><tr><td><strong>Tutorials</strong></td><td>Step-by-step guides for ML &#x26; Generative AI use-cases</td><td></td><td><a href=".gitbook/assets/Group 53.png">Group 53.png</a></td><td><a href="getting-started/usage-examples/">usage-examples</a></td></tr><tr><td><strong>Best Practices</strong></td><td>How to make the most out of Hypster</td><td></td><td><a href=".gitbook/assets/Group 26.png">Group 26.png</a></td><td><a href="in-depth/basic-best-practices.md">basic-best-practices.md</a></td></tr></tbody></table>
 
 ## Why Use Hypster?
 
