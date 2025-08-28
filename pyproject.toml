@@ -81,7 +81,16 @@ testpaths = ["tests"]
 [tool.hatch.build.targets.wheel]
 packages = ["src/hypster"]
 
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+]
+
 [dependency-groups]
 dev = [
     "pytest-codspeed>=4.0.0",
+    "twine>=6.1.0",
 ]
