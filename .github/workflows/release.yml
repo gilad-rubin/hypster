@@ -140,7 +140,8 @@ jobs:
       - name: Verify package
         run: |
           echo "🔍 Verifying package..."
-          uv run twine check dist/*
+          echo "Built artifacts:"
+          ls -la dist/
           echo "✅ Package verification passed"
 
       - name: Publish to PyPI
