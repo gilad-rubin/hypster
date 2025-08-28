@@ -1,17 +1,20 @@
-# Performing Hyperparameter Optimization
+# 🧪 Performing Hyperparameter Optimization
 
 This page shows how to run HPO using Hypster’s define-by-run configs and typed HPO specs. The examples use Optuna.
 
 ## Concepts
-- Define-by-run: your config executes conditionally; only touched parameters are suggested.
-- Inline HPO specs (optional): pass `hpo_spec=` to encode search semantics (log/step/ordered) next to each parameter. If you omit it, sensible defaults are used: linear scale, no quantization (step=None), and unordered categoricals (ordered=False).
+
+* Define-by-run: your config executes conditionally; only touched parameters are suggested.
+* Inline HPO specs (optional): pass `hpo_spec=` to encode search semantics (log/step/ordered) next to each parameter. If you omit it, sensible defaults are used: linear scale, no quantization (step=None), and unordered categoricals (ordered=False).
 
 HPO spec classes (backend-agnostic):
-- `HpoInt(step=None, scale="linear"|"log", base=10.0, include_max=True)`
-- `HpoFloat(step=None, scale="linear"|"log", base=10.0, distribution=None|"uniform"|"loguniform"|"normal"|"lognormal", center=None, spread=None)`
-- `HpoCategorical(ordered=False, weights=None)`
+
+* `HpoInt(step=None, scale="linear"|"log", base=10.0, include_max=True)`
+* `HpoFloat(step=None, scale="linear"|"log", base=10.0, distribution=None|"uniform"|"loguniform"|"normal"|"lognormal", center=None, spread=None)`
+* `HpoCategorical(ordered=False, weights=None)`
 
 ## Installation
+
 ```bash
 uv add 'hypster[optuna]'
 # or
@@ -19,6 +22,7 @@ uv add optuna
 ```
 
 ## Minimal example (Optuna)
+
 ```python
 import optuna
 from sklearn.datasets import make_classification
@@ -61,7 +65,8 @@ print(study.best_value, study.best_params)
 ```
 
 ## Notes
-- Supported params: `hp.int`, `hp.float`, `hp.select`.
-- Multi-value params exist in Hypster but are not expanded for HPO in the Optuna integration yet.
-- It’s straightforward to add other backends (e.g., Ray Tune). If you’re interested, please open an issue or PR.
-- For Optuna-specific details and ask-and-tell examples, see the Integrations section.
+
+* Supported params: `hp.int`, `hp.float`, `hp.select`.
+* Multi-value params exist in Hypster but are not expanded for HPO in the Optuna integration yet.
+* It’s straightforward to add other backends (e.g., Ray Tune). If you’re interested, please open an issue or PR.
+* For Optuna-specific details and ask-and-tell examples, see the Integrations section.

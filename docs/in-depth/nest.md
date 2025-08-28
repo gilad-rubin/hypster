@@ -1,4 +1,4 @@
-# Nested Configurations
+# 🪆 Nested Configurations
 
 Hypster enables hierarchical configuration management through the `hp.nest()` method, allowing you to compose complex configurations from smaller, reusable components.
 
@@ -29,7 +29,7 @@ def nest(
 
 {% stepper %}
 {% step %}
-### Define a reusable config
+#### Define a reusable config
 
 ```python
 from hypster import config, HP
@@ -45,7 +45,7 @@ def llm_config(hp: HP):
 {% endstep %}
 
 {% step %}
-### Save it
+#### Save it
 
 ```python
 llm_config.save("configs/llm.py")
@@ -53,7 +53,7 @@ llm_config.save("configs/llm.py")
 {% endstep %}
 
 {% step %}
-### Define a parent config and use `hp.nest`
+#### Define a parent config and use `hp.nest`
 
 ```python
 @config
@@ -74,7 +74,7 @@ def qa_config(hp: HP):
 {% endstep %}
 
 {% step %}
-### Instantiate using dot notation
+#### Instantiate using dot notation
 
 ```python
 qa_config(values={

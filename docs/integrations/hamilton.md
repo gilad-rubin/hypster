@@ -1,2 +1,6 @@
-# Hamilton
+---
+hidden: true
+---
+
+# Hamilton & HyperNodes
 

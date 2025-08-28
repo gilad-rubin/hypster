@@ -3,6 +3,7 @@
 Optuna is a popular black-box optimizer. This page shows how to use Optuna with Hypster.
 
 ## Installation
+
 ```bash
 uv add 'hypster[optuna]'
 # or
@@ -11,11 +12,11 @@ uv add optuna
 
 ## Usage
 
-See Advanced → Performing Hyperparameter Optimization for a full example. Summary:
+See Advanced → [Performing Hyperparameter Optimization](../in-depth/performing-hyperparameter-optimization.md) for a full example. Summary:
 
-1) Define your Hypster config (hpo_spec is optional; defaults are sensible).
-2) In your objective, call `hypster.hpo.optuna.suggest_values(trial, config=...)` to get a values dict.
-3) Instantiate your config with those values and evaluate.
+1. Define your Hypster config (hpo\_spec is optional; defaults are sensible).
+2. In your objective, call `hypster.hpo.optuna.suggest_values(trial, config=...)` to get a values dict.
+3. Instantiate your config with those values and evaluate.
 
 ```python
 import optuna
@@ -37,6 +38,7 @@ def objective(trial: optuna.Trial) -> float:
 ```
 
 ## Notes
-- Supports scalar parameters: `hp.int`, `hp.float`, `hp.select`.
-- Multi-* parameters are not expanded in the Optuna adapter (use booleans or explicit scalars if needed).
-- It’s easy to add other backends (e.g., Ray Tune). Please open an issue or PR if you’re interested.
+
+* Supports scalar parameters: `hp.int`, `hp.float`, `hp.select`.
+* Multi-\* parameters are not expanded in the Optuna adapter (use booleans or explicit scalars if needed).
+* It’s easy to add other backends (e.g., Ray Tune). Please open an issue or PR if you’re interested.

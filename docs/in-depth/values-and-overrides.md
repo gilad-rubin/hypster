@@ -1,4 +1,4 @@
-# Values & Overrides
+# 🔧 Values & Overrides
 
 This page explains how to provide overrides to a configuration function using dotted keys and nested dictionaries, and which one takes precedence when both are provided.
 
@@ -57,9 +57,9 @@ Dotted keys can target deeper levels when there is no nested dict override at th
 
 ## Unknown and unreachable parameters
 
-- Unknown or unreachable values (values for parameters on a branch that wasn’t taken) are handled by `on_unknown` in `instantiate`:
-  - `on_unknown="warn"` (default): issue a warning
-  - `on_unknown="raise"`: raise an error
-  - `on_unknown="ignore"`: silently ignore
+* Unknown or unreachable values (values for parameters on a branch that wasn’t taken) are handled by `on_unknown` in `instantiate`:
+  * `on_unknown="warn"` (default): issue a warning
+  * `on_unknown="raise"`: raise an error
+  * `on_unknown="ignore"`: silently ignore
 
 Hypster will include helpful suggestions when a name looks like a typo.

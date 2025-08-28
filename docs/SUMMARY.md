@@ -15,13 +15,14 @@
 
 ## In Depth
 
-* [🔧 Values & Overrides](in-depth/values-and-overrides.md)
 * [🍱 HP Call Types](in-depth/hp-call-types/README.md)
   * [Selectable Types](in-depth/hp-call-types/select-and-multi-select.md)
   * [Numeric Types](in-depth/hp-call-types/int-and-multi-int.md)
   * [Boolean Types](in-depth/hp-call-types/bool-and-multi-bool.md)
   * [Textual Types](in-depth/hp-call-types/text-and-multi-text.md)
-  * [Nested Configurations](in-depth/hp-call-types/nest.md)
+* [🧪 Performing Hyperparameter Optimization](in-depth/performing-hyperparameter-optimization.md)
+* [🪆 Nested Configurations](in-depth/nest.md)
+* [🔧 Values & Overrides](in-depth/values-and-overrides.md)
 * [🧠 Best Practices](in-depth/basic-best-practices.md)
 
 ## Advanced
@@ -29,7 +30,6 @@
 * [Nesting](advanced/nesting.md)
 * [Usage tips / Best Practices](advanced/usage-tips-best-practices.md)
 * [Saving & Loading Configs](advanced/saving-and-loading-configs.md)
-* [Performing Hyperparameter Optimization](advanced/performing-hyperparameter-optimization.md)
 
 ## Reproducibility
 
