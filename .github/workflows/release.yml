@@ -223,7 +223,6 @@ jobs:
           draft: ${{ inputs.create_draft }}
           prerelease: false
           generate_release_notes: false
-          make_latest: true
 
       - name: Summary
         run: |
