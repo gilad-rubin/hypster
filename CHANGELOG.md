@@ -3,19 +3,16 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.5] - 2025-01-13
+## [0.3.8] - 2025-08-28
 
 ### Fixed
-- Fixed Hatch build configuration for proper package metadata generation
-- Resolved CI test failures due to import errors
-- Enhanced release workflow with better error handling and package verification
+- Fixed linting issues in hp.py (removed unused import of `Any` from typing)
+- Cleaned up import statements to comply with linting standards
 
-### Improved
-- Updated GitHub Actions workflows for more reliable CI/CD
-- Added optuna dependency to CI for comprehensive HPO testing
-- Enhanced codecov badge configuration and removed deprecated GitBook badge
+### Changed
+- Updated changelog to reflect actual release history and remove unreleased version entries
 
-## [0.3.4] - 2025-08-27
+## [0.3.7] - 2025-08-27
 
 Hypster Revamp: explicit, debuggable, and ready for HPO.
 
