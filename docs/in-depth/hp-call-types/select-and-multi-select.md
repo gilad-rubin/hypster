@@ -16,7 +16,7 @@ The `select` and `multi_select` methods enable categorical parameter configurati
 def select(
     options: Union[Dict[ValidKeyType, Any], List[ValidKeyType]],
     *,
-    name: Optional[str] = None,
+    name: str,
     default: Optional[ValidKeyType] = None,
     options_only: bool = False
 ) -> Any
@@ -28,7 +28,7 @@ def select(
 def multi_select(
     options: Union[Dict[ValidKeyType, Any], List[ValidKeyType]],
     *,
-    name: Optional[str] = None,
+    name: str,
     default: List[ValidKeyType] = None,
     options_only: bool = False
 ) -> List[Any]
@@ -47,11 +47,22 @@ def multi_select(
 Use when the parameter keys and values are identical:
 
 ```python
-# Single selection
-model_type = hp.select(["haiku", "sonnet"], default="haiku")
+from hypster import HP, instantiate
 
-# Multiple selection
-features = hp.multi_select(["price", "size", "color"], default=["price", "size"])
+def model_config(hp: HP):
+    # Single selection from list
+    model_type = hp.select(["haiku", "sonnet"], name="model_type", default="haiku")
+
+    # Multiple selection from list
+    features = hp.multi_select(["price", "size", "color"], name="features", default=["price", "size"])
+
+    return {
+        "model_type": model_type,
+        "features": features
+    }
+
+# Usage
+cfg = instantiate(model_config, values={"model_type": "sonnet", "features": ["price", "color"]})
 ```
 
 ### Dictionary Form
@@ -59,17 +70,28 @@ features = hp.multi_select(["price", "size", "color"], default=["price", "size"]
 Use when parameter keys need to map to different values:
 
 ```python
-# Single selection with simple values
-model = hp.select({
-    "haiku": "claude-3-haiku-20240307",
-    "sonnet": "claude-3-sonnet-20240229"
-}, default="haiku")
+from hypster import HP, instantiate
 
-# Multiple selection with complex values
-callbacks = hp.multi_select({
-    "cost": cost_callback,
-    "runtime": runtime_callback
-}, default=["cost"])
+def llm_config(hp: HP):
+    # Single selection with value mapping
+    model = hp.select({
+        "haiku": "claude-3-haiku-20240307",
+        "sonnet": "claude-3-sonnet-20240229"
+    }, name="model", default="haiku")
+
+    # Multiple selection with object mapping
+    callbacks = hp.multi_select({
+        "cost": cost_callback,
+        "runtime": runtime_callback
+    }, name="callbacks", default=["cost"])
+
+    return {
+        "model": model,
+        "callbacks": callbacks
+    }
+
+# Usage
+cfg = instantiate(llm_config, values={"model": "sonnet", "callbacks": ["cost", "runtime"]})
 ```
 
 ### Value Resolution
@@ -77,18 +99,23 @@ callbacks = hp.multi_select({
 When using dictionary form, the configuration system maps input keys to their corresponding values:
 
 ```python
-# Configuration definition
-model = hp.select({
-    "haiku": "claude-3-haiku-20240307",
-    "sonnet": "claude-3-sonnet-20240229"
-}, default="haiku")
+from hypster import HP, instantiate
 
-# Usage
-config = my_config(values={"model": "haiku"})
-# Returns: "claude-3-haiku-20240307"
+def my_config(hp: HP):
+    # Configuration definition with dictionary mapping
+    model = hp.select({
+        "haiku": "claude-3-haiku-20240307",
+        "sonnet": "claude-3-sonnet-20240229"
+    }, name="model", default="haiku")
 
-config = my_config(values={"model": "sonnet"})
-# Returns: "claude-3-sonnet-20240229"
+    return {"model": model}
+
+# Usage - keys are mapped to their values
+config1 = instantiate(my_config, values={"model": "haiku"})
+# config1 -> {"model": "claude-3-haiku-20240307"}
+
+config2 = instantiate(my_config, values={"model": "sonnet"})
+# config2 -> {"model": "claude-3-sonnet-20240229"}
 ```
 
 #### When to Use Dictionary Form?
@@ -173,63 +200,42 @@ model = hp.select(["haiku", "sonnet"], options_only=True)
 ### Valid Instantiation Examples
 
 ```python
+from hypster import HP, instantiate
+
+def my_config(hp: HP):
+    model_type = hp.select(["haiku", "sonnet"], name="model_type", options_only=False)
+    return {"model_type": model_type}
+
 # Using predefined values
-my_config(values={"model_type": "haiku"})
+cfg1 = instantiate(my_config, values={"model_type": "haiku"})
 
 # Using custom values (when options_only=False)
-my_config(values={"model_type": "claude-3-opus-20240229"})
+cfg2 = instantiate(my_config, values={"model_type": "claude-3-opus-20240229"})
 ```
 
 ### Invalid Instantiation Examples
 
 ```python
-# Using a value not in the options list with options_only=True
-my_config(values={"model_type": "claude-3-opus-20240229"})
+def strict_config(hp: HP):
+    model_type = hp.select(["haiku", "sonnet"], name="model_type", options_only=True)
+    return {"model_type": model_type}
+
+# This will raise an error - value not in options list when options_only=True
+cfg = instantiate(strict_config, values={"model_type": "claude-3-opus-20240229"})
 ```
 
-I'll improve the Reproducibility and Value History section by adding clear examples:
-
-## Reproducibility and Value History
-
-Hypster maintains a historical record of parameter values to ensure configuration reproducibility across different runs. This history can be accessed using `my_config.get_last_snapshot()`, allowing you to view and reuse previous configurations.
-
-### Value Serialization
-
-When instantiating parameters with values outside the predefined options, Hypster handles serialization in two ways:
-
-#### Simple types (str, int, float, bool)&#x20;
-
-are properly logged and reproducible, regardless of if they were originally in the pre-defined options or not.
-
-#### Complex objects
+## Required Name Parameter
 
 {% hint style="warning" %}
-Complex object (classes, functions, anything outside of str, int, float, bool) will be serialized as strings using `str(value)` and will **not be reproducible for future runs**.
+All `hp.*` calls that you want to be overrideable must include an explicit `name="..."` argument.
 {% endhint %}
 
-### Examples
-
 ```python
-# Define configuration with options
-model = hp.select({
-    "haiku": "claude-3-haiku-20240307",
-    "sonnet": "claude-3-sonnet-20240229"
-})
+# Correct usage - explicit names
+model_type = hp.select(["haiku", "sonnet"], name="model_type")
+features = hp.multi_select(["price", "size", "color"], name="features")
 
-# Example 1: Serializable value not in options
-my_config(values={"model": "claude-3-opus"})
-# Stored in history as "claude-3-opus"
-# Fully reproducible since it's a simple string
-
-# Example 2: Non-serializable value
-class ModelClass:
-    def __init__(self, model: str):
-        self.model = model
-
-    def __str__(self):
-        return f"ModelClass(model={self.model})"
-
-my_config(values={"model": ModelClass(model="haiku")})
-# Stored in history as a string: "ModelClass(model=haiku)"
-# Not reproducible since it's converted to string representation
+# Incorrect usage - missing names (will raise error)
+model_type = hp.select(["haiku", "sonnet"])  # Error: missing name
+features = hp.multi_select(["price", "size", "color"])  # Error: missing name
 ```

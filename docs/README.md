@@ -19,7 +19,7 @@ layout:
 
 <div data-full-width="false"><figure><picture><source srcset=".gitbook/assets/hypster_text_white_text.png" media="(prefers-color-scheme: dark)"><img src=".gitbook/assets/hypster_with_text (1).png" alt=""></picture><figcaption></figcaption></figure></div>
 
-### **Hypster is a lightweight framework for defining configurations functions to optimize ML & AI workflows.**
+### Hypster is a lightweight configuration framework for **optimizing AI & ML workflows**
 
 > Hypster is in preview and is not ready for production use.
 >
@@ -28,11 +28,10 @@ layout:
 ### Key Features
 
 * :snake: **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
-* :nesting\_dolls: **Hierarchical Configurations**: Support for nested and swappable configurations
+* :nesting\_dolls: **Hierarchical, Conditional Configurations**: Support for nested and swappable configurations
 * :triangular\_ruler: **Type Safety**: Built-in type hints and validation
-* :package: **Portability**: Easy serialization and loading of configurations
-* :test\_tube: **Experiment Ready**: Built-in support for hyperparameter optimization
-* :video\_game: **Interactive UI**: Jupyter widgets integration for interactive parameter selection
+* :test_tube: **Hyperparameter Optimization Built-In**: Native, first-class optuna support
+
 
 > Show your support by giving us a [star](https://github.com/gilad-rubin/hypster)! ⭐
 

@@ -91,31 +91,3 @@ cfg = instantiate(
 Control unknown or unreachable values via `on_unknown`: `"warn"` (default), `"raise"`, or `"ignore"`.
 {% endstep %}
 {% endstepper %}
-
-## Saving & Loading Config Functions
-
-Save configurations to reuse them across projects:
-
-```python
-# Save directly from config function
-my_config.save("configs/my_config.py") # Creates directories if needed
-
-# Save using hypster.save
-from hypster import save
-save(my_config, "configs/nested/my_config.py")
-```
-
-#### Loading Configurations
-
-Load saved configurations in two ways:
-
-```python
-# Method 1: Direct loading
-from hypster import load
-my_config = load("configs/my_config.py")
-
-# Method 2: Load for nesting
-@config
-def parent_config(hp: HP):
-    nested_config = hp.nest("configs/my_config.py")
-```

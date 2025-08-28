@@ -13,9 +13,9 @@ Hypster provides several parameter types to handle different configuration needs
 
 ### Value Types
 
-* **number & multi\_number**
+* **float & multi\_float**
   * Floating-point numbers with optional bounds
-  * Accepts both integers and floats
+  * Accepts floating-point values only
 * **int & multi\_int**
   * Integer values with optional bounds
   * Strict integer validation
@@ -36,8 +36,7 @@ Hypster provides several parameter types to handle different configuration needs
 
 All selectable & value-based types support:
 
-* Automatic name inference
-* Interactive UI widgets
+* Explicit parameter naming (required)
 * Type validation
 * Default values
 

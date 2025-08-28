@@ -5,55 +5,59 @@ Let's walk through a simple example to understand how Hypster works. We'll creat
 Prerequisites:
 
 ```bash
+uv add scikit-learn
+```
+or
+```bash
 pip install scikit-learn
 ```
 
 ## Configurable Machine Learning Classifier
 
 ```python
-from hypster import HP, config
+from hypster import HP, instantiate
 
-
-@config
 def classifier_config(hp: HP):
     from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 
     # Define the model type choice
     model_type = hp.select(["random_forest", "hist_boost"],
-                           default="hist_boost")
+                           name="model_type", default="hist_boost")
 
     # Create the classifier based on selection
     if model_type == "hist_boost":
-        learning_rate = hp.number(0.01, min=0.001, max=0.1)
-        max_depth = hp.int(10, min=3, max=20)
+        learning_rate = hp.float(0.01, name="learning_rate", min=0.001, max=0.1)
+        max_depth = hp.int(10, name="max_depth", min=3)
 
         classifier = HistGradientBoostingClassifier(
             learning_rate=learning_rate,
             max_depth=max_depth,
         )
     else:  # model_type == "random_forest"
-        n_estimators = hp.int(100, min=10, max=500)
-        max_depth = hp.int(5, min=3, max=10)
-        bootstrap = hp.bool(default=True)
+        n_estimators = hp.int(100, name="n_estimators", max=500)
+        max_depth = hp.int(5, name="max_depth")
+        bootstrap = hp.bool(True, name="bootstrap")
 
         classifier = RandomForestClassifier(
             n_estimators=n_estimators,
             max_depth=max_depth,
             bootstrap=bootstrap
         )
+
+    return {"classifier": classifier}
 ```
 
 {% code overflow="wrap" %}
 ```python
 # Instantiate with histogram gradient boosting
-hist_config = classifier_config(values={
+hist_config = instantiate(classifier_config, values={
     "model_type": "hist_boost",
     "learning_rate": 0.05,
     "max_depth": 3
 })
 
 # Instantiate with random forest
-rf_config = classifier_config(values={
+rf_config = instantiate(classifier_config, values={
     "model_type": "random_forest",
     "n_estimators": 200,
     "bootstrap": False
@@ -63,23 +67,22 @@ rf_config = classifier_config(values={
 
 This example demonstrates several key features of Hypster:
 
-1. **Configuration Definition**: Using the `@config` decorator to define a configuration space
-2. **Parameter Types**: Using different HP call types (`select`, `number`, `int`, `bool`)
-3. **Default Values**: Setting sensible defaults for all parameters
-4. **Conditional Logic**: Different parameters based on model selection
-5. **Multiple Instantiations**: Creating different configurations from the same space
+1. **Configuration Definition**: Using a regular Python function to define a configuration space
+2. **Parameter Types**: Using different HP call types (`select`, `float`, `int`, `bool`)
+3. **Conditional Logic**: Different parameters based on model selection
+4. **Multiple Instantiations**: Creating different configurations from the same space
 
 ## Understanding the Code
 
-1. We define a configuration space using the `@config` decorator
-2. The configuration function takes an `hp` parameter of type `HP`
+1. We define a configuration function that takes an `hp` parameter of type `HP`
+2. The configuration function uses `return` to explicitly return its outputs
 3. We use various HP calls to define our parameter space:
    * `hp.select()` for categorical choices
-   * `hp.number()` for floating-point & integer values
+   * `hp.float()` for floating-point values
    * `hp.int()` for integer values only
    * `hp.bool()` for boolean values
-4. The configuration returns a dictionary with our instantiated objects
-5. We can create multiple instances with different configurations
+4. All `hp.*` calls include explicit `name="..."` arguments (required for overrideability)
+5. We use `instantiate(config_func, values=...)` to execute the configuration with overrides
 
 ## Training and Evaluating
 
@@ -95,7 +98,7 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
 
 # Use the configured classifier
 for model_type in ["random_forest", "hist_boost"]:
-    results = classifier_config(values={"model_type": model_type})
+    results = instantiate(classifier_config, values={"model_type": model_type})
     classifier = results["classifier"]
 
     # Train and evaluate

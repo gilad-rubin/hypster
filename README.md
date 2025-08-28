@@ -5,14 +5,12 @@
   </picture>
 </p>
 
-
 <div align="center">
   <div>
     <a href="https://gilad-rubin.gitbook.io/hypster"><strong>Docs</strong></a> ·
     <a href="https://github.com/gilad-rubin/hypster/issues/new?template=bug_report.md"><strong>Report Bug</strong></a> ·
     <a href="https://github.com/gilad-rubin/hypster/issues/new?template=feature_request.md"><strong>Feature Request</strong></a> ·
-    <a href="https://github.com/gilad-rubin/hypster/blob/hypster-v2/CHANGELOG.md"><strong>Changelog</strong></a> ·
-    <a href="https://github.com/gilad-rubin/hypster/issues?q=is%3Aopen+label%3Aroadmap"><strong>Roadmap</strong></a>
+    <a href="https://github.com/gilad-rubin/hypster/blob/hypster-v2/CHANGELOG.md"><strong>Changelog</strong></a>
   </div>
 </div>
 
@@ -30,7 +28,7 @@
   <a href="https://codecov.io/gh/gilad-rubin/hypster"><img src="https://codecov.io/gh/gilad-rubin/hypster/branch/hypster-v2/graph/badge.svg" alt="codecov"/></a>
   <a href="https://pypi.org/project/hypster/"><img src="https://img.shields.io/pypi/v/hypster.svg" alt="PyPI version"/></a>
   <a href="https://pypi.org/project/hypster/"><img src="https://img.shields.io/pypi/pyversions/hypster.svg" alt="Python versions"/></a>
-  <a href="https://gilad-rubin.gitbook.io/hypster"><img src="https://img.shields.io/badge/docs-gitbook-blue" alt="Docs"/></a>
+  <a href="https://gilad-rubin.gitbook.io/hypster"><img src="https://img.shields.io/badge/docs-gitbook-**blue**" alt="Docs"/></a>
   <a href="https://deepwiki.com/gilad-rubin/hypster"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"/></a>
   <a href="https://codspeed.io/gilad-rubin/hypster"><img src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" alt="CodSpeed"/></a>
@@ -38,9 +36,7 @@
 
 <p align="center">
   <em>
-    Hypster is a Pythonic framework for defining <b>conditional & hierarchical configuration spaces</b> to build and
-    optimize <b>AI/ML workflows</b>. It enables <b>swappable components</b>, <b>safe overrides</b>, and is
-    <b>HPO‑ready</b> out of the box.
+    Hypster is a lightweight configuration framework for <b>optimizing AI & ML workflows</b>
   </em>
 </p>
 
@@ -49,6 +45,13 @@
 > Hypster is in active development and not yet battle-tested in production.
 >
 > If you’re gaining value and want to promote it to production, please reach out!
+
+## Key Features
+
+* :snake: **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
+* :nesting_dolls: **Hierarchical, Conditional Configurations**: Support for nested and swappable configurations
+* :triangular_ruler: **Type Safety**: Built-in type hints and validation
+* :test_tube: **Hyperparameter Optimization Built-In**: Native, first-class optuna support
 
 ## Installation
 
@@ -72,22 +75,20 @@ Define a configuration function and instantiate it with overrides:
 
 ```python
 from hypster import HP, instantiate
+from llm import LLM
 
+def llm_config(hp: HP):
+    model_name = hp.select(["gpt-4o-mini", "gpt-4o"], name="model_name")
+    temperature = hp.float(0.7, name="temperature", min=0.0, max=1.0)
+    max_tokens = hp.int(256, name="max_tokens", min=1, max=4096)
+    llm = LLM(model_name=model_name, temperature=temperature, max_tokens=max_tokens)
+    return llm
 
-def model_cfg(hp: HP):
-    kind = hp.select(["rf", "lr"], name="kind")
-    if kind == "rf":
-        n = hp.int(100, name="n_estimators", min=50, max=300)
-        d = hp.float(10.0, name="max_depth", min=2.0, max=30.0)
-        return {"model": ("rf", n, d)}
-    C = hp.float(1.0, name="C", min=1e-5, max=10.0)
-    solver = hp.select(["lbfgs", "saga"], name="solver")
-    return {"model": ("lr", C, solver)}
-
-cfg = instantiate(model_cfg, values={"kind": "rf", "n_estimators": 200, "max_depth": 12.5})
+llm = instantiate(llm_config, values={"model_name": "gpt-4o-mini", "temperature": 0.3})
+llm.invoke("How's your day going?")
 ```
 
-### HPO with Optuna (optional)
+## HPO with Optuna
 
 ```python
 import optuna
