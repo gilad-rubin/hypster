@@ -107,22 +107,14 @@ def test_select_dict_none_and_tuples() -> None:
 
     def config(hp: HP) -> Dict[str, Any]:
         # Test None values
-        tokenizer = hp.select({
-            "none": None,
-            "basic": "basic_tokenizer"
-        }, name="tokenizer", default="none")
-        
+        tokenizer = hp.select({"none": None, "basic": "basic_tokenizer"}, name="tokenizer", default="none")
+
         # Test tuple values (e.g., n-gram ranges)
-        ngram_range = hp.select({
-            "unigram": (1, 1),
-            "bigram": (1, 2),
-            "trigram": (1, 3)
-        }, name="ngram_range", default="bigram")
-        
-        return {
-            "tokenizer": tokenizer,
-            "ngram_range": ngram_range
-        }
+        ngram_range = hp.select(
+            {"unigram": (1, 1), "bigram": (1, 2), "trigram": (1, 3)}, name="ngram_range", default="bigram"
+        )
+
+        return {"tokenizer": tokenizer, "ngram_range": ngram_range}
 
     # Test defaults
     result = instantiate(config)
