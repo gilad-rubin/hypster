@@ -1,6 +1,10 @@
+---
+hidden: true
+---
+
 # 🎮 Interactive Instantiation (UI)
 
-As configuration spaces become more complex, manual instantiation can become challenging.&#x20;
+As configuration spaces become more complex, manual instantiation can become challenging.
 
 To tackle this challenge, Hypster provides an interactive UI for Jupyter notebooks on JupyterLab, VSCode, Google Colab, and any platform that supports `ipywidgets`.
 
