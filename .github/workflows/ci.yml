@@ -3,14 +3,14 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [ main, master, hypster-v2 ]
+    branches: [main, master]
 
 jobs:
   lint-type-test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
