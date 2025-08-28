@@ -445,7 +445,7 @@ wheels = [
 
 [[package]]
 name = "hypster"
-version = "0.3.5"
+version = "0.3.7"
 source = { editable = "." }
 
 [package.optional-dependencies]
