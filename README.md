@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source srcset="assets/hypster_white_text.png" media="(prefers-color-scheme: dark)">
-    <img src="assets/hypster_with_text.png" alt="Hypster Logo" width="600"/>
-  </picture>
+  <img src="https://raw.githubusercontent.com/gilad-rubin/hypster/master/assets/hypster_with_text.png" alt="Hypster Logo" width="600"/>
 </p>
 
 <div align="center">
@@ -40,18 +37,15 @@
   </em>
 </p>
 
-> [!WARNING]
->
-> Hypster is in active development and not yet battle-tested in production.
->
+> ⚠️ Hypster is in active development and not yet battle-tested in production.
 > If you’re gaining value and want to promote it to production, please reach out!
 
 ## Key Features
 
-* :snake: **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
-* :nesting_dolls: **Hierarchical, Conditional Configurations**: Support for nested and swappable configurations
-* :triangular_ruler: **Type Safety**: Built-in type hints and validation
-* :test_tube: **Hyperparameter Optimization Built-In**: Native, first-class optuna support
+- 🐍 **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
+- 🪆 **Hierarchical, Conditional Configurations**: Support for nested and swappable configurations
+- 📐 **Type Safety**: Built-in type hints and validation
+- 🧪 **Hyperparameter Optimization Built-In**: Native, first-class optuna support
 
 ## Installation
 

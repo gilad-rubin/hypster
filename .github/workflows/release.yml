@@ -1,27 +1,244 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., 0.3.4)"
+        required: true
+        type: string
+      publish_to_pypi:
+        description: "Publish to PyPI"
+        required: true
+        default: true
+        type: boolean
+      create_draft:
+        description: "Create as draft release"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  contents: write
+  id-token: write # For trusted publishing
 
 jobs:
-  build-and-publish:
+  validate-inputs:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v2
+      - name: Validate version format
+        id: validate
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "Validating version: $VERSION"
+
+          # Strict semantic version validation
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected semantic version (e.g., 1.2.3, 1.2.3-alpha.1, 1.2.3+build.1)"
+            exit 1
+          fi
+
+          echo "✅ Version format is valid"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: validate-inputs
+    runs-on: ubuntu-latest
+    environment: release # Use environment protection
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          python-version: '3.12'
-      - name: Build
-        run: uv build
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+          uv pip install build twine
+
+      - name: Update version and create commit
+        id: version_update
+        env:
+          VERSION: ${{ needs.validate-inputs.outputs.version }}
+        run: |
+          echo "🔄 Updating version to $VERSION"
+
+          # Backup original file
+          cp pyproject.toml pyproject.toml.backup
+
+          # Update version in pyproject.toml
+          sed -i -E "0,/^version = \".*\"/s//version = \"$VERSION\"/" pyproject.toml
+
+          # Verify the change was made
+          if ! grep -q "version = \"$VERSION\"" pyproject.toml; then
+            echo "❌ Failed to update version in pyproject.toml"
+            exit 1
+          fi
+
+          echo "✅ Version updated successfully"
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if there are changes to commit
+          if git diff --quiet pyproject.toml; then
+            echo "⚠️ No version changes detected"
+          else
+            git add pyproject.toml
+            git commit -m "chore: bump version to v$VERSION"
+
+            # Push changes
+            CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+            git push origin "$CURRENT_BRANCH"
+            echo "✅ Version commit pushed to $CURRENT_BRANCH"
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        env:
+          VERSION: ${{ steps.version_update.outputs.version }}
+        run: |
+          TAG="v$VERSION"
+
+          # Check if tag already exists
+          if git tag -l | grep -q "^$TAG$"; then
+            echo "⚠️ Tag $TAG already exists"
+            git tag -d "$TAG" || true
+            git push origin ":refs/tags/$TAG" || true
+            echo "🗑️ Removed existing tag"
+          fi
+
+          # Create new tag
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          echo "✅ Created and pushed tag $TAG"
+
+      - name: Build package
+        run: |
+          echo "🔨 Building package..."
+          uv build
+
+          # Verify build artifacts
+          if [ ! -f "dist/"*.whl ] || [ ! -f "dist/"*.tar.gz ]; then
+            echo "❌ Build artifacts not found"
+            exit 1
+          fi
+
+          echo "✅ Package built successfully"
+          ls -la dist/
+
+      - name: Verify package
+        run: |
+          echo "🔍 Verifying package..."
+          uv run twine check dist/*
+          echo "✅ Package verification passed"
+
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.12.4
+        if: ${{ inputs.publish_to_pypi }}
+        uses: pypa/gh-action-pypi-publish@v1.9.0
         with:
-          packages-dir: dist
+          packages-dir: dist/
           verbose: true
           skip-existing: true
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          print-hash: true
+
+      - name: Extract changelog for release
+        id: changelog
+        env:
+          VERSION: ${{ steps.version_update.outputs.version }}
+        run: |
+          echo "📝 Extracting changelog for version $VERSION"
+
+          # Extract changelog section using awk
+          CHANGELOG_SECTION=$(awk -v version="$VERSION" '
+            BEGIN { in_section = 0; found = 0 }
+            /^## \['"'"'version'"'"'\]/ || /^## \['"'"'$version'"'"'\]/ {
+              in_section = 1; found = 1; print; next
+            }
+            /^## \[/ && in_section { in_section = 0; exit }
+            in_section { print }
+          ' CHANGELOG.md)
+
+                    # Fallback if no changelog section found
+          if [ -z "$CHANGELOG_SECTION" ]; then
+            echo "⚠️ No changelog section found for version $VERSION"
+            CHANGELOG_SECTION="## [$VERSION] - $(date +%Y-%m-%d)
+
+          Release $VERSION
+
+          See [CHANGELOG.md](CHANGELOG.md) for detailed changes."
+          else
+            echo "✅ Found changelog section for version $VERSION"
+          fi
+
+          # Escape for GitHub Actions multiline output
+          {
+            echo "content<<EOF"
+            echo "$CHANGELOG_SECTION"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version_update.outputs.version }}
+          name: "Hypster v${{ steps.version_update.outputs.version }}"
+          body: |
+            ${{ steps.changelog.outputs.content }}
+
+            ---
+
+            ## 📦 Installation
+
+            **Standard installation:**
+            ```bash
+            pip install hypster==${{ steps.version_update.outputs.version }}
+            ```
+
+            **With HPO support:**
+            ```bash
+            pip install 'hypster[optuna]==${{ steps.version_update.outputs.version }}'
+            ```
+
+            ## 📚 Documentation
+
+            - [Getting Started](https://github.com/gilad-rubin/hypster#getting-started)
+            - [Documentation](https://github.com/gilad-rubin/hypster/tree/master/docs)
+            - [Examples](https://github.com/gilad-rubin/hypster/tree/master/playground)
+
+            Full changelog: [CHANGELOG.md](https://github.com/gilad-rubin/hypster/blob/master/CHANGELOG.md)
+          draft: ${{ inputs.create_draft }}
+          prerelease: false
+          generate_release_notes: false
+          make_latest: true
+
+      - name: Summary
+        run: |
+          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** v${{ steps.version_update.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **PyPI Published:** ${{ inputs.publish_to_pypi }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Draft Release:** ${{ inputs.create_draft }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** [v${{ steps.version_update.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version_update.outputs.version }})" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Installation Commands" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "pip install hypster==${{ steps.version_update.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
