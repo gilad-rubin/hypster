@@ -100,3 +100,36 @@ def test_select_dict_complex_types() -> None:
     # Override
     result = instantiate(config, values={"model": "large"})
     assert result == {"name": "gpt-4", "max_tokens": 8192}
+
+
+def test_select_dict_none_and_tuples() -> None:
+    """Test hp.select with dictionary containing None values and tuples."""
+
+    def config(hp: HP) -> Dict[str, Any]:
+        # Test None values
+        tokenizer = hp.select({
+            "none": None,
+            "basic": "basic_tokenizer"
+        }, name="tokenizer", default="none")
+        
+        # Test tuple values (e.g., n-gram ranges)
+        ngram_range = hp.select({
+            "unigram": (1, 1),
+            "bigram": (1, 2),
+            "trigram": (1, 3)
+        }, name="ngram_range", default="bigram")
+        
+        return {
+            "tokenizer": tokenizer,
+            "ngram_range": ngram_range
+        }
+
+    # Test defaults
+    result = instantiate(config)
+    assert result["tokenizer"] is None
+    assert result["ngram_range"] == (1, 2)
+
+    # Test overrides
+    result = instantiate(config, values={"tokenizer": "basic", "ngram_range": "trigram"})
+    assert result["tokenizer"] == "basic_tokenizer"
+    assert result["ngram_range"] == (1, 3)
