@@ -1,7 +1,7 @@
 # 🎮 Interactive Instantiation (UI)
 
 {% hint style="info" %}
-**Note**: Interactive UI functionality has been temporarily removed in v0.3.1 as part of the major revamp. The Hypster team is working on bringing back an improved UI experience in a future release.
+**Note**: Interactive UI functionality has been temporarily removed in v0.3 as part of the major revamp. The Hypster team is working on bringing back an improved UI experience in a future release.
 {% endhint %}
 
 ## Current Workflow
