@@ -20,7 +20,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write # For trusted publishing
 
 jobs:
   validate-inputs:
@@ -47,7 +46,6 @@ jobs:
   release:
     needs: validate-inputs
     runs-on: ubuntu-latest
-    environment: release # Use environment protection
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -56,20 +54,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@v3
-        with:
-          version: "latest"
-          enable-cache: true
-
-      - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: |
-          uv sync --dev
-          uv pip install build twine
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install project and dev deps
+        run: uv pip install -e ".[dev]"
 
       - name: Update version and create commit
         id: version_update
@@ -152,12 +145,14 @@ jobs:
 
       - name: Publish to PyPI
         if: ${{ inputs.publish_to_pypi }}
-        uses: pypa/gh-action-pypi-publish@v1.9.0
+        uses: pypa/gh-action-pypi-publish@v1.10.3
         with:
           packages-dir: dist/
           verbose: true
           skip-existing: true
           print-hash: true
+          # Use token if trusted publishing is not configured
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
       - name: Extract changelog for release
         id: changelog

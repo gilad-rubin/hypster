@@ -21,11 +21,10 @@
 
 </p>
 <p align="center">
-  <a href="https://github.com/gilad-rubin/hypster/actions/workflows/ci.yml?query=branch%3Ahypster-v2"><img src="https://github.com/gilad-rubin/hypster/actions/workflows/ci.yml/badge.svg?branch=hypster-v2" alt="CI"/></a>
-  <a href="https://codecov.io/gh/gilad-rubin/hypster"><img src="https://codecov.io/gh/gilad-rubin/hypster/branch/hypster-v2/graph/badge.svg" alt="codecov"/></a>
+  <a href="https://github.com/gilad-rubin/hypster/actions/workflows/ci.yml"><img src="https://github.com/gilad-rubin/hypster/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+  <a href="https://codecov.io/gh/gilad-rubin/hypster"><img src="https://codecov.io/gh/gilad-rubin/hypster/graph/badge.svg" alt="codecov"/></a>
   <a href="https://pypi.org/project/hypster/"><img src="https://img.shields.io/pypi/v/hypster.svg" alt="PyPI version"/></a>
   <a href="https://pypi.org/project/hypster/"><img src="https://img.shields.io/pypi/pyversions/hypster.svg" alt="Python versions"/></a>
-  <a href="https://gilad-rubin.gitbook.io/hypster"><img src="https://img.shields.io/badge/docs-gitbook-**blue**" alt="Docs"/></a>
   <a href="https://deepwiki.com/gilad-rubin/hypster"><img src="https://deepwiki.com/badge.svg" alt="DeepWiki"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"/></a>
   <a href="https://codspeed.io/gilad-rubin/hypster"><img src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" alt="CodSpeed"/></a>
