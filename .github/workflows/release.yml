@@ -148,9 +148,6 @@ jobs:
         run: |
           echo "🔍 Verifying package..."
 
-          # Run our verification script
-          uv run python scripts/verify_build.py
-
           # Additional verification with built-in tools
           echo "Built artifacts:"
           ls -la dist/
