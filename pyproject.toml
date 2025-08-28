@@ -1,6 +1,6 @@
 [project]
 name = "hypster"
-version = "0.3.4"
+version = "0.3.5"
 description = "A flexible configuration system for Python projects"
 authors = [
     {name = "Gilad Rubin", email = "me@giladrubin.com"}
