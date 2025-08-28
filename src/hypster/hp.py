@@ -433,187 +433,199 @@ class HP:
 
         return result
 
+    # --- Public API methods ---
+    # Use underscore prefix to avoid conflicts with built-in names
 
-# --- Public API methods attached after class definition to avoid built-in name linting ---
+    def _int(
+        self,
+        default: int,
+        *,
+        name: str,
+        min: Optional[int] = None,
+        max: Optional[int] = None,
+        strict: bool = False,
+        hpo_spec: "HpoInt | None" = None,
+    ) -> int:
+        """Integer parameter with optional bounds validation."""
+        spec = HP.SingleValueSpec(
+            name=name,
+            default=default,
+            validator=IntValidator(),
+            supports_strict=True,
+            strict=strict,
+            min=min,
+            max=max,
+            track_called=True,
+            use_validator_name=True,
+        )
+        return self._execute_single(spec)
 
+    def _float(
+        self,
+        default: float,
+        *,
+        name: str,
+        min: Optional[float] = None,
+        max: Optional[float] = None,
+        strict: bool = False,
+        hpo_spec: "HpoFloat | None" = None,
+    ) -> float:
+        """Float parameter with optional bounds validation."""
+        spec = HP.SingleValueSpec(
+            name=name,
+            default=default,
+            validator=FloatValidator(),
+            supports_strict=True,
+            strict=strict,
+            min=min,
+            max=max,
+            track_called=True,
+            use_validator_name=True,
+        )
+        return self._execute_single(spec)
 
-def HP_int(
-    self: HP,
-    default: int,
-    *,
-    name: str,
-    min: Optional[int] = None,
-    max: Optional[int] = None,
-    strict: bool = False,
-    hpo_spec: "HpoInt | None" = None,
-) -> int:
-    """Integer parameter with optional bounds validation."""
-    spec = HP.SingleValueSpec(
-        name=name,
-        default=default,
-        validator=IntValidator(),
-        supports_strict=True,
-        strict=strict,
-        min=min,
-        max=max,
-        track_called=True,
-        use_validator_name=True,
-    )
-    return self._execute_single(spec)
+    def _text(self, default: str, *, name: str) -> str:
+        """Text parameter."""
+        spec = HP.SingleValueSpec(
+            name=name,
+            default=default,
+            validator=TextValidator(),
+            supports_strict=False,
+            track_called=True,
+            use_validator_name=True,
+        )
+        return self._execute_single(spec)
 
+    def _bool(self, default: bool, *, name: str) -> bool:
+        """Boolean parameter."""
+        spec = HP.SingleValueSpec(
+            name=name,
+            default=default,
+            validator=BoolValidator(),
+            supports_strict=False,
+            track_called=True,
+            use_validator_name=True,
+        )
+        return self._execute_single(spec)
 
-def HP_float(
-    self: HP,
-    default: float,
-    *,
-    name: str,
-    min: Optional[float] = None,
-    max: Optional[float] = None,
-    strict: bool = False,
-    hpo_spec: "HpoFloat | None" = None,
-) -> float:
-    """Float parameter with optional bounds validation."""
-    spec = HP.SingleValueSpec(
-        name=name,
-        default=default,
-        validator=FloatValidator(),
-        supports_strict=True,
-        strict=strict,
-        min=min,
-        max=max,
-        track_called=True,
-        use_validator_name=True,
-    )
-    return self._execute_single(spec)
+    def _select(
+        self,
+        options: Union[List[Any], Dict[Any, Any]],
+        *,
+        name: str,
+        default: Optional[Any] = None,
+        options_only: bool = False,
+        hpo_spec: "HpoCategorical | None" = None,
+    ) -> Any:
+        """Selection parameter from options."""
+        spec = HP.SelectSingleSpec(name=name, options=options, default=default, options_only=options_only)
+        return self._execute_select_single(spec)
 
+    def _multi_int(
+        self,
+        default: List[int],
+        *,
+        name: str,
+        min: Optional[int] = None,
+        max: Optional[int] = None,
+        strict: bool = False,
+    ) -> List[int]:
+        """Multi-integer parameter with optional bounds validation."""
+        spec = HP.MultiValueSpec(
+            name=name,
+            default=default,
+            element_validator=IntValidator(),
+            supports_strict=True,
+            strict=strict,
+            min=min,
+            max=max,
+        )
+        return self._execute_multi(spec)
 
-def HP_text(self: HP, default: str, *, name: str) -> str:
-    """Text parameter."""
-    spec = HP.SingleValueSpec(
-        name=name,
-        default=default,
-        validator=TextValidator(),
-        supports_strict=False,
-        track_called=True,
-        use_validator_name=True,
-    )
-    return self._execute_single(spec)
+    def _multi_float(
+        self,
+        default: List[float],
+        *,
+        name: str,
+        min: Optional[float] = None,
+        max: Optional[float] = None,
+        strict: bool = False,
+    ) -> List[float]:
+        """Multi-float parameter with optional bounds validation."""
+        spec = HP.MultiValueSpec(
+            name=name,
+            default=default,
+            element_validator=FloatValidator(),
+            supports_strict=True,
+            strict=strict,
+            min=min,
+            max=max,
+        )
+        return self._execute_multi(spec)
 
+    def _multi_text(self, default: List[str], *, name: str) -> List[str]:
+        """Multi-text parameter."""
+        spec = HP.MultiValueSpec(
+            name=name,
+            default=default,
+            element_validator=TextValidator(),
+            supports_strict=False,
+        )
+        return self._execute_multi(spec)
 
-def HP_bool(self: HP, default: bool, *, name: str) -> bool:
-    """Boolean parameter."""
-    spec = HP.SingleValueSpec(
-        name=name,
-        default=default,
-        validator=BoolValidator(),
-        supports_strict=False,
-        track_called=True,
-        use_validator_name=True,
-    )
-    return self._execute_single(spec)
+    def _multi_bool(self, default: List[bool], *, name: str) -> List[bool]:
+        """Multi-boolean parameter."""
+        spec = HP.MultiValueSpec(
+            name=name,
+            default=default,
+            element_validator=BoolValidator(),
+            supports_strict=False,
+        )
+        return self._execute_multi(spec)
 
+    def _multi_select(
+        self,
+        options: Union[List[Any], Dict[Any, Any]],
+        *,
+        name: str,
+        default: Optional[List[Any]] = None,
+        options_only: bool = False,
+    ) -> List[Any]:
+        """Multi-selection parameter from options."""
+        spec = HP.SelectMultiSpec(name=name, options=options, default=default, options_only=options_only)
+        return self._execute_select_multi(spec)
 
-def HP_select(
-    self: HP,
-    options: Union[List[Any], Dict[Any, Any]],
-    *,
-    name: str,
-    default: Optional[Any] = None,
-    options_only: bool = False,
-    hpo_spec: "HpoCategorical | None" = None,
-) -> Any:
-    """Selection parameter from options."""
-    spec = HP.SelectSingleSpec(name=name, options=options, default=default, options_only=options_only)
-    return self._execute_select_single(spec)
+    # Map public API names to internal methods
+    def __getattr__(self, name: str) -> Any:
+        """Route public API names to internal methods."""
+        method_map = {
+            "int": self._int,
+            "float": self._float,
+            "text": self._text,
+            "bool": self._bool,
+            "select": self._select,
+            "multi_int": self._multi_int,
+            "multi_float": self._multi_float,
+            "multi_text": self._multi_text,
+            "multi_bool": self._multi_bool,
+            "multi_select": self._multi_select,
+        }
 
+        if name in method_map:
+            return method_map[name]
 
-def HP_multi_int(
-    self: HP,
-    default: List[int],
-    *,
-    name: str,
-    min: Optional[int] = None,
-    max: Optional[int] = None,
-    strict: bool = False,
-) -> List[int]:
-    """Multi-integer parameter with optional bounds validation."""
-    spec = HP.MultiValueSpec(
-        name=name,
-        default=default,
-        element_validator=IntValidator(),
-        supports_strict=True,
-        strict=strict,
-        min=min,
-        max=max,
-    )
-    return self._execute_multi(spec)
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
-
-def HP_multi_float(
-    self: HP,
-    default: List[float],
-    *,
-    name: str,
-    min: Optional[float] = None,
-    max: Optional[float] = None,
-    strict: bool = False,
-) -> List[float]:
-    """Multi-float parameter with optional bounds validation."""
-    spec = HP.MultiValueSpec(
-        name=name,
-        default=default,
-        element_validator=FloatValidator(),
-        supports_strict=True,
-        strict=strict,
-        min=min,
-        max=max,
-    )
-    return self._execute_multi(spec)
-
-
-def HP_multi_text(self: HP, default: List[str], *, name: str) -> List[str]:
-    """Multi-text parameter."""
-    spec = HP.MultiValueSpec(
-        name=name,
-        default=default,
-        element_validator=TextValidator(),
-        supports_strict=False,
-    )
-    return self._execute_multi(spec)
-
-
-def HP_multi_bool(self: HP, default: List[bool], *, name: str) -> List[bool]:
-    """Multi-boolean parameter."""
-    spec = HP.MultiValueSpec(
-        name=name,
-        default=default,
-        element_validator=BoolValidator(),
-        supports_strict=False,
-    )
-    return self._execute_multi(spec)
-
-
-def HP_multi_select(
-    self: HP,
-    options: Union[List[Any], Dict[Any, Any]],
-    *,
-    name: str,
-    default: Optional[List[Any]] = None,
-    options_only: bool = False,
-) -> List[Any]:
-    """Multi-selection parameter from options."""
-    spec = HP.SelectMultiSpec(name=name, options=options, default=default, options_only=options_only)
-    return self._execute_select_multi(spec)
-
-
-# Attach methods to class (preserve public API names without declaring inside the class body)
-setattr(HP, "int", HP_int)
-setattr(HP, "float", HP_float)
-setattr(HP, "text", HP_text)
-setattr(HP, "bool", HP_bool)
-setattr(HP, "select", HP_select)
-setattr(HP, "multi_int", HP_multi_int)
-setattr(HP, "multi_float", HP_multi_float)
-setattr(HP, "multi_text", HP_multi_text)
-setattr(HP, "multi_bool", HP_multi_bool)
-setattr(HP, "multi_select", HP_multi_select)
+    # Type stubs for IDE/type checker support
+    if TYPE_CHECKING:
+        # These declarations exist only for type checking
+        int = _int
+        float = _float
+        text = _text
+        bool = _bool
+        select = _select
+        multi_int = _multi_int
+        multi_float = _multi_float
+        multi_text = _multi_text
+        multi_bool = _multi_bool
+        multi_select = _multi_select
