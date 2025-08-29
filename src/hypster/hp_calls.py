@@ -25,12 +25,16 @@ class ParameterValidator:
 
     def validate_bounds(
         self,
-        value: Union[int, float],
+        value: Optional[Union[int, float]],
         min_val: Optional[Union[int, float]],
         max_val: Optional[Union[int, float]],
         param_path: str,
     ) -> None:
         """Validate numeric bounds."""
+        # Skip validation if value is None
+        if value is None:
+            return
+            
         if min_val is not None and value < min_val:
             if max_val is not None:
                 raise HPCallError(
@@ -53,7 +57,9 @@ class ParameterValidator:
 class IntValidator(ParameterValidator):
     """Validates int parameters with optional type conversion."""
 
-    def validate_value(self, value: Any, param_path: str, strict: bool = False) -> int:
+    def validate_value(self, value: Any, param_path: str, strict: bool = False) -> Optional[int]:
+        if value is None:
+            return None
         if isinstance(value, float):
             if strict:
                 raise HPCallError(param_path, f"expected int but got float ({value}). Use an integer value.")
@@ -72,7 +78,9 @@ class IntValidator(ParameterValidator):
 class FloatValidator(ParameterValidator):
     """Validates float parameters with optional type conversion."""
 
-    def validate_value(self, value: Any, param_path: str, strict: bool = False) -> float:
+    def validate_value(self, value: Any, param_path: str, strict: bool = False) -> Optional[float]:
+        if value is None:
+            return None
         if isinstance(value, int):
             if strict or "." in param_path:
                 raise HPCallError(
@@ -97,7 +105,9 @@ class TextValidator(ParameterValidator):
 class BoolValidator(ParameterValidator):
     """Validates boolean parameters."""
 
-    def validate_value(self, value: Any, param_path: str) -> bool:
+    def validate_value(self, value: Any, param_path: str) -> Optional[bool]:
+        if value is None:
+            return None
         if not isinstance(value, bool):
             raise HPCallError(param_path, f"expected boolean but got {type(value).__name__} ({value})")
         return value
