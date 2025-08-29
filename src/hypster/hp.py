@@ -17,6 +17,9 @@ from .utils import unflatten_dict
 if TYPE_CHECKING:  # only for type hints; avoid runtime imports
     from .hpo.types import HpoCategorical, HpoFloat, HpoInt
 
+# Sentinel object to distinguish between no default and explicit None default
+_NO_DEFAULT = object()
+
 
 @dataclass(frozen=True)
 class OptionsAdapter:
@@ -34,8 +37,8 @@ class OptionsAdapter:
             option_map = {k: k for k in option_keys}
         return option_keys, option_map
 
-    def resolve_default(self, explicit_default: Optional[Any]) -> Optional[Any]:
-        if explicit_default is not None:
+    def resolve_default(self, explicit_default: Any, no_default_sentinel: Any) -> Optional[Any]:
+        if explicit_default is not no_default_sentinel:
             return explicit_default
         if isinstance(self.options, dict):
             # First key if available
@@ -204,7 +207,7 @@ class HP:
 
         adapter = OptionsAdapter(options=options, options_only=options_only)
         option_keys, option_map = adapter.keys_and_map()
-        actual_default = adapter.resolve_default(default)
+        actual_default = adapter.resolve_default(default, _NO_DEFAULT)
 
         value, found = self._get_value_for_param(name)
         if found:
@@ -438,14 +441,14 @@ class HP:
 
     def _int(
         self,
-        default: int,
+        default: Optional[int],
         *,
         name: str,
         min: Optional[int] = None,
         max: Optional[int] = None,
         strict: bool = False,
         hpo_spec: "HpoInt | None" = None,
-    ) -> int:
+    ) -> Optional[int]:
         """Integer parameter with optional bounds validation."""
         spec = HP.SingleValueSpec(
             name=name,
@@ -462,14 +465,14 @@ class HP:
 
     def _float(
         self,
-        default: float,
+        default: Optional[float],
         *,
         name: str,
         min: Optional[float] = None,
         max: Optional[float] = None,
         strict: bool = False,
         hpo_spec: "HpoFloat | None" = None,
-    ) -> float:
+    ) -> Optional[float]:
         """Float parameter with optional bounds validation."""
         spec = HP.SingleValueSpec(
             name=name,
@@ -496,7 +499,7 @@ class HP:
         )
         return self._execute_single(spec)
 
-    def _bool(self, default: bool, *, name: str) -> bool:
+    def _bool(self, default: Optional[bool], *, name: str) -> Optional[bool]:
         """Boolean parameter."""
         spec = HP.SingleValueSpec(
             name=name,
@@ -513,7 +516,7 @@ class HP:
         options: Union[List[Any], Dict[Any, Any]],
         *,
         name: str,
-        default: Optional[Any] = None,
+        default: Optional[Any] = _NO_DEFAULT,
         options_only: bool = False,
         hpo_spec: "HpoCategorical | None" = None,
     ) -> Any:
