@@ -32,7 +32,7 @@
 
 <p align="center">
   <em>
-    Hypster is a lightweight configuration framework for <b>optimizing AI & ML workflows</b>
+    Hypster is a lightweight configuration framework for managing and <b>optimizing AI & ML workflows</b>
   </em>
 </p>
 
