@@ -510,14 +510,26 @@ class HP:
 
     def _select(
         self,
-        options: Union[List[Any], Dict[Any, Any]],
+        options: Union[List[Union[int, float, str, bool]], Dict[Union[int, float, str, bool], Any]],
         *,
         name: str,
         default: Optional[Any] = None,
         options_only: bool = False,
         hpo_spec: "HpoCategorical | None" = None,
     ) -> Any:
-        """Selection parameter from options."""
+        """Selection parameter from options.
+
+        Args:
+            options: Either a list of primitives (int, float, str, bool) or
+                    a dict with primitive keys and any values
+            name: Parameter name
+            default: Default value (must be from options if options_only=True)
+            options_only: If True, only allow values from options
+            hpo_spec: Optional HPO specification
+
+        Returns:
+            Selected value (or mapped value for dict options)
+        """
         spec = HP.SelectSingleSpec(name=name, options=options, default=default, options_only=options_only)
         return self._execute_select_single(spec)
 
@@ -585,13 +597,24 @@ class HP:
 
     def _multi_select(
         self,
-        options: Union[List[Any], Dict[Any, Any]],
+        options: Union[List[Union[int, float, str, bool]], Dict[Union[int, float, str, bool], Any]],
         *,
         name: str,
         default: Optional[List[Any]] = None,
         options_only: bool = False,
     ) -> List[Any]:
-        """Multi-selection parameter from options."""
+        """Multi-selection parameter from options.
+
+        Args:
+            options: Either a list of primitives (int, float, str, bool) or
+                    a dict with primitive keys and any values
+            name: Parameter name
+            default: Default list of values
+            options_only: If True, only allow values from options
+
+        Returns:
+            List of selected values (or mapped values for dict options)
+        """
         spec = HP.SelectMultiSpec(name=name, options=options, default=default, options_only=options_only)
         return self._execute_select_multi(spec)
 
