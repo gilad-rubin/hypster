@@ -581,3 +581,172 @@ class TestOverrides:
         result, params = instantiate(config, values={"base": 200, "child.x": 30}, return_params=True)
         assert result == {"result": 250}  # 200 + 30 + 20
         assert params.get_flat() == {"base": 200, "child.x": 30, "child.y": 20}
+
+
+class TestMultiParameterListPreservation:
+    """Test that multi_x parameters preserve their list values without conversion warnings."""
+
+    def test_multi_int_preserves_list_no_warning(self):
+        """Test that multi_int returns list without conversion warnings."""
+
+        def config(hp: HP):
+            test = hp.multi_int([1, 2, 3], name="test")
+            return test
+
+        result, params = instantiate(config, return_params=True)
+
+        # The actual result should be the list
+        assert result == [1, 2, 3]
+
+        # get_flat() should return the list as-is without conversion
+        flat_params = params.get_flat()
+        assert flat_params["test"] == [1, 2, 3]
+        assert isinstance(flat_params["test"], list)
+
+        # No warnings should be generated for multi_int lists
+        import warnings
+
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            params.get_flat()
+
+        # Filter out any warnings that aren't about parameter conversion
+        conversion_warnings = [w for w in warning_list if "converted to string" in str(w.message)]
+        assert len(conversion_warnings) == 0
+
+    def test_multi_float_preserves_list_no_warning(self):
+        """Test that multi_float returns list without conversion warnings."""
+
+        def config(hp: HP):
+            test = hp.multi_float([1.1, 2.2, 3.3], name="test")
+            return test
+
+        result, params = instantiate(config, return_params=True)
+
+        # The actual result should be the list
+        assert result == [1.1, 2.2, 3.3]
+
+        # get_flat() should return the list as-is without conversion
+        flat_params = params.get_flat()
+        assert flat_params["test"] == [1.1, 2.2, 3.3]
+        assert isinstance(flat_params["test"], list)
+
+        # No warnings should be generated for multi_float lists
+        import warnings
+
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            params.get_flat()
+
+        conversion_warnings = [w for w in warning_list if "converted to string" in str(w.message)]
+        assert len(conversion_warnings) == 0
+
+    def test_multi_text_preserves_list_no_warning(self):
+        """Test that multi_text returns list without conversion warnings."""
+
+        def config(hp: HP):
+            test = hp.multi_text(["a", "b", "c"], name="test")
+            return test
+
+        result, params = instantiate(config, return_params=True)
+
+        # The actual result should be the list
+        assert result == ["a", "b", "c"]
+
+        # get_flat() should return the list as-is without conversion
+        flat_params = params.get_flat()
+        assert flat_params["test"] == ["a", "b", "c"]
+        assert isinstance(flat_params["test"], list)
+
+        # No warnings should be generated for multi_text lists
+        import warnings
+
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            params.get_flat()
+
+        conversion_warnings = [w for w in warning_list if "converted to string" in str(w.message)]
+        assert len(conversion_warnings) == 0
+
+    def test_multi_bool_preserves_list_no_warning(self):
+        """Test that multi_bool returns list without conversion warnings."""
+
+        def config(hp: HP):
+            test = hp.multi_bool([True, False, True], name="test")
+            return test
+
+        result, params = instantiate(config, return_params=True)
+
+        # The actual result should be the list
+        assert result == [True, False, True]
+
+        # get_flat() should return the list as-is without conversion
+        flat_params = params.get_flat()
+        assert flat_params["test"] == [True, False, True]
+        assert isinstance(flat_params["test"], list)
+
+        # No warnings should be generated for multi_bool lists
+        import warnings
+
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            params.get_flat()
+
+        conversion_warnings = [w for w in warning_list if "converted to string" in str(w.message)]
+        assert len(conversion_warnings) == 0
+
+    def test_multi_select_preserves_list_no_warning(self):
+        """Test that multi_select returns list without conversion warnings."""
+
+        def config(hp: HP):
+            test = hp.multi_select([1, 2, 3, 4], default=[1, 3], name="test")
+            return test
+
+        result, params = instantiate(config, return_params=True)
+
+        # The actual result should be the list
+        assert result == [1, 3]
+
+        # get_flat() should return the list as-is without conversion
+        flat_params = params.get_flat()
+        assert flat_params["test"] == [1, 3]
+        assert isinstance(flat_params["test"], list)
+
+        # No warnings should be generated for multi_select lists with primitive values
+        import warnings
+
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            params.get_flat()
+
+        conversion_warnings = [w for w in warning_list if "converted to string" in str(w.message)]
+        assert len(conversion_warnings) == 0
+
+    def test_multi_select_with_complex_dict_still_warns(self):
+        """Test that multi_select with complex dict values still uses key fallback and warns."""
+
+        def config(hp: HP):
+            complex_dict = {
+                "option1": {"nested": "complex", "data": [1, 2, 3]},
+                "option2": {"other": "complex", "stuff": {"more": "nesting"}},
+            }
+            selected = hp.multi_select(complex_dict, default=["option1"], name="test")
+            return selected
+
+        import warnings
+
+        with warnings.catch_warnings(record=True) as warning_list:
+            warnings.simplefilter("always")
+            result, params = instantiate(config, return_params=True)
+            flat_params = params.get_flat()
+
+        # The result should be the actual complex object
+        assert result == [{"nested": "complex", "data": [1, 2, 3]}]
+
+        # But the return_params should fall back to the key
+        assert flat_params["test"] == ["option1"]
+
+        # Should generate appropriate warning about complex values
+        all_warnings = [str(w.message) for w in warning_list]
+        complex_warnings = [w for w in all_warnings if "keys instead" in w]
+        assert len(complex_warnings) > 0

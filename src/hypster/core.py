@@ -1,17 +1,61 @@
 """The Core API for instantiating configurations."""
 
 import warnings
-from typing import Any, Dict, Literal, Optional, Protocol, Tuple, TypeVar
+from typing import Any, Dict, Literal, Optional, Protocol, Tuple, TypeVar, Union, overload
 
 from .hp import HP
 from .hp_calls import HPCallError
-from .utils import suggest_similar_names, validate_config_func_signature
+from .utils import suggest_similar_names, unflatten_dict, validate_config_func_signature
 
 T = TypeVar("T", covariant=True)
 
 
 class ConfigFunc(Protocol[T]):
     def __call__(self, hp: HP, *args: Any, **kwargs: Any) -> T: ...
+
+
+class SelectedParams:
+    """Container for selected hyperparameter values."""
+
+    def __init__(self, values: Dict[str, Any]):
+        """
+        Args:
+            values: Flat dictionary with dot-separated keys and sanitized values
+        """
+        self._values = values
+
+    def get_flat(self) -> Dict[str, Any]:
+        """Return parameters as flat dictionary with dot-separated keys."""
+        return self._values.copy()
+
+    def get_nested(self) -> Dict[str, Any]:
+        """Return parameters as nested dictionary structure."""
+        # Use existing unflatten_dict utility from utils.py
+        return unflatten_dict(self._values)
+
+
+@overload
+def instantiate(
+    func: ConfigFunc[T],
+    *,
+    values: Optional[Dict[str, Any]] = None,
+    args: Tuple[Any, ...] = (),
+    kwargs: Optional[Dict[str, Any]] = None,
+    on_unknown: Literal["warn", "raise", "ignore"] = "warn",
+    return_params: Literal[False] = False,
+) -> T: ...
+
+
+@overload
+def instantiate(
+    func: ConfigFunc[T],
+    *,
+    values: Optional[Dict[str, Any]] = None,
+    args: Tuple[Any, ...] = (),
+    kwargs: Optional[Dict[str, Any]] = None,
+    on_unknown: Literal["warn", "raise", "ignore"] = "warn",
+    return_params: Literal[True],
+) -> Tuple[T, SelectedParams]: ...
 
 
 def instantiate(
@@ -21,7 +65,8 @@ def instantiate(
     args: Tuple[Any, ...] = (),
     kwargs: Optional[Dict[str, Any]] = None,
     on_unknown: Literal["warn", "raise", "ignore"] = "warn",
-) -> T:
+    return_params: bool = False,
+) -> Union[T, Tuple[T, SelectedParams]]:
     """
     Execute a config function with the given values.
 
@@ -34,9 +79,10 @@ def instantiate(
             - 'warn': Issue warning and continue (default)
             - 'raise': Raise ValueError
             - 'ignore': Silently ignore unknown parameters
+        return_params: If True, return tuple of (result, SelectedParams)
 
     Returns:
-        Whatever the config function returns
+        Whatever the config function returns, or tuple if return_params=True
 
     Raises:
         ValueError: If func doesn't have hp: HP as first parameter
@@ -62,6 +108,19 @@ def instantiate(
         # Check for unknown/unreachable parameters
         called_params = hp.called_params - original_called_params
         _handle_unknown_parameters(values, called_params, on_unknown)
+
+        # Handle return_params
+        if return_params:
+            # Get sanitized values and complex params
+            sanitized_values, complex_params = hp.get_selected_values()
+
+            # Issue consolidated warning for complex params
+            if complex_params:
+                _issue_complex_params_warning(complex_params)
+
+            # Create and return SelectedParams
+            selected_params = SelectedParams(sanitized_values)
+            return result, selected_params
 
         return result
 
@@ -104,3 +163,15 @@ def _handle_unknown_parameters(provided_values: Dict[str, Any], called_params: s
         raise ValueError(error_message)
     elif on_unknown == "warn":
         warnings.warn(error_message, UserWarning, stacklevel=3)
+
+
+def _issue_complex_params_warning(complex_params: list[tuple[str, str]]) -> None:
+    """Issue a consolidated warning for all complex parameter values."""
+    if not complex_params:
+        return
+
+    lines = ["The following parameter values are not primitives and were converted:"]
+    for param_name, reason in complex_params:
+        lines.append(f"  - {param_name}: {reason}")
+
+    warnings.warn("\n".join(lines), UserWarning, stacklevel=3)
