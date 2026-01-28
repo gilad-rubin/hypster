@@ -12,7 +12,20 @@ T = TypeVar("T", covariant=True)
 
 
 class ConfigFunc(Protocol[T]):
-    def __call__(self, hp: HP, *args: Any, **kwargs: Any) -> T: ...
+    """Protocol for configuration functions that accept HP as first parameter."""
+
+    def __call__(self, hp: HP, *args: Any, **kwargs: Any) -> T:
+        """Execute the configuration function.
+
+        Args:
+            hp: The HP parameter interface for defining hyperparameters
+            *args: Additional positional arguments
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            The configuration result of type T
+        """
+        ...
 
 
 @dataclass
@@ -43,10 +56,25 @@ class SelectedParams:
         Example:
             >>> params.get_nested()
             {'batch_size': 32, 'optimizer': {'lr': 0.001, 'momentum': 0.9}}
+
+        Raises:
+            ValueError: If there are prefix collisions (e.g., both 'model' and 'model.param' exist)
         """
+        # Check for prefix collisions before unflattening
+        keys = list(self._values.keys())
+        for i, key1 in enumerate(keys):
+            for key2 in keys[i + 1 :]:
+                # Check if one key is a prefix of another
+                if key1.startswith(key2 + ".") or key2.startswith(key1 + "."):
+                    raise ValueError(
+                        f"Cannot create nested structure: parameter name collision detected. "
+                        f"Both '{key1}' and '{key2}' exist, where one is a prefix of the other. "
+                        f"This creates ambiguity in the nested structure."
+                    )
         return unflatten_dict(self._values)
 
     def __repr__(self) -> str:
+        """Return string representation of SelectedParams."""
         return f"SelectedParams({self._values})"
 
 
@@ -126,6 +154,7 @@ class InstantiateResult:
         return len(self.values)
 
     def __repr__(self) -> str:
+        """Return string representation of InstantiateResult."""
         return f"InstantiateResult(values={self.values!r}, params={self.params!r})"
 
 
@@ -212,7 +241,16 @@ def instantiate(
 
 
 def _handle_unknown_parameters(provided_values: Dict[str, Any], called_params: set[str], on_unknown: str) -> None:
-    """Handle unknown or unreachable parameters based on on_unknown setting."""
+    """Handle unknown or unreachable parameters based on on_unknown setting.
+
+    Args:
+        provided_values: Dictionary of parameter values provided by the user
+        called_params: Set of parameter names that were actually called during execution
+        on_unknown: Strategy for handling unknown parameters ('warn', 'raise', or 'ignore')
+
+    Raises:
+        ValueError: If on_unknown='raise' and unknown parameters are found
+    """
     if on_unknown == "ignore":
         return
 
@@ -248,7 +286,12 @@ def _handle_unknown_parameters(provided_values: Dict[str, Any], called_params: s
 
 
 def _issue_complex_params_warning(complex_params: list[tuple[str, str]]) -> None:
-    """Issue a consolidated warning for all complex parameter values."""
+    """Issue a consolidated warning for all complex parameter values.
+
+    Args:
+        complex_params: List of tuples containing (param_name, reason) for each
+                       parameter with a complex (non-primitive) value that was converted
+    """
     if not complex_params:
         return
 

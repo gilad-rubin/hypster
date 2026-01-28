@@ -17,6 +17,7 @@ from .utils import unflatten_dict
 if TYPE_CHECKING:  # only for type hints; avoid runtime imports
     from .hpo.types import HpoCategorical, HpoFloat, HpoInt
 
+
 @dataclass(frozen=True)
 class OptionsAdapter:
     """Helper to normalize options and defaults for select/multi_select."""
