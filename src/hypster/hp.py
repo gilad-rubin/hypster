@@ -253,7 +253,17 @@ class HP:
                 }
 
                 return final_value
-            return None
+            else:
+                # Track None default in SelectedParams for consistency
+                self.selected_values[full_path] = None
+                self.param_metadata[full_path] = {
+                    "type": "select",
+                    "is_dict_options": isinstance(options, dict),
+                    "options": options,
+                    "selected_key": None,
+                    "options_only": options_only,
+                }
+                return None
 
     def _handle_select_multi(
         self,
@@ -826,17 +836,28 @@ class HP:
 
         # For dict options, apply the same logic as select but for each item
         sanitized_list = []
-        has_complex = False
+        warnings = []
 
         for i, (val, key) in enumerate(zip(values, selected_keys)):
-            if self._is_primitive(val):
-                sanitized_list.append(val)
+            # Check if the key is actually in the options dict
+            if isinstance(options, dict) and key in options:
+                # This is a normal dict selection - check if the mapped value is primitive
+                if self._is_primitive(val):
+                    sanitized_list.append(val)
+                else:
+                    # Return the key instead of the complex value
+                    sanitized_list.append(key)
+                    warnings.append(f"[{i}]: using key '{key}' instead of complex value")
             else:
-                sanitized_list.append(key)
-                has_complex = True
+                # This is an override value not in the dict, apply normal sanitization
+                sanitized_val, warning = self._sanitize_param_value(f"{name}[{i}]", val)
+                sanitized_list.append(sanitized_val)
+                if warning:
+                    warnings.append(f"[{i}]: {warning}")
 
-        warning = "some values are complex, using keys instead" if has_complex else None
-        return sanitized_list, warning
+        if warnings:
+            return sanitized_list, "; ".join(warnings)
+        return sanitized_list, None
 
     # Type stubs for IDE/type checker support
     if TYPE_CHECKING:
