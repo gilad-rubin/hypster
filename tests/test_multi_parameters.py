@@ -14,10 +14,10 @@ def test_multi_int() -> None:
         return hp.multi_int([1, 2, 3], name="values", min=0, max=10)
 
     result = instantiate(config)
-    assert result == [1, 2, 3]
+    assert result.values == [1, 2, 3]
 
     result = instantiate(config, values={"values": [5, 6, 7]})
-    assert result == [5, 6, 7]
+    assert result.values == [5, 6, 7]
 
     # Bounds validation on each element
     with pytest.raises(ValueError, match="exceeds maximum"):
@@ -31,10 +31,10 @@ def test_multi_float() -> None:
         return hp.multi_float([1.0, 2.5, 3.7], name="values", min=0.0, max=10.0)
 
     result = instantiate(config)
-    assert result == [1.0, 2.5, 3.7]
+    assert result.values == [1.0, 2.5, 3.7]
 
     result = instantiate(config, values={"values": [5.5, 6.1, 7.9]})
-    assert result == [5.5, 6.1, 7.9]
+    assert result.values == [5.5, 6.1, 7.9]
 
     # Test strict parameter behavior
     def strict_config(hp: HP) -> List[float]:
@@ -49,7 +49,7 @@ def test_multi_float() -> None:
         return hp.multi_float([1.0, 2.0], name="values")
 
     result = instantiate(flexible_config, values={"values": [1, 2]})
-    assert result == [1.0, 2.0]  # Converted to floats
+    assert result.values == [1.0, 2.0]  # Converted to floats
 
 
 def test_multi_select() -> None:
@@ -59,10 +59,10 @@ def test_multi_select() -> None:
         return hp.multi_select(["a", "b", "c"], name="choices", default=["a"])
 
     result = instantiate(config)
-    assert result == ["a"]
+    assert result.values == ["a"]
 
     result = instantiate(config, values={"choices": ["a", "b"]})
-    assert result == ["a", "b"]
+    assert result.values == ["a", "b"]
 
 
 def test_multi_select_with_dict() -> None:
@@ -73,14 +73,14 @@ def test_multi_select_with_dict() -> None:
 
     # Default (should return mapped values)
     result = instantiate(config)
-    assert result == ["value1"]
+    assert result.values == ["value1"]
 
     # Override with keys
     result = instantiate(config, values={"choices": ["opt1", "opt2"]})
-    assert result == ["value1", "value2"]
+    assert result.values == ["value1", "value2"]
 
     result = instantiate(config, values={"choices": ["opt2", "opt3"]})
-    assert result == ["value2", "value3"]
+    assert result.values == ["value2", "value3"]
 
     # Test options_only=True with dict
     def strict_multi_dict_config(hp: HP) -> List[str]:
@@ -89,10 +89,10 @@ def test_multi_select_with_dict() -> None:
         )
 
     result = instantiate(strict_multi_dict_config)
-    assert result == ["alpha"]
+    assert result.values == ["alpha"]
 
     result = instantiate(strict_multi_dict_config, values={"items": ["a", "b"]})
-    assert result == ["alpha", "beta"]
+    assert result.values == ["alpha", "beta"]
 
     # Should reject invalid keys when options_only=True
     with pytest.raises(ValueError, match="not in allowed options"):
@@ -107,13 +107,13 @@ def test_multi_select_with_dict() -> None:
         return hp.multi_select({"x": "ex", "y": "why"}, name="items", default=["x"], options_only=False)
 
     result = instantiate(flexible_multi_dict_config)
-    assert result == ["ex"]
+    assert result.values == ["ex"]
 
     result = instantiate(flexible_multi_dict_config, values={"items": ["x", "y"]})
-    assert result == ["ex", "why"]
+    assert result.values == ["ex", "why"]
 
     result = instantiate(flexible_multi_dict_config, values={"items": ["custom", "values"]})
-    assert result == ["custom", "values"]
+    assert result.values == ["custom", "values"]
 
 
 def test_multi_select_dict_mixed_usage() -> None:
@@ -126,4 +126,4 @@ def test_multi_select_dict_mixed_usage() -> None:
 
     # Mix of preset keys and custom values
     result = instantiate(config, values={"configs": ["preset1", "custom", "preset2"]})
-    assert result == ["config1", "custom", "config2"]
+    assert result.values == ["config1", "custom", "config2"]

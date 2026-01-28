@@ -17,7 +17,6 @@ from .utils import unflatten_dict
 if TYPE_CHECKING:  # only for type hints; avoid runtime imports
     from .hpo.types import HpoCategorical, HpoFloat, HpoInt
 
-
 @dataclass(frozen=True)
 class OptionsAdapter:
     """Helper to normalize options and defaults for select/multi_select."""
@@ -54,6 +53,9 @@ class HP:
         self.namespace_stack: List[str] = []  # For nested name prefixes
         self.called_params: set[str] = set()  # Track called parameter names
         self.nested_scopes: set[str] = set()  # Track names that have been nested
+        # Track actual values used for return_params feature
+        self.selected_values: Dict[str, Any] = {}  # Full path -> actual value used
+        self.param_metadata: Dict[str, Dict[str, Any]] = {}  # Full path -> metadata for sanitization
 
     def _get_full_param_path(self, name: str) -> str:
         """Get full parameter path including namespace stack."""
@@ -148,6 +150,9 @@ class HP:
         if (min is not None or max is not None) and hasattr(validator, "validate_bounds"):
             validator.validate_bounds(validated_value, min, max, full_path)
 
+        # Track the actual value used for return_params
+        self.selected_values[full_path] = validated_value
+
         return validated_value
 
     def _handle_multi_value(
@@ -185,6 +190,15 @@ class HP:
         if min is not None or max is not None:
             multi_validator.validate_bounds(validated_values, min, max, full_path)
 
+        # Track the actual value used for return_params
+        self.selected_values[full_path] = validated_values
+
+        # Track metadata to indicate this is a multi-parameter (list should be preserved)
+        self.param_metadata[full_path] = {
+            "type": "multi",
+            "element_type": type(element_validator).__name__.replace("Validator", "").lower(),
+        }
+
         return validated_values
 
     def _handle_select_single(
@@ -209,11 +223,35 @@ class HP:
         value, found = self._get_value_for_param(name)
         if found:
             validated_key = validator.validate_value(value, option_keys, options_only, full_path)
-            return option_map.get(validated_key, validated_key)
+            final_value = option_map.get(validated_key, validated_key)
+
+            # Track for params: store metadata about the selection
+            self.selected_values[full_path] = final_value
+            self.param_metadata[full_path] = {
+                "type": "select",
+                "is_dict_options": isinstance(options, dict),
+                "options": options,
+                "selected_key": validated_key,
+                "options_only": options_only,
+            }
+
+            return final_value
         else:
             if actual_default is not None:
                 validated_key = validator.validate_value(actual_default, option_keys, options_only, full_path)
-                return option_map.get(validated_key, validated_key)
+                final_value = option_map.get(validated_key, validated_key)
+
+                # Track for params
+                self.selected_values[full_path] = final_value
+                self.param_metadata[full_path] = {
+                    "type": "select",
+                    "is_dict_options": isinstance(options, dict),
+                    "options": options,
+                    "selected_key": validated_key,
+                    "options_only": options_only,
+                }
+
+                return final_value
             return None
 
     def _handle_select_multi(
@@ -245,14 +283,38 @@ class HP:
                 validated_key = validator.validate_value(item, option_keys, options_only, f"{full_path}[{i}]")
                 validated_keys.append(validated_key)
 
-            return [option_map.get(k, k) for k in validated_keys]
+            final_values = [option_map.get(k, k) for k in validated_keys]
+
+            # Track for return_params
+            self.selected_values[full_path] = final_values
+            self.param_metadata[full_path] = {
+                "type": "multi_select",
+                "is_dict_options": isinstance(options, dict),
+                "options": options,
+                "selected_keys": validated_keys,
+                "options_only": options_only,
+            }
+
+            return final_values
         else:
             validated_keys = []
             for i, item in enumerate(actual_default):
                 validated_key = validator.validate_value(item, option_keys, options_only, f"{full_path}[{i}]")
                 validated_keys.append(validated_key)
 
-            return [option_map.get(k, k) for k in validated_keys]
+            final_values = [option_map.get(k, k) for k in validated_keys]
+
+            # Track for return_params
+            self.selected_values[full_path] = final_values
+            self.param_metadata[full_path] = {
+                "type": "multi_select",
+                "is_dict_options": isinstance(options, dict),
+                "options": options,
+                "selected_keys": validated_keys,
+                "options_only": options_only,
+            }
+
+            return final_values
 
     # --- Executor structures ---
     @dataclass(frozen=True)
@@ -403,6 +465,22 @@ class HP:
                 full_nested_param = f"{full_path}.{param}"
                 self.called_params.add(full_nested_param)
 
+        # Copy selected values and metadata from nested HP back to parent for return_params
+        for nested_param, value in nested_hp.selected_values.items():
+            # Prefix the parameter with the full nested path
+            if "." in nested_param:
+                # Already has namespace, use as is
+                prefixed_param = nested_param
+            else:
+                # Add the current nesting prefix
+                prefixed_param = f"{full_path}.{nested_param}"
+
+            self.selected_values[prefixed_param] = value
+
+            # Copy metadata if it exists
+            if nested_param in nested_hp.param_metadata:
+                self.param_metadata[prefixed_param] = nested_hp.param_metadata[nested_param]
+
         return result
 
     # Helpers
@@ -510,14 +588,26 @@ class HP:
 
     def _select(
         self,
-        options: Union[List[Any], Dict[Any, Any]],
+        options: Union[List[Union[int, float, str, bool]], Dict[Union[int, float, str, bool], Any]],
+        default: Optional[Any] = None,
         *,
         name: str,
-        default: Optional[Any] = None,
         options_only: bool = False,
         hpo_spec: "HpoCategorical | None" = None,
     ) -> Any:
-        """Selection parameter from options."""
+        """Selection parameter from options.
+
+        Args:
+            options: Either a list of primitives (int, float, str, bool) or
+                    a dict with primitive keys and any values
+            name: Parameter name
+            default: Default value (must be from options if options_only=True)
+            options_only: If True, only allow values from options
+            hpo_spec: Optional HPO specification
+
+        Returns:
+            Selected value (or mapped value for dict options)
+        """
         spec = HP.SelectSingleSpec(name=name, options=options, default=default, options_only=options_only)
         return self._execute_select_single(spec)
 
@@ -585,13 +675,24 @@ class HP:
 
     def _multi_select(
         self,
-        options: Union[List[Any], Dict[Any, Any]],
+        options: Union[List[Union[int, float, str, bool]], Dict[Union[int, float, str, bool], Any]],
+        default: Optional[List[Any]] = None,
         *,
         name: str,
-        default: Optional[List[Any]] = None,
         options_only: bool = False,
     ) -> List[Any]:
-        """Multi-selection parameter from options."""
+        """Multi-selection parameter from options.
+
+        Args:
+            options: Either a list of primitives (int, float, str, bool) or
+                    a dict with primitive keys and any values
+            name: Parameter name
+            default: Default list of values
+            options_only: If True, only allow values from options
+
+        Returns:
+            List of selected values (or mapped values for dict options)
+        """
         spec = HP.SelectMultiSpec(name=name, options=options, default=default, options_only=options_only)
         return self._execute_select_multi(spec)
 
@@ -615,6 +716,126 @@ class HP:
             return method_map[name]
 
         raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
+    # Helper methods for return_params feature
+    def _is_primitive(self, value: Any) -> bool:
+        """Check if value is a primitive type (int, float, str, bool)."""
+        return isinstance(value, (int, float, str, bool))
+
+    def _sanitize_param_value(
+        self, name: str, value: Any, options: Optional[Any] = None, is_dict_options: bool = False
+    ) -> tuple[Any, Optional[str]]:
+        """Sanitize parameter value for return_params."""
+
+        # Check if primitive
+        if self._is_primitive(value):
+            return value, None  # No warning
+
+        # For dict options, return the key if we can find it
+        if is_dict_options and options and isinstance(options, dict):
+            for key, val in options.items():
+                if val is value:  # Use 'is' for exact object identity
+                    return key, f"using key '{key}' instead of complex value"
+
+        # Convert to string for non-primitives
+        str_value = str(value)
+        return str_value, f"converted to string: {str_value}"
+
+    def get_selected_values(self) -> tuple[Dict[str, Any], list[tuple[str, str]]]:
+        """Get sanitized values and complex parameter warnings for return_params."""
+        sanitized_values = {}
+        complex_params = []
+
+        for full_path, value in self.selected_values.items():
+            # Get metadata for this parameter if available
+            metadata = self.param_metadata.get(full_path, {})
+            param_type = metadata.get("type", "simple")
+
+            if param_type == "multi":
+                # For multi-parameters, preserve the list as-is (no conversion to string)
+                sanitized_values[full_path] = value
+                # No warning since lists from multi-parameters are expected
+
+            elif param_type in ["select", "multi_select"]:
+                # Handle select/multi_select with special dict logic
+                is_dict_options = metadata.get("is_dict_options", False)
+                options = metadata.get("options", {})
+
+                if param_type == "select":
+                    sanitized_val, warning = self._sanitize_select_value(
+                        full_path, value, options, is_dict_options, metadata.get("selected_key")
+                    )
+                    sanitized_values[full_path] = sanitized_val
+                    if warning:
+                        complex_params.append((full_path, warning))
+
+                elif param_type == "multi_select":
+                    sanitized_val, warning = self._sanitize_multi_select_value(
+                        full_path, value, options, is_dict_options, metadata.get("selected_keys", [])
+                    )
+                    sanitized_values[full_path] = sanitized_val
+                    if warning:
+                        complex_params.append((full_path, warning))
+            else:
+                # Simple parameter (int, float, bool, text, etc.)
+                sanitized_val, warning = self._sanitize_param_value(full_path, value)
+                sanitized_values[full_path] = sanitized_val
+                if warning:
+                    complex_params.append((full_path, warning))
+
+        return sanitized_values, complex_params
+
+    def _sanitize_select_value(
+        self, name: str, value: Any, options: Any, is_dict_options: bool, selected_key: Any
+    ) -> tuple[Any, Optional[str]]:
+        """Sanitize a select parameter value."""
+        if not is_dict_options:
+            # For list options, return the value directly and apply normal sanitization
+            return self._sanitize_param_value(name, value)
+
+        # For dict options, check if the selected_key is actually a key in the options
+        if isinstance(options, dict) and selected_key in options:
+            # This is a normal dict selection - check if the mapped value is primitive
+            if self._is_primitive(value):
+                return value, None  # Return the primitive value
+            else:
+                # Return the key instead of the complex value
+                return selected_key, f"using key '{selected_key}' instead of complex value"
+        else:
+            # This is an override value not in the dict, treat as normal parameter
+            return self._sanitize_param_value(name, value)
+
+    def _sanitize_multi_select_value(
+        self, name: str, values: list[Any], options: Any, is_dict_options: bool, selected_keys: list[Any]
+    ) -> tuple[list[Any], Optional[str]]:
+        """Sanitize a multi_select parameter value."""
+        if not is_dict_options:
+            # For list options, sanitize each value
+            sanitized_list = []
+            warnings = []
+            for i, val in enumerate(values):
+                sanitized_val, warning = self._sanitize_param_value(f"{name}[{i}]", val)
+                sanitized_list.append(sanitized_val)
+                if warning:
+                    warnings.append(f"[{i}]: {warning}")
+
+            if warnings:
+                return sanitized_list, "; ".join(warnings)
+            return sanitized_list, None
+
+        # For dict options, apply the same logic as select but for each item
+        sanitized_list = []
+        has_complex = False
+
+        for i, (val, key) in enumerate(zip(values, selected_keys)):
+            if self._is_primitive(val):
+                sanitized_list.append(val)
+            else:
+                sanitized_list.append(key)
+                has_complex = True
+
+        warning = "some values are complex, using keys instead" if has_complex else None
+        return sanitized_list, warning
 
     # Type stubs for IDE/type checker support
     if TYPE_CHECKING:

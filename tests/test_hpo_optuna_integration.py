@@ -79,8 +79,8 @@ def test_optuna_suggest_values_rf_branch_and_instantiate():
     assert values["rf.n_estimators"] == 200
     assert values["rf.max_depth"] == 12.5
 
-    model = instantiate(model_cfg, values=values)
-    assert isinstance(model, _RF)
+    result = instantiate(model_cfg, values=values)
+    assert isinstance(result.values, _RF)
 
     # Check that step was forwarded on int and log was False
     int_calls = [c for c in trial.calls if c["fn"] == "int" and c["name"] == "rf.n_estimators"]
@@ -94,8 +94,8 @@ def test_optuna_suggest_values_lr_branch_and_log_float():
     assert values["lr.C"] == 0.01
     assert values["lr.solver"] == "saga"
 
-    model = instantiate(model_cfg, values=values)
-    assert isinstance(model, _LR)
+    result = instantiate(model_cfg, values=values)
+    assert isinstance(result.values, _LR)
 
     # Float with log scale true
     float_calls = [c for c in trial.calls if c["fn"] == "float" and c["name"] == "lr.C"]
@@ -117,5 +117,5 @@ def test_nested_overrides_passed_to_child():
     # no int call for tree.depth recorded
     assert not any(c for c in trial.calls if c["fn"] == "int" and c["name"] == "tree.depth")
 
-    out = instantiate(parent, values=values)
-    assert out == 6
+    result = instantiate(parent, values=values)
+    assert result.values == 6

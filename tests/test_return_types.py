@@ -15,7 +15,7 @@ def test_dict_return() -> None:
         return {"a": a, "b": b}
 
     result = instantiate(config)
-    assert result == {"a": 1, "b": 2.0}
+    assert result.values == {"a": 1, "b": 2.0}
 
 
 def test_single_object_return() -> None:
@@ -30,8 +30,8 @@ def test_single_object_return() -> None:
         return Model(n_estimators=n)
 
     result = instantiate(config, values={"n_estimators": 200})
-    assert isinstance(result, Model)
-    assert result.n_estimators == 200
+    assert isinstance(result.values, Model)
+    assert result.values.n_estimators == 200
 
 
 def test_dataclass_return() -> None:
@@ -46,9 +46,9 @@ def test_dataclass_return() -> None:
         return Config(lr=hp.float(0.1, name="lr"), epochs=hp.int(10, name="epochs"))
 
     result = instantiate(config, values={"lr": 0.05})
-    assert isinstance(result, Config)
-    assert result.lr == 0.05
-    assert result.epochs == 10
+    assert isinstance(result.values, Config)
+    assert result.values.lr == 0.05
+    assert result.values.epochs == 10
 
 
 def test_collect_helper() -> None:

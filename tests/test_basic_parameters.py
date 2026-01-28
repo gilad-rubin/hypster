@@ -16,11 +16,11 @@ def test_int_parameter() -> None:
 
     # Default value
     result = instantiate(config)
-    assert result == {"batch_size": 32}
+    assert result.values == {"batch_size": 32}
 
     # Override
     result = instantiate(config, values={"batch_size": 64})
-    assert result == {"batch_size": 64}
+    assert result.values == {"batch_size": 64}
 
     # Bounds validation
     with pytest.raises(ValueError, match="exceeds maximum"):
@@ -35,15 +35,15 @@ def test_float_parameter() -> None:
 
     # Default
     result = instantiate(config)
-    assert result == 0.5
+    assert result.values == 0.5
 
     # Override with float
     result = instantiate(config, values={"lr": 0.7})
-    assert result == 0.7
+    assert result.values == 0.7
 
     # Accept integer when strict=False (default)
     result = instantiate(config, values={"lr": 1})
-    assert result == 1.0  # Converted to float
+    assert result.values == 1.0  # Converted to float
 
     # Test strict=True behavior
     def strict_config(hp: HP) -> float:
@@ -62,7 +62,7 @@ def test_int_parameter_with_strict() -> None:
 
     # Accept float that can be converted when strict=False (default)
     result = instantiate(config, values={"batch_size": 64.0})
-    assert result == 64  # Converted to int
+    assert result.values == 64  # Converted to int
 
     # Reject float that loses precision
     with pytest.raises(ValueError, match="would lose precision"):
@@ -88,10 +88,10 @@ def test_text_parameter() -> None:
         return hp.text("hello", name="greeting")
 
     result = instantiate(config)
-    assert result == "hello"
+    assert result.values == "hello"
 
     result = instantiate(config, values={"greeting": "hi"})
-    assert result == "hi"
+    assert result.values == "hi"
 
     # Type validation
     with pytest.raises(ValueError, match="expected string"):
@@ -105,10 +105,10 @@ def test_bool_parameter() -> None:
         return hp.bool(True, name="flag")
 
     result = instantiate(config)
-    assert result is True
+    assert result.values is True
 
     result = instantiate(config, values={"flag": False})
-    assert result is False
+    assert result.values is False
 
     # Type validation
     with pytest.raises(ValueError, match="expected boolean"):
