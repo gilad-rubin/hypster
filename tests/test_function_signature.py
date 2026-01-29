@@ -12,7 +12,7 @@ def test_valid_signature() -> None:
         return hp.int(10, name="value")
 
     result = instantiate(config)
-    assert result == 10
+    assert result.values == 10
 
 
 def test_invalid_first_param_name() -> None:
@@ -43,4 +43,4 @@ def test_extra_args_allowed() -> None:
         return base * multiplier
 
     result = instantiate(config, kwargs={"multiplier": 3})
-    assert result == 30
+    assert result.values == 30

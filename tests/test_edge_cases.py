@@ -20,11 +20,11 @@ def test_deeply_nested_paths() -> None:
         return {"l2": hp.nest(level2, name="l2")}
 
     result = instantiate(level1)
-    assert result == {"l2": {"l3": 3}}
+    assert result.values == {"l2": {"l3": 3}}
 
     # Deep override
     result = instantiate(level1, values={"l2.l3.value": 5})
-    assert result == {"l2": {"l3": 5}}
+    assert result.values == {"l2": {"l3": 5}}
 
 
 def test_conditional_same_name_allowed() -> None:
@@ -43,19 +43,19 @@ def test_conditional_same_name_allowed() -> None:
 
     # Should work fine with int mode (default)
     result = instantiate(config)
-    assert result == {"mode": "int", "value": 10}
+    assert result.values == {"mode": "int", "value": 10}
 
     # Should work with float mode
     result = instantiate(config, values={"mode": "float"})
-    assert result == {"mode": "float", "value": 10.0}
+    assert result.values == {"mode": "float", "value": 10.0}
 
     # Override value in int mode
     result = instantiate(config, values={"value": 50})
-    assert result == {"mode": "int", "value": 50}
+    assert result.values == {"mode": "int", "value": 50}
 
     # Override value in float mode
     result = instantiate(config, values={"mode": "float", "value": 50.5})
-    assert result == {"mode": "float", "value": 50.5}
+    assert result.values == {"mode": "float", "value": 50.5}
 
 
 def test_name_collision_detection() -> None:

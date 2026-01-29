@@ -18,11 +18,11 @@ def test_basic_nesting() -> None:
         return {"child": child_result, "y": y}
 
     result = instantiate(parent)
-    assert result == {"child": {"x": 10}, "y": 20}
+    assert result.values == {"child": {"x": 10}, "y": 20}
 
     # Override nested value with dot notation
     result = instantiate(parent, values={"child.x": 15})
-    assert result == {"child": {"x": 15}, "y": 20}
+    assert result.values == {"child": {"x": 15}, "y": 20}
 
 
 def test_nest_with_args_kwargs() -> None:
@@ -38,7 +38,7 @@ def test_nest_with_args_kwargs() -> None:
         return {"calc1": result1, "calc2": result2}
 
     result = instantiate(parent)
-    assert result == {"calc1": 10, "calc2": 25}  # 5*2=10, 5*3+10=25
+    assert result.values == {"calc1": 10, "calc2": 25}  # 5*2=10, 5*3+10=25
 
 
 def test_conditional_nesting() -> None:
@@ -61,10 +61,10 @@ def test_conditional_nesting() -> None:
         return {"model": model}
 
     result = instantiate(config)
-    assert result == {"model": {"type": "A", "param": 1}}
+    assert result.values == {"model": {"type": "A", "param": 1}}
 
     result = instantiate(config, values={"model_type": "b", "model.param": 3.0})
-    assert result == {"model": {"type": "B", "param": 3.0}}
+    assert result.values == {"model": {"type": "B", "param": 3.0}}
 
 
 def test_nested_dict_override_precedence() -> None:
@@ -86,4 +86,4 @@ def test_nested_dict_override_precedence() -> None:
             "child": {"x": 200},  # nested dict notation
         },
     )
-    assert result == {"x": 200, "y": 20}  # nested dict wins
+    assert result.values == {"x": 200, "y": 20}  # nested dict wins

@@ -14,10 +14,10 @@ def test_select_parameter() -> None:
         return hp.select(["a", "b", "c"], name="choice", default="a")
 
     result = instantiate(config)
-    assert result == "a"
+    assert result.values == "a"
 
     result = instantiate(config, values={"choice": "b"})
-    assert result == "b"
+    assert result.values == "b"
 
     # options_only enforcement - default is False
     def strict_config(hp: HP) -> str:
@@ -31,7 +31,7 @@ def test_select_parameter() -> None:
         return hp.select(["a", "b"], name="choice", default="a", options_only=False)
 
     result = instantiate(flexible_config, values={"choice": "custom"})
-    assert result == "custom"
+    assert result.values == "custom"
 
 
 def test_select_parameter_with_dict() -> None:
@@ -42,21 +42,21 @@ def test_select_parameter_with_dict() -> None:
 
     # Default value (should return the mapped value)
     result = instantiate(config)
-    assert result == "gpt-4o-mini"
+    assert result.values == "gpt-4o-mini"
 
     # Override with key
     result = instantiate(config, values={"model": "smart"})
-    assert result == "gpt-4"
+    assert result.values == "gpt-4"
 
     # Test options_only=True with dict
     def strict_dict_config(hp: HP) -> str:
         return hp.select({"small": "gpt-3.5", "large": "gpt-4"}, name="model", default="small", options_only=True)
 
     result = instantiate(strict_dict_config)
-    assert result == "gpt-3.5"
+    assert result.values == "gpt-3.5"
 
     result = instantiate(strict_dict_config, values={"model": "large"})
-    assert result == "gpt-4"
+    assert result.values == "gpt-4"
 
     # Should reject keys not in dictionary when options_only=True
     with pytest.raises(ValueError, match="not in allowed options"):
@@ -73,13 +73,13 @@ def test_select_parameter_with_dict() -> None:
         )
 
     result = instantiate(flexible_dict_config)
-    assert result == "value1"
+    assert result.values == "value1"
 
     result = instantiate(flexible_dict_config, values={"choice": "preset2"})
-    assert result == "value2"
+    assert result.values == "value2"
 
     result = instantiate(flexible_dict_config, values={"choice": "custom"})
-    assert result == "custom"
+    assert result.values == "custom"
 
 
 def test_select_dict_complex_types() -> None:
@@ -95,11 +95,11 @@ def test_select_dict_complex_types() -> None:
 
     # Default
     result = instantiate(config)
-    assert result == {"name": "gpt-3.5-turbo", "max_tokens": 4096}
+    assert result.values == {"name": "gpt-3.5-turbo", "max_tokens": 4096}
 
     # Override
     result = instantiate(config, values={"model": "large"})
-    assert result == {"name": "gpt-4", "max_tokens": 8192}
+    assert result.values == {"name": "gpt-4", "max_tokens": 8192}
 
 
 def test_select_dict_none_and_tuples() -> None:

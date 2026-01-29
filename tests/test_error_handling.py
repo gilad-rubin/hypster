@@ -21,7 +21,7 @@ def test_on_unknown_warn_default() -> None:
         result = instantiate(config, values={"unknown_param": 0.05})
 
         # Should complete successfully with defaults
-        assert result == {"lr": 0.1}
+        assert result.values == {"lr": 0.1}
 
         # Should have issued a warning
         assert len(w) == 1
@@ -32,7 +32,7 @@ def test_on_unknown_warn_default() -> None:
         warnings.simplefilter("always")
         result = instantiate(config, values={"unknown_param": 0.05}, on_unknown="warn")
 
-        assert result == {"lr": 0.1}
+        assert result.values == {"lr": 0.1}
         assert len(w) == 1
         assert "'unknown_param': Unknown parameter" in str(w[0].message)
 
@@ -58,7 +58,7 @@ def test_on_unknown_ignore() -> None:
 
     # Should complete successfully without warnings
     result = instantiate(config, values={"unknown_param": 0.05}, on_unknown="ignore")
-    assert result == {"lr": 0.1}
+    assert result.values == {"lr": 0.1}
 
 
 def test_on_unknown_with_suggestions() -> None:
@@ -121,7 +121,7 @@ def test_on_unknown_conditional_reachability() -> None:
         )
 
         # Should complete with logistic model
-        assert result == {"model": "logistic", "penalty": "l2"}
+        assert result.values == {"model": "logistic", "penalty": "l2"}
 
         # Should warn about unreachable parameter
         assert len(w) == 1
