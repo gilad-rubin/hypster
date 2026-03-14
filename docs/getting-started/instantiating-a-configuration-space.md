@@ -2,6 +2,8 @@
 
 Use `instantiate(func, values=...)` to execute your configuration function with optional overrides.
 
+If you want to inspect the available parameters first, use [`explore()`](exploring-a-configuration-space.md) before instantiating.
+
 ```python
 from hypster import instantiate
 
@@ -27,6 +29,8 @@ instantiate(model_cfg, values={"n_trees": 200}, on_unknown="warn")
 ## Dotted keys vs nested dicts
 
 See In Depth → Values & Overrides for how to pass nested overrides and precedence.
+
+The same `values=` format also works with `explore()` when you want to inspect a specific conditional branch.
 
 ## Passing args/kwargs to nested configs
 

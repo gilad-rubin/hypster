@@ -65,6 +65,42 @@ class HP:
         """Make full path for parameter name validation."""
         return self._get_full_param_path(name)
 
+    def _record_parameter(
+        self,
+        *,
+        path: str,
+        name: str,
+        kind: str,
+        default_value: Any,
+        selected_value: Any,
+        options: Optional[List[Any]] = None,
+        minimum: Optional[Union[int, float]] = None,
+        maximum: Optional[Union[int, float]] = None,
+    ) -> None:
+        if self.exploration_tracker is None:
+            return
+
+        record = getattr(self.exploration_tracker, "record_parameter", None)
+        if callable(record):
+            record(
+                path=path,
+                name=name,
+                kind=kind,
+                default_value=default_value,
+                selected_value=selected_value,
+                options=options,
+                minimum=minimum,
+                maximum=maximum,
+            )
+
+    def _record_nest(self, *, path: str, name: str) -> None:
+        if self.exploration_tracker is None:
+            return
+
+        record = getattr(self.exploration_tracker, "record_nest", None)
+        if callable(record):
+            record(path=path, name=name)
+
     def _get_value_for_param(self, name: str) -> tuple[Any, bool]:
         """Get value for parameter, returns (value, found)."""
         # Check for exact match with just the name first (for nested contexts)
@@ -112,6 +148,7 @@ class HP:
         *,
         default: Any,
         name: str,
+        param_type: str,
         validator: Any,
         supports_strict: bool = False,
         strict: bool = False,
@@ -148,6 +185,16 @@ class HP:
         if (min is not None or max is not None) and hasattr(validator, "validate_bounds"):
             validator.validate_bounds(validated_value, min, max, full_path)
 
+        self._record_parameter(
+            path=full_path,
+            name=name,
+            kind=param_type,
+            default_value=default,
+            selected_value=validated_value,
+            minimum=min,
+            maximum=max,
+        )
+
         return validated_value
 
     def _handle_multi_value(
@@ -155,6 +202,7 @@ class HP:
         *,
         default: List[Any],
         name: str,
+        param_type: str,
         element_validator: Any,
         supports_strict: bool = False,
         strict: bool = False,
@@ -185,6 +233,16 @@ class HP:
         if min is not None or max is not None:
             multi_validator.validate_bounds(validated_values, min, max, full_path)
 
+        self._record_parameter(
+            path=full_path,
+            name=name,
+            kind=param_type,
+            default_value=default,
+            selected_value=validated_values,
+            minimum=min,
+            maximum=max,
+        )
+
         return validated_values
 
     def _handle_select_single(
@@ -209,11 +267,35 @@ class HP:
         value, found = self._get_value_for_param(name)
         if found:
             validated_key = validator.validate_value(value, option_keys, options_only, full_path)
+            self._record_parameter(
+                path=full_path,
+                name=name,
+                kind="select",
+                default_value=actual_default,
+                selected_value=validated_key,
+                options=option_keys,
+            )
             return option_map.get(validated_key, validated_key)
         else:
             if actual_default is not None:
                 validated_key = validator.validate_value(actual_default, option_keys, options_only, full_path)
+                self._record_parameter(
+                    path=full_path,
+                    name=name,
+                    kind="select",
+                    default_value=actual_default,
+                    selected_value=validated_key,
+                    options=option_keys,
+                )
                 return option_map.get(validated_key, validated_key)
+            self._record_parameter(
+                path=full_path,
+                name=name,
+                kind="select",
+                default_value=actual_default,
+                selected_value=None,
+                options=option_keys,
+            )
             return None
 
     def _handle_select_multi(
@@ -245,6 +327,14 @@ class HP:
                 validated_key = validator.validate_value(item, option_keys, options_only, f"{full_path}[{i}]")
                 validated_keys.append(validated_key)
 
+            self._record_parameter(
+                path=full_path,
+                name=name,
+                kind="multi_select",
+                default_value=actual_default,
+                selected_value=validated_keys,
+                options=option_keys,
+            )
             return [option_map.get(k, k) for k in validated_keys]
         else:
             validated_keys = []
@@ -252,6 +342,14 @@ class HP:
                 validated_key = validator.validate_value(item, option_keys, options_only, f"{full_path}[{i}]")
                 validated_keys.append(validated_key)
 
+            self._record_parameter(
+                path=full_path,
+                name=name,
+                kind="multi_select",
+                default_value=actual_default,
+                selected_value=validated_keys,
+                options=option_keys,
+            )
             return [option_map.get(k, k) for k in validated_keys]
 
     # --- Executor structures ---
@@ -259,6 +357,7 @@ class HP:
     class SingleValueSpec:
         name: str
         default: Any
+        param_type: str
         validator: Any
         supports_strict: bool = False
         strict: bool = False
@@ -271,6 +370,7 @@ class HP:
     class MultiValueSpec:
         name: str
         default: List[Any]
+        param_type: str
         element_validator: Any
         supports_strict: bool = False
         strict: bool = False
@@ -296,6 +396,7 @@ class HP:
         return self._handle_single_value(
             default=spec.default,
             name=spec.name,
+            param_type=spec.param_type,
             validator=spec.validator,
             supports_strict=spec.supports_strict,
             strict=spec.strict,
@@ -309,6 +410,7 @@ class HP:
         return self._handle_multi_value(
             default=spec.default,
             name=spec.name,
+            param_type=spec.param_type,
             element_validator=spec.element_validator,
             supports_strict=spec.supports_strict,
             strict=spec.strict,
@@ -380,7 +482,9 @@ class HP:
             nested_values.update(values)
 
         # Create new HP instance for nested call with namespace
-        nested_hp = HP(nested_values)
+        self._record_nest(path=full_path, name=name)
+
+        nested_hp = self.__class__(nested_values, exploration_tracker=self.exploration_tracker)
         nested_hp.namespace_stack = self.namespace_stack + [name]
         nested_hp.called_params = self.called_params  # Share called_params tracking
 
@@ -450,6 +554,7 @@ class HP:
         spec = HP.SingleValueSpec(
             name=name,
             default=default,
+            param_type="int",
             validator=IntValidator(),
             supports_strict=True,
             strict=strict,
@@ -474,6 +579,7 @@ class HP:
         spec = HP.SingleValueSpec(
             name=name,
             default=default,
+            param_type="float",
             validator=FloatValidator(),
             supports_strict=True,
             strict=strict,
@@ -489,6 +595,7 @@ class HP:
         spec = HP.SingleValueSpec(
             name=name,
             default=default,
+            param_type="text",
             validator=TextValidator(),
             supports_strict=False,
             track_called=True,
@@ -501,6 +608,7 @@ class HP:
         spec = HP.SingleValueSpec(
             name=name,
             default=default,
+            param_type="bool",
             validator=BoolValidator(),
             supports_strict=False,
             track_called=True,
@@ -534,6 +642,7 @@ class HP:
         spec = HP.MultiValueSpec(
             name=name,
             default=default,
+            param_type="multi_int",
             element_validator=IntValidator(),
             supports_strict=True,
             strict=strict,
@@ -555,6 +664,7 @@ class HP:
         spec = HP.MultiValueSpec(
             name=name,
             default=default,
+            param_type="multi_float",
             element_validator=FloatValidator(),
             supports_strict=True,
             strict=strict,
@@ -568,6 +678,7 @@ class HP:
         spec = HP.MultiValueSpec(
             name=name,
             default=default,
+            param_type="multi_text",
             element_validator=TextValidator(),
             supports_strict=False,
         )
@@ -578,6 +689,7 @@ class HP:
         spec = HP.MultiValueSpec(
             name=name,
             default=default,
+            param_type="multi_bool",
             element_validator=BoolValidator(),
             supports_strict=False,
         )

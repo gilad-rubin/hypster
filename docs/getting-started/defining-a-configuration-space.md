@@ -7,10 +7,10 @@ A Hypster configuration function is a regular Python function. It receives `hp: 
 #### Imports
 
 ```python
-from hypster import HP, instantiate
+from hypster import HP, explore, instantiate
 ```
 
-This makes sure you have the `HP` class for the first parameter and `instantiate(...)` to execute your config.
+This gives you the `HP` class for authoring the config, `explore(...)` for inspecting it, and `instantiate(...)` for executing it.
 {% endstep %}
 
 {% step %}
@@ -67,6 +67,20 @@ Import libraries you need inside the function body when portability matters (so 
 {% hint style="info" %}
 Return exactly what your downstream code needs. You can also gather outputs from locals using `hp.collect(locals(), include=[...])`.
 {% endhint %}
+{% endstep %}
+
+{% step %}
+#### Exploration
+
+Inspect the parameter tree before wiring values into a real run:
+
+```python
+from hypster import explore
+
+explore(model_cfg)
+```
+
+This prints the reachable parameters, defaults, options, and nested scopes for the default branch. See [Exploring a Configuration Space](exploring-a-configuration-space.md) for branch-specific exploration and programmatic access.
 {% endstep %}
 
 {% step %}

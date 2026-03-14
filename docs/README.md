@@ -30,6 +30,7 @@ layout:
 * :snake: **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
 * :nesting\_dolls: **Hierarchical, Conditional Configurations**: Support for nested and swappable configurations
 * :triangular\_ruler: **Type Safety**: Built-in type hints and validation
+* :mag: **Schema Exploration**: Inspect parameters, defaults, and active branches with `explore()`
 * :test_tube: **Hyperparameter Optimization Built-In**: Native, first-class optuna support
 
 
@@ -63,6 +64,16 @@ def llm_config(hp: HP):
     model_name = hp.select(["gpt-5", "claude-sonnet-4-0", "gemini-2.5-flash"], name="model_name")
     temperature = hp.float(0.0, name="temperature", min=0.0, max=1.0)
     return {"model_name": model_name, "temperature": temperature}
+```
+{% endstep %}
+
+{% step %}
+**Explore your configuration**
+
+```python
+from hypster import explore
+
+explore(llm_config)
 ```
 {% endstep %}
 

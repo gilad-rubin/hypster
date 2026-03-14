@@ -6,6 +6,7 @@
 
 * [🖥️ Installation](getting-started/installation.md)
 * [🚀 Defining of A Config Function](getting-started/defining-a-configuration-space.md)
+* [🔎 Exploring a Configuration Space](getting-started/exploring-a-configuration-space.md)
 * [⚡ Instantiating a Config Function](getting-started/instantiating-a-configuration-space.md)
 * [🍡 Selecting Output Variables](getting-started/selecting-output-variables.md)
 
