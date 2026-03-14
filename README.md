@@ -67,7 +67,7 @@ pip install hypster
 Define a configuration function and instantiate it with overrides:
 
 ```python
-from hypster import HP, instantiate
+from hypster import HP, explore, instantiate
 from llm import LLM
 
 def llm_config(hp: HP):
@@ -77,9 +77,17 @@ def llm_config(hp: HP):
     llm = LLM(model_name=model_name, temperature=temperature, max_tokens=max_tokens)
     return llm
 
+explore(llm_config)
+# llm_config
+# ├── model_name: select = "gpt-4o-mini"  (options: ["gpt-4o-mini", "gpt-4o"])
+# ├── temperature: float = 0.7  (0.0-1.0)
+# └── max_tokens: int = 256  (1-4096)
+
 llm = instantiate(llm_config, values={"model_name": "gpt-4o-mini", "temperature": 0.3})
 llm.invoke("How's your day going?")
 ```
+
+Use `explore(..., values=...)` to inspect a specific conditional branch before you instantiate it, or `explore(..., return_info=True)` to get a JSON-serializable schema object.
 
 ## HPO with Optuna
 
