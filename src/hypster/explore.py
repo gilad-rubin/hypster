@@ -13,7 +13,7 @@ from .utils import validate_config_func_signature
 
 def _format_value(value: Any) -> str:
     if isinstance(value, str):
-        return json.dumps(value)
+        return json.dumps(value, ensure_ascii=False)
     if value is None:
         return "None"
     if isinstance(value, list):
