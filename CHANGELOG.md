@@ -3,6 +3,21 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.9] - 2026-03-14
+
+### Added
+- `explore()` function for configuration introspection and schema extraction
+  - Traces through a config function to capture all parameters without executing the full config
+  - Returns a `ConfigSchema` with parameter types, defaults, options, and constraints
+  - Supports nested configurations with dot-notation path tracking
+  - Pretty-prints a tree view of the parameter structure
+  - Use `return_info=True` to get a `ConfigSchema` object for programmatic access
+  - `ConfigSchema.defaults()` extracts default values as a flat dict
+  - `ConfigSchema.to_dict()` returns a JSON-serializable schema
+
+### Changed
+- Updated all dependencies to latest versions
+
 ## [0.3.8] - 2025-08-28
 
 ### Fixed
