@@ -13,3 +13,5 @@ playground/
 docs_v2/*
 .specstory/*
 .cursor/*
+.coverage
+coverage.xml
