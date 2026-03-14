@@ -1,8 +1,18 @@
 from __future__ import annotations
 
+import json
+from enum import Enum
 from typing import Any, Dict
 
-from hypster import HP, explore
+import pytest
+
+import hypster
+from hypster import HP
+from hypster.explore import explore
+
+
+def test_explore_is_exported_from_package() -> None:
+    assert callable(getattr(hypster, "explore"))
 
 
 def test_explore_prints_simple_tree(capsys) -> None:
@@ -142,3 +152,57 @@ def test_explore_values_select_a_different_branch() -> None:
         '    ├── model: select = "gpt-4o-mini"  (options: ["gpt-4o-mini", "gpt-4.1"])\n'
         "    └── temperature: float = 0.7  (0.0-2.0)"
     )
+
+
+def test_explore_warns_on_unknown_or_unreachable_values() -> None:
+    def config(hp: HP) -> Dict[str, Any]:
+        mode = hp.select(["a", "b"], name="mode", default="a")
+        if mode == "a":
+            hp.int(1, name="count")
+        return {"mode": mode}
+
+    with pytest.warns(UserWarning, match="Unknown or unreachable parameters"):
+        explore(config, values={"missing": 123})
+
+    with pytest.warns(UserWarning, match="Unknown or unreachable parameters"):
+        explore(config, values={"mode": "b", "count": 9})
+
+
+def test_explore_can_raise_on_unknown_values() -> None:
+    def config(hp: HP) -> Dict[str, Any]:
+        hp.int(5, name="batch_size")
+        return {"batch_size": 5}
+
+    with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
+        explore(config, values={"batchsize": 7}, on_unknown="raise")
+
+
+def test_explore_to_dict_is_json_serializable() -> None:
+    class Provider(Enum):
+        OPENAI = "openai"
+        GEMINI = "gemini"
+
+    def config(hp: HP) -> Dict[str, Any]:
+        provider = hp.select([Provider.OPENAI, Provider.GEMINI], name="provider", default=Provider.OPENAI)
+        return {"provider": provider}
+
+    info = explore(config, return_info=True)
+
+    assert info is not None
+    assert info.to_dict() == {
+        "name": "config",
+        "parameters": [
+            {
+                "name": "provider",
+                "path": "provider",
+                "kind": "select",
+                "default_value": "openai",
+                "selected_value": "openai",
+                "options": ["openai", "gemini"],
+                "minimum": None,
+                "maximum": None,
+                "children": [],
+            }
+        ],
+    }
+    assert json.dumps(info.to_dict())

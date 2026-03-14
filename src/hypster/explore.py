@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from enum import Enum
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
-from .core import ConfigFunc
+from .core import ConfigFunc, _handle_unknown_parameters
 from .hp import HP
 from .hp_calls import HPCallError
 from .utils import validate_config_func_signature
@@ -17,6 +18,18 @@ def _format_value(value: Any) -> str:
         return "None"
     if isinstance(value, list):
         return "[" + ", ".join(_format_value(item) for item in value) + "]"
+    return repr(value)
+
+
+def _to_jsonable(value: Any) -> Any:
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, Enum):
+        return _to_jsonable(value.value)
+    if isinstance(value, (list, tuple)):
+        return [_to_jsonable(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _to_jsonable(item) for key, item in value.items()}
     return repr(value)
 
 
@@ -40,11 +53,11 @@ class ParameterInfo:
             "name": self.name,
             "path": self.path,
             "kind": self.kind,
-            "default_value": self.default_value,
-            "selected_value": self.selected_value,
-            "options": self.options,
-            "minimum": self.minimum,
-            "maximum": self.maximum,
+            "default_value": _to_jsonable(self.default_value),
+            "selected_value": _to_jsonable(self.selected_value),
+            "options": _to_jsonable(self.options),
+            "minimum": _to_jsonable(self.minimum),
+            "maximum": _to_jsonable(self.maximum),
             "children": [child.to_dict() for child in self.children],
         }
 
@@ -118,6 +131,9 @@ class SchemaTracer(HP):
         if exploration_tracker is None:
             self._schema = ConfigSchema(name="")
             self._nodes_by_path: Dict[str, ParameterInfo] = {}
+        else:
+            self._schema = tracker._schema
+            self._nodes_by_path = tracker._nodes_by_path
 
     def record_nest(self, *, path: str, name: str) -> None:
         self._ensure_group(path, name)
@@ -193,17 +209,23 @@ def explore(
     values: Optional[Dict[str, Any]] = None,
     args: Tuple[Any, ...] = (),
     kwargs: Optional[Dict[str, Any]] = None,
+    on_unknown: Literal["warn", "raise", "ignore"] = "warn",
     return_info: bool = False,
 ) -> Optional[ConfigSchema]:
     validate_config_func_signature(func)
 
-    tracer = SchemaTracer(values or {})
+    values = values or {}
+    tracer = SchemaTracer(values)
     kwargs = kwargs or {}
+    original_called_params = tracer.called_params.copy()
 
     try:
         func(tracer, *args, **kwargs)
     except HPCallError as e:
         raise ValueError(str(e)) from e
+
+    called_params = tracer.called_params - original_called_params
+    _handle_unknown_parameters(values, called_params, on_unknown)
 
     schema = tracer.build_schema(getattr(func, "__name__", func.__class__.__name__))
 

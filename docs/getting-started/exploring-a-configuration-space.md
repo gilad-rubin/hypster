@@ -125,6 +125,8 @@ info.to_dict()
 # JSON-serializable nested structure
 ```
 
+By default, `explore()` also warns when `values=` contains unknown names or overrides for a branch that was not reached. Pass `on_unknown="raise"` to make that strict, or `on_unknown="ignore"` to silence it.
+
 ## When to use `explore()` vs `instantiate()`
 
 Use `explore()` when you want to understand the configuration space.
