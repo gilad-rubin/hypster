@@ -129,9 +129,9 @@ By default, `explore()` also warns when `values=` contains unknown names or over
 
 ## When to use `explore()` vs `instantiate()`
 
-Use `explore()` when you want to understand the configuration space.
+Use `explore()` to understand the configuration space.
 
-Use `instantiate()` when you want the actual object, dict, or workflow your config returns.
+Call `instantiate()` when you need the actual object, dict, or workflow your config returns.
 
 ```python
 from hypster import instantiate
