@@ -71,15 +71,16 @@ Dependencies:
 {% endtab %}
 
 {% tab title="Development (pip)" %}
-Hypster's maintainer tooling lives in local `uv` dependency groups rather than a published `dev` extra.
+Hypster's maintainer tooling lives in local `uv` dependency groups rather than a published `dev` extra, so a `pip`-based setup installs runtime extras and maintainer tools separately.
 
 ```bash
 git clone https://github.com/gilad-rubin/hypster.git
 cd hypster
-uv sync --all-extras --dev
+python -m pip install -e ".[jupyter,optuna]"
+python -m pip install pytest pytest-cov "coverage[toml]" ruff mypy pre-commit pytest-codspeed
 ```
 
-If you prefer `pip`, install the runtime extras you need, then add maintainer tools separately.
+Adjust the extras in the first command if you only need a subset of the optional runtime integrations.
 {% endtab %}
 {% endtabs %}
 
