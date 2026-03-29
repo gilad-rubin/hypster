@@ -3,7 +3,7 @@
 ## Setup
 
 ```bash
-uv pip install -e ".[dev]"
+uv sync --all-extras --dev
 uv run pre-commit install
 ```
 

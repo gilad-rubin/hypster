@@ -37,6 +37,17 @@ def test_explore_prints_simple_tree(capsys) -> None:
     )
 
 
+def test_explore_prints_unicode_text_without_ascii_escaping(capsys) -> None:
+    def config(hp: HP) -> Dict[str, Any]:
+        prompt = hp.text("שלום\n你好\nمرحبا", name="prompt")
+        return {"prompt": prompt}
+
+    result = explore(config)
+
+    assert result is None
+    assert capsys.readouterr().out == 'config\n└── prompt: text = "שלום\\n你好\\nمرحبا"\n'
+
+
 def test_explore_returns_schema_info_and_defaults() -> None:
     def config(hp: HP) -> Dict[str, Any]:
         batching = hp.select(["single", "split"], name="batching", default="split")
