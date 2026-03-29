@@ -46,21 +46,20 @@ jobs:
   release:
     needs: validate-inputs
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version_update.outputs.version }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup UV
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           python-version: "3.12"
-
-      - name: Install project dependencies
-        run: uv sync --all-extras
 
       - name: Update version and create commit
         id: version_update
@@ -148,46 +147,26 @@ jobs:
         run: |
           echo "🔍 Verifying package..."
 
-          # Additional verification with built-in tools
           echo "Built artifacts:"
           ls -la dist/
 
-          # Check wheel contents
           echo "Checking wheel contents:"
           uv run python -m zipfile -l dist/*.whl | head -20
 
+          echo "Smoke testing wheel..."
+          uv run --isolated --no-project --with dist/*.whl python -c "import hypster; print(hypster.__version__)"
+
+          echo "Smoke testing source distribution..."
+          uv run --isolated --no-project --with dist/*.tar.gz python -c "import hypster; print(hypster.__version__)"
+
           echo "✅ Package verification completed"
 
-      - name: Publish to PyPI
-        if: ${{ inputs.publish_to_pypi }}
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          echo "📦 Publishing to PyPI..."
-
-          # Install twine for publishing
-          uv add --dev twine
-
-          # Check package with twine first
-          echo "Checking package with twine..."
-          uv run twine check dist/*
-
-          # Upload to PyPI
-          echo "Uploading to PyPI..."
-          uv run twine upload dist/* --verbose --skip-existing
-
-      # Alternative PyPI publishing method using GitHub Action
-      # Uncomment this and comment out the above step if you prefer using the action
-      # - name: Publish to PyPI (Alternative)
-      #   if: ${{ inputs.publish_to_pypi }}
-      #   uses: pypa/gh-action-pypi-publish@v1.11.0
-      #   with:
-      #     packages-dir: dist/
-      #     verbose: true
-      #     skip-existing: true
-      #     print-hash: true
-      #     password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ steps.version_update.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
 
       - name: Extract changelog for release
         id: changelog
@@ -271,3 +250,34 @@ jobs:
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "pip install hypster==${{ steps.version_update.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
+
+  publish-pypi:
+    needs: release
+    if: ${{ inputs.publish_to_pypi }}
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ needs.release.outputs.version }}
+          path: dist
+
+      - name: Publish to PyPI
+        run: |
+          echo "📦 Publishing to PyPI with Trusted Publishing..."
+          ls -la dist/
+          uv publish

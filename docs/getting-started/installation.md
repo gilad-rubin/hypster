@@ -57,7 +57,9 @@ Dependencies:
 Interested in **contributing to Hypster?** Go ahead and install the full development suite using:
 
 ```bash
-uv add "hypster[dev]"
+git clone https://github.com/gilad-rubin/hypster.git
+cd hypster
+uv sync --all-extras --dev
 ```
 
 Dependencies:
@@ -69,18 +71,15 @@ Dependencies:
 {% endtab %}
 
 {% tab title="Development (pip)" %}
-Interested in **contributing to Hypster?** Go ahead and install the full development suite using:
+Hypster's maintainer tooling lives in local `uv` dependency groups rather than a published `dev` extra.
 
 ```bash
-pip install hypster[dev]
+git clone https://github.com/gilad-rubin/hypster.git
+cd hypster
+uv sync --all-extras --dev
 ```
 
-Dependencies:
-
-* [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
-* [ruff](https://github.com/astral-sh/ruff)
-* [mypy](https://github.com/python/mypy)
-* [pytest](https://github.com/pytest-dev/pytest)
+If you prefer `pip`, install the runtime extras you need, then add maintainer tools separately.
 {% endtab %}
 {% endtabs %}
 
