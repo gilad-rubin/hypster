@@ -6,10 +6,11 @@ Hypster provides string parameter configuration through `text` and `multi_text` 
 
 ```python
 def text(
-    default: str,
+    default: Optional[str],
     *,
-    name: str
-) -> str
+    name: str,
+    allow_none: bool = False
+) -> Optional[str]
 
 def multi_text(
     default: List[str] = [],
@@ -17,6 +18,18 @@ def multi_text(
     name: str
 ) -> List[str]
 ```
+
+## Nullable text values
+
+Use `allow_none=True` when `None` is an intentional text value:
+
+```python
+def llm_config(hp: HP):
+    system_prompt = hp.text(None, name="system_prompt", allow_none=True)
+    return {"system_prompt": system_prompt}
+```
+
+Nullable elements are not supported for `multi_text`; use `multi_select(..., allow_none=True)` for nullable categorical lists.
 
 ## Usage Examples
 

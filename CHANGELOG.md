@@ -3,6 +3,29 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-22
+
+### Added
+- `instantiate_with_params()` and `InstantiationOutput` for returning both the config value and replayable selected params.
+- `allow_none=True` for scalar params and `select`/`multi_select` choices.
+- Documentation for reproducible logging, replay, nullable params, and dict-backed select values.
+
+### Breaking Changes
+- `instantiate()`, `instantiate_with_params()`, and `explore()` now raise on unknown or unreachable `values` by default. Pass `on_unknown="warn"` or `on_unknown="ignore"` for softer behavior.
+- `hp.*` and `hp.nest` names must be valid Python identifiers. Replace literal dots, spaces, and hyphens with underscores, and let Hypster compose dotted paths from nesting.
+- Scalar parameters now require `allow_none=True` when `default=None` or a `None` override is valid.
+- `select` and `multi_select` choices must be logging-safe scalar values. Use dictionary-backed select to map simple keys to complex runtime objects.
+- Complex dictionary values in `values=` are interpreted as nested parameter paths, not as custom select values.
+
+### Changed
+- Nested dict `values` are normalized into dotted parameter paths for duplicate and unknown-value checks.
+- Nested dict keys must be valid identifier segments; use top-level dotted keys to spell full parameter paths.
+
+### Fixed
+- Unknown/unreachable value errors now guide users to run `explore(config, values=...)` to inspect the active branch.
+- Duplicate dotted and nested entries for the same parameter path now fail instead of silently choosing one value.
+- Invalid `on_unknown` policies are rejected before user config code executes.
+
 ## [0.3.10] - 2026-03-14
 
 ### Fixed

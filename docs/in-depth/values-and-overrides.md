@@ -1,6 +1,6 @@
 # 🔧 Values & Overrides
 
-This page explains how to provide overrides to a configuration function using dotted keys and nested dictionaries, and which one takes precedence when both are provided.
+This page explains how to provide overrides to a configuration function using dotted keys and nested dictionaries.
 
 ## Basics
 
@@ -36,30 +36,34 @@ instantiate(parent, values={"child": {"x": 25}})
 # => {"x": 25, "y": 20}
 ```
 
-## Precedence: nested dict wins
+## Duplicate paths
 
-If you provide both dotted keys and a nested dict for the same scope, the nested dict wins.
+Dotted keys and nested dictionaries are two ways to spell the same parameter path. Do not provide the same path twice. Hypster raises even when both values are identical, because duplicate input is ambiguous for logging and replay.
 
 ```python
 instantiate(
     parent,
     values={
-        "child.x": 100,         # dotted notation
-        "child": {"x": 200},  # nested dict
+        "child.x": 100,
+        "child": {"x": 100},
     },
 )
-# => {"x": 200, "y": 20}
+# ValueError: Duplicate value for 'child.x'
 ```
 
 ## Deeply nested
 
-Dotted keys can target deeper levels when there is no nested dict override at that level. You can mix and match as needed, keeping in mind that a nested dict for a scope overrides dotted keys for that scope.
+Dotted keys can target deeper levels, and nested dictionaries can express the same shape. You can mix both forms as long as each final parameter path appears once.
+
+```python
+instantiate(parent, values={"child": {"x": 25}, "other.y": 30})
+```
 
 ## Unknown and unreachable parameters
 
 * Unknown or unreachable values (values for parameters on a branch that wasn’t taken) are handled by `on_unknown` in `instantiate`:
-  * `on_unknown="warn"` (default): issue a warning
-  * `on_unknown="raise"`: raise an error
+  * `on_unknown="raise"` (default): raise an error
+  * `on_unknown="warn"`: issue a warning
   * `on_unknown="ignore"`: silently ignore
 
-Hypster will include helpful suggestions when a name looks like a typo.
+Nested dictionaries participate in the same unknown/unreachable check as dotted paths. Hypster includes helpful suggestions when a name looks like a typo, and errors guide you to run `explore(config, values=...)` to inspect the active branch.

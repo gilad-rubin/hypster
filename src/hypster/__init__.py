@@ -3,7 +3,7 @@
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
-from .core import ConfigFunc, instantiate
+from .core import ConfigFunc, InstantiationOutput, instantiate, instantiate_with_params
 from .explore import explore
 from .hp import HP
 
@@ -14,4 +14,12 @@ except PackageNotFoundError:  # During editable/source runs before install
     __version__ = "0.0.0"
 
 
-__all__ = ["HP", "instantiate", "explore", "ConfigFunc", "__version__"]
+__all__ = [
+    "HP",
+    "instantiate",
+    "instantiate_with_params",
+    "InstantiationOutput",
+    "explore",
+    "ConfigFunc",
+    "__version__",
+]

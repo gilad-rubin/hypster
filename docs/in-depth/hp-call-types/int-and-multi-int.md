@@ -10,12 +10,13 @@ Hypster provides flexible numeric parameter configuration through `int`, `multi_
 
 ```python
 def int(
-    default: int,
+    default: Optional[int],
     *,
     name: str,
     min: Optional[int] = None,
-    max: Optional[int] = None
-) -> int
+    max: Optional[int] = None,
+    allow_none: bool = False
+) -> Optional[int]
 
 def multi_int(
     default: List[int] = [],
@@ -30,12 +31,13 @@ def multi_int(
 
 ```python
 def float(
-    default: float,
+    default: Optional[float],
     *,
     name: str,
     min: Optional[float] = None,
-    max: Optional[float] = None
-) -> float
+    max: Optional[float] = None,
+    allow_none: bool = False
+) -> Optional[float]
 
 def multi_float(
     default: List[float] = [],
@@ -110,6 +112,22 @@ def training_config(hp: HP):
         "learning_rates": learning_rates
     }
 ```
+
+## Nullable numeric values
+
+Use `allow_none=True` when `None` is a real scalar value:
+
+```python
+def tree_config(hp: HP):
+    max_depth = hp.int(None, name="max_depth", allow_none=True)
+    dropout = hp.float(0.1, name="dropout", min=0.0, max=1.0, allow_none=True)
+    return {"max_depth": max_depth, "dropout": dropout}
+
+instantiate(tree_config, values={"dropout": None})
+# => {"max_depth": None, "dropout": None}
+```
+
+Nullable elements are not supported for `multi_int` or `multi_float`. Use `multi_select(..., allow_none=True)` for nullable categorical lists.
 
 ### Valid Examples
 

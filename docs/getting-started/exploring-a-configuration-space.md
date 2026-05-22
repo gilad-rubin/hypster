@@ -25,6 +25,7 @@ def gemini(hp: HP):
         [None, "minimal", "elevated"],
         name="thinking_level",
         default=None,
+        allow_none=True,
     )
     return {"model": model, "thinking_level": thinking_level}
 
@@ -125,7 +126,7 @@ info.to_dict()
 # JSON-serializable nested structure
 ```
 
-By default, `explore()` also warns when `values=` contains unknown names or overrides for a branch that was not reached. Pass `on_unknown="raise"` to make that strict, or `on_unknown="ignore"` to silence it.
+By default, `explore()` raises when `values=` contains unknown names or overrides for a branch that was not reached. Pass `on_unknown="warn"` to inspect while warning, or `on_unknown="ignore"` to silence it.
 
 ## When to use `explore()` vs `instantiate()`
 

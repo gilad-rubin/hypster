@@ -1,6 +1,5 @@
 """Test error handling strategies for unknown parameters."""
 
-import warnings
 from typing import Any, Dict
 
 import pytest
@@ -8,33 +7,24 @@ import pytest
 from hypster import HP, instantiate
 
 
-def test_on_unknown_warn_default() -> None:
-    """Test that on_unknown='warn' is the default behavior."""
+def test_on_unknown_raise_default() -> None:
+    """Test that on_unknown='raise' is the default behavior."""
 
     def config(hp: HP) -> Dict[str, float]:
         lr = hp.float(0.1, name="learning_rate")
         return {"lr": lr}
 
-    # Default behavior should warn
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        result = instantiate(config, values={"unknown_param": 0.05})
+    with pytest.raises(ValueError) as exc_info:
+        instantiate(config, values={"unknown_param": 0.05})
 
-        # Should complete successfully with defaults
-        assert result == {"lr": 0.1}
-
-        # Should have issued a warning
-        assert len(w) == 1
-        assert "'unknown_param': Unknown parameter" in str(w[0].message)
+    assert "'unknown_param': Unknown parameter" in str(exc_info.value)
+    assert "explore(config, values=...)" in str(exc_info.value)
 
     # Explicit warn should behave the same
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+    with pytest.warns(UserWarning, match="'unknown_param': Unknown parameter"):
         result = instantiate(config, values={"unknown_param": 0.05}, on_unknown="warn")
 
-        assert result == {"lr": 0.1}
-        assert len(w) == 1
-        assert "'unknown_param': Unknown parameter" in str(w[0].message)
+    assert result == {"lr": 0.1}
 
 
 def test_on_unknown_raise() -> None:
@@ -61,6 +51,27 @@ def test_on_unknown_ignore() -> None:
     assert result == {"lr": 0.1}
 
 
+def test_on_unknown_invalid_policy_has_guidance() -> None:
+    calls = []
+
+    def config(hp: HP) -> Dict[str, float]:
+        calls.append("executed")
+        return {"lr": hp.float(0.1, name="learning_rate")}
+
+    with pytest.raises(ValueError, match="on_unknown must be one of"):
+        instantiate(config, values={"learning_rate": 0.2}, on_unknown="silent")  # type: ignore[arg-type]
+
+    assert calls == []
+
+
+def test_values_must_be_a_mapping() -> None:
+    def config(hp: HP) -> Dict[str, float]:
+        return {"lr": hp.float(0.1, name="learning_rate")}
+
+    with pytest.raises(ValueError, match="expected a dictionary"):
+        instantiate(config, values=["learning_rate"])  # type: ignore[arg-type]
+
+
 def test_on_unknown_with_suggestions() -> None:
     """Test that error messages include helpful suggestions."""
 
@@ -69,12 +80,10 @@ def test_on_unknown_with_suggestions() -> None:
         temperature = hp.float(0.7, name="temperature")
         return {"lr": learning_rate, "temp": temperature}
 
-    # Typo should suggest similar parameter (in warn mode by default)
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        result = instantiate(config, values={"lerning_rate": 0.05})
+    # Typo should suggest similar parameter in warn mode
+    with pytest.warns(UserWarning) as w:
+        result = instantiate(config, values={"lerning_rate": 0.05}, on_unknown="warn")
 
-        assert len(w) == 1
         warning_msg = str(w[0].message)
         assert "lerning_rate" in warning_msg
         assert "learning_rate" in warning_msg  # suggestion
@@ -112,18 +121,27 @@ def test_on_unknown_conditional_reachability() -> None:
             penalty = hp.text("l2", name="penalty")
             return {"model": "logistic", "penalty": penalty}
 
-    # Default warn mode should warn about unreachable parameter
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        result = instantiate(
+    with pytest.raises(ValueError) as exc_info:
+        instantiate(
             config,
             values={"n_trees": 200},  # unreachable when model_type='logistic'
         )
 
-        # Should complete with logistic model
-        assert result == {"model": "logistic", "penalty": "l2"}
+    assert "n_trees" in str(exc_info.value)
+    assert "explore(config, values=...)" in str(exc_info.value)
 
-        # Should warn about unreachable parameter
-        assert len(w) == 1
-        assert "n_trees" in str(w[0].message)
-        assert "unreachable" in str(w[0].message).lower()
+
+def test_nested_values_unknown_keys_participate_in_on_unknown() -> None:
+    def child(hp: HP) -> Dict[str, float]:
+        return {"lr": hp.float(0.1, name="learning_rate")}
+
+    def config(hp: HP) -> Dict[str, Dict[str, float]]:
+        return {"model": hp.nest(child, name="model")}
+
+    with pytest.raises(ValueError) as exc_info:
+        instantiate(config, values={"model": {"lerning_rate": 0.2}})
+
+    error = str(exc_info.value)
+    assert "model.lerning_rate" in error
+    assert "model.learning_rate" in error
+    assert "Nested dict values are interpreted as parameter paths" in error

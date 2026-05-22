@@ -125,3 +125,57 @@ def test_select_dict_none_and_tuples() -> None:
     result = instantiate(config, values={"tokenizer": "basic", "ngram_range": "trigram"})
     assert result["tokenizer"] == "basic_tokenizer"
     assert result["ngram_range"] == (1, 3)
+
+
+def test_select_none_choice_requires_allow_none() -> None:
+    def nullable_config(hp: HP) -> object:
+        return hp.select([None, "hello"], name="model", default=None, allow_none=True)
+
+    assert instantiate(nullable_config) is None
+    assert instantiate(nullable_config, values={"model": "hello"}) == "hello"
+    assert instantiate(nullable_config, values={"model": None}) is None
+
+    def missing_allow_none(hp: HP) -> object:
+        return hp.select([None, "hello"], name="model", default=None)
+
+    with pytest.raises(ValueError, match="allow_none=True"):
+        instantiate(missing_allow_none)
+
+
+def test_select_rejects_complex_list_options_with_dict_guidance() -> None:
+    def config(hp: HP) -> object:
+        return hp.select([{"layers": 2}, {"layers": 4}], name="model")
+
+    with pytest.raises(ValueError) as exc_info:
+        instantiate(config)
+
+    error = str(exc_info.value)
+    assert "Select choices must be logging-safe" in error
+    assert "Use dict-backed select" in error
+
+
+def test_select_choice_validation_preserves_bool_int_identity() -> None:
+    from hypster.utils import validate_select_choice
+
+    assert type(validate_select_choice(True, param_path="choice")) is bool
+    assert type(validate_select_choice(1, param_path="choice")) is int
+    assert type(validate_select_choice(1.0, param_path="choice")) is float
+
+
+def test_select_dict_keys_are_logged_even_when_values_are_complex() -> None:
+    from hypster import instantiate_with_params
+
+    def config(hp: HP) -> Dict[str, Any]:
+        return hp.select(
+            {
+                "small": {"layers": 2, "units": [64, 32]},
+                "large": {"layers": 4, "units": [256, 128]},
+            },
+            name="model",
+            default="small",
+        )
+
+    output = instantiate_with_params(config, values={"model": "large"})
+
+    assert output.value == {"layers": 4, "units": [256, 128]}
+    assert output.params == {"model": "large"}

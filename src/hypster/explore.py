@@ -5,10 +5,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
-from .core import ConfigFunc, _handle_unknown_parameters
+from .core import ConfigFunc, _handle_unknown_parameters, _validate_on_unknown
 from .hp import HP
 from .hp_calls import HPCallError
-from .utils import validate_config_func_signature
+from .utils import normalize_values, validate_config_func_signature
 
 
 def _format_value(value: Any) -> str:
@@ -125,10 +125,10 @@ class ConfigSchema:
 
 
 class SchemaTracer(HP):
-    def __init__(self, values: Dict[str, Any], exploration_tracker: Optional[Any] = None):
-        tracker = exploration_tracker or self
-        super().__init__(values, exploration_tracker=tracker)
-        if exploration_tracker is None:
+    def __init__(self, values: Dict[str, Any], parameter_tracker: Optional[Any] = None):
+        tracker = parameter_tracker or self
+        super().__init__(values, parameter_tracker=tracker)
+        if parameter_tracker is None:
             self._schema = ConfigSchema(name="")
             self._nodes_by_path: Dict[str, ParameterInfo] = {}
         else:
@@ -209,12 +209,13 @@ def explore(
     values: Optional[Dict[str, Any]] = None,
     args: Tuple[Any, ...] = (),
     kwargs: Optional[Dict[str, Any]] = None,
-    on_unknown: Literal["warn", "raise", "ignore"] = "warn",
+    on_unknown: Literal["warn", "raise", "ignore"] = "raise",
     return_info: bool = False,
 ) -> Optional[ConfigSchema]:
     validate_config_func_signature(func)
+    _validate_on_unknown(on_unknown)
 
-    values = values or {}
+    values = normalize_values(values)
     tracer = SchemaTracer(values)
     kwargs = kwargs or {}
     original_called_params = tracer.called_params.copy()

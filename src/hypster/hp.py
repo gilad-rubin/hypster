@@ -1,8 +1,10 @@
 """The HP Parameter Interface."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Optional, Protocol, Tuple, Union, overload
 
+from ._sentinels import NO_DEFAULT as _NO_DEFAULT
 from .hp_calls import (
     BoolValidator,
     FloatValidator,
@@ -12,32 +14,48 @@ from .hp_calls import (
     SelectValidator,
     TextValidator,
 )
-from .utils import unflatten_dict
+from .utils import normalize_values, validate_identifier_name, validate_select_choice
 
 if TYPE_CHECKING:  # only for type hints; avoid runtime imports
     from .hpo.types import HpoCategorical, HpoFloat, HpoInt
+
+
+class ParameterTracker(Protocol):
+    """Receives parameter-recording events from HP execution."""
+
+    def record_parameter(
+        self,
+        *,
+        path: str,
+        name: str,
+        kind: str,
+        default_value: Any,
+        selected_value: Any,
+        options: Optional[List[Any]] = None,
+        minimum: Optional[Union[int, float]] = None,
+        maximum: Optional[Union[int, float]] = None,
+    ) -> None: ...
 
 
 @dataclass(frozen=True)
 class OptionsAdapter:
     """Helper to normalize options and defaults for select/multi_select."""
 
-    options: Union[List[Any], Dict[Any, Any]]
-    options_only: bool
+    options: Union[List[Any], Mapping[Any, Any]]
 
-    def keys_and_map(self) -> Tuple[List[Any], Dict[Any, Any]]:
-        if isinstance(self.options, dict):
+    def keys_and_map(self) -> Tuple[List[Any], Mapping[Any, Any]]:
+        if isinstance(self.options, Mapping):
             option_keys = list(self.options.keys())
             option_map = self.options
         else:
             option_keys = list(self.options)
-            option_map = {k: k for k in option_keys}
+            option_map = {}
         return option_keys, option_map
 
-    def resolve_default(self, explicit_default: Optional[Any]) -> Optional[Any]:
-        if explicit_default is not None:
+    def resolve_default(self, explicit_default: Any) -> Any:
+        if explicit_default is not _NO_DEFAULT:
             return explicit_default
-        if isinstance(self.options, dict):
+        if isinstance(self.options, Mapping):
             # First key if available
             return next(iter(self.options.keys()), None)
         # First item if available
@@ -47,10 +65,10 @@ class OptionsAdapter:
 class HP:
     """The HP parameter interface for configuration functions."""
 
-    def __init__(self, values: Dict[str, Any], exploration_tracker: Optional[Any] = None):
+    def __init__(self, values: Dict[str, Any], parameter_tracker: Optional[ParameterTracker] = None):
         """HP is created by instantiate() - users don't instantiate directly."""
         self.values = values or {}
-        self.exploration_tracker = exploration_tracker  # Optional, only for explore mode
+        self.parameter_tracker = parameter_tracker
         self.namespace_stack: List[str] = []  # For nested name prefixes
         self.called_params: set[str] = set()  # Track called parameter names
         self.nested_scopes: set[str] = set()  # Track names that have been nested
@@ -77,10 +95,10 @@ class HP:
         minimum: Optional[Union[int, float]] = None,
         maximum: Optional[Union[int, float]] = None,
     ) -> None:
-        if self.exploration_tracker is None:
+        if self.parameter_tracker is None:
             return
 
-        record = getattr(self.exploration_tracker, "record_parameter", None)
+        record = getattr(self.parameter_tracker, "record_parameter", None)
         if callable(record):
             record(
                 path=path,
@@ -94,10 +112,10 @@ class HP:
             )
 
     def _record_nest(self, *, path: str, name: str) -> None:
-        if self.exploration_tracker is None:
+        if self.parameter_tracker is None:
             return
 
-        record = getattr(self.exploration_tracker, "record_nest", None)
+        record = getattr(self.parameter_tracker, "record_nest", None)
         if callable(record):
             record(path=path, name=name)
 
@@ -112,24 +130,7 @@ class HP:
         if full_path in self.values:
             return self.values[full_path], True
 
-        # Check for nested structure
-        nested_values = unflatten_dict(self.values)
-        try:
-            current = nested_values
-            for part in full_path.split("."):
-                current = current[part]
-            return current, True
-        except (KeyError, TypeError):
-            pass
-
-        # Try with just the name in nested structure
-        try:
-            current = nested_values
-            for part in name.split("."):
-                current = current[part]
-            return current, True
-        except (KeyError, TypeError):
-            return None, False
+        return None, False
 
     def _validate_name_not_called(self, name: str) -> None:
         """Validate that this parameter name hasn't been called before."""
@@ -142,6 +143,7 @@ class HP:
         """Manual name validation for calls that don't use a validator for naming."""
         if name is None:
             raise HPCallError(full_path, "requires 'name' for overrides")
+        validate_identifier_name(name, kind="parameter name")
 
     def _handle_single_value(
         self,
@@ -154,6 +156,7 @@ class HP:
         strict: bool = False,
         min: Optional[Union[int, float]] = None,
         max: Optional[Union[int, float]] = None,
+        allow_none: bool = False,
         track_called: bool = False,
         use_validator_name: bool = True,
     ) -> Any:
@@ -162,6 +165,7 @@ class HP:
         # Validate name (either via validator or manual message)
         if use_validator_name:
             validator.validate_name(name, full_path)
+            validate_identifier_name(name, kind="parameter name")
         else:
             self._validate_name(name, full_path)
 
@@ -169,20 +173,34 @@ class HP:
         if track_called:
             self.called_params.add(full_path)
 
+        if default is None and not allow_none:
+            raise HPCallError(
+                full_path,
+                "default=None requires allow_none=True. How to fix: pass allow_none=True, or use a non-None default.",
+            )
+
         value, found = self._get_value_for_param(name)
-        if found:
-            if supports_strict:
-                validated_value = validator.validate_value(value, full_path, strict=strict)
-            else:
-                validated_value = validator.validate_value(value, full_path)
+        raw_value = value if found else default
+        if raw_value is None:
+            if not allow_none:
+                raise HPCallError(
+                    full_path,
+                    "None is only allowed when allow_none=True. "
+                    "How to fix: pass allow_none=True, or provide a non-None value.",
+                )
+            validated_value = None
         else:
             if supports_strict:
-                validated_value = validator.validate_value(default, full_path, strict=strict)
+                validated_value = validator.validate_value(raw_value, full_path, strict=strict)
             else:
-                validated_value = validator.validate_value(default, full_path)
+                validated_value = validator.validate_value(raw_value, full_path)
 
         # Bounds validation if applicable
-        if (min is not None or max is not None) and hasattr(validator, "validate_bounds"):
+        if (
+            validated_value is not None
+            and (min is not None or max is not None)
+            and hasattr(validator, "validate_bounds")
+        ):
             validator.validate_bounds(validated_value, min, max, full_path)
 
         self._record_parameter(
@@ -208,6 +226,7 @@ class HP:
         strict: bool = False,
         min: Optional[Union[int, float]] = None,
         max: Optional[Union[int, float]] = None,
+        allow_none: bool = False,
     ) -> List[Any]:
         full_path = self._get_full_param_path(name)
 
@@ -215,6 +234,14 @@ class HP:
         self._validate_name(name, full_path)
         self._validate_name_not_called(name)
         self.called_params.add(full_path)
+
+        if allow_none:
+            raise HPCallError(
+                full_path,
+                f"allow_none=True is not supported for hp.{param_type}() yet. "
+                "How to fix: remove allow_none=True, or use hp.multi_select([...], allow_none=True) "
+                "when you need nullable categorical choices.",
+            )
 
         multi_validator = MultiValidator(element_validator)
 
@@ -248,24 +275,30 @@ class HP:
     def _handle_select_single(
         self,
         *,
-        options: Union[List[Any], Dict[Any, Any]],
+        options: Union[List[Any], Mapping[Any, Any]],
         name: str,
-        default: Optional[Any] = None,
+        default: Any = _NO_DEFAULT,
         options_only: bool = False,
+        allow_none: bool = False,
     ) -> Any:
         validator = SelectValidator()
         full_path = self._get_full_param_path(name)
 
         validator.validate_name(name, full_path)
+        validate_identifier_name(name, kind="parameter name")
         self._validate_name_not_called(name)
         self.called_params.add(full_path)
 
-        adapter = OptionsAdapter(options=options, options_only=options_only)
+        is_mapping = isinstance(options, Mapping)
+        adapter = OptionsAdapter(options=options)
         option_keys, option_map = adapter.keys_and_map()
+        for index, option in enumerate(option_keys):
+            validate_select_choice(option, param_path=f"{full_path} option #{index}", allow_none=allow_none)
         actual_default = adapter.resolve_default(default)
 
         value, found = self._get_value_for_param(name)
         if found:
+            validate_select_choice(value, param_path=full_path, allow_none=allow_none)
             validated_key = validator.validate_value(value, option_keys, options_only, full_path)
             self._record_parameter(
                 path=full_path,
@@ -275,46 +308,48 @@ class HP:
                 selected_value=validated_key,
                 options=option_keys,
             )
-            return option_map.get(validated_key, validated_key)
+            return option_map.get(validated_key, validated_key) if is_mapping else validated_key
         else:
-            if actual_default is not None:
-                validated_key = validator.validate_value(actual_default, option_keys, options_only, full_path)
-                self._record_parameter(
-                    path=full_path,
-                    name=name,
-                    kind="select",
-                    default_value=actual_default,
-                    selected_value=validated_key,
-                    options=option_keys,
+            if actual_default is None and default is _NO_DEFAULT and not option_keys:
+                raise HPCallError(
+                    full_path,
+                    "select has no options and no default. "
+                    "How to fix: provide at least one option, pass default=..., or pass allow_none=True.",
                 )
-                return option_map.get(validated_key, validated_key)
+            validate_select_choice(actual_default, param_path=full_path, allow_none=allow_none)
+            validated_key = validator.validate_value(actual_default, option_keys, options_only, full_path)
             self._record_parameter(
                 path=full_path,
                 name=name,
                 kind="select",
                 default_value=actual_default,
-                selected_value=None,
+                selected_value=validated_key,
                 options=option_keys,
             )
-            return None
+            return option_map.get(validated_key, validated_key) if is_mapping else validated_key
 
     def _handle_select_multi(
         self,
         *,
-        options: Union[List[Any], Dict[Any, Any]],
+        options: Union[List[Any], Mapping[Any, Any]],
         name: str,
         default: Optional[List[Any]] = None,
         options_only: bool = False,
+        allow_none: bool = False,
     ) -> List[Any]:
         validator = SelectValidator()
         full_path = self._get_full_param_path(name)
 
         validator.validate_name(name, full_path)
+        validate_identifier_name(name, kind="parameter name")
         self._validate_name_not_called(name)
         self.called_params.add(full_path)
 
-        adapter = OptionsAdapter(options=options, options_only=options_only)
+        is_mapping = isinstance(options, Mapping)
+        adapter = OptionsAdapter(options=options)
         option_keys, option_map = adapter.keys_and_map()
+        for index, option in enumerate(option_keys):
+            validate_select_choice(option, param_path=f"{full_path} option #{index}", allow_none=allow_none)
         actual_default = list(default or [])
 
         value, found = self._get_value_for_param(name)
@@ -324,6 +359,7 @@ class HP:
 
             validated_keys = []
             for i, item in enumerate(value):
+                validate_select_choice(item, param_path=f"{full_path}[{i}]", allow_none=allow_none)
                 validated_key = validator.validate_value(item, option_keys, options_only, f"{full_path}[{i}]")
                 validated_keys.append(validated_key)
 
@@ -335,10 +371,11 @@ class HP:
                 selected_value=validated_keys,
                 options=option_keys,
             )
-            return [option_map.get(k, k) for k in validated_keys]
+            return [option_map.get(k, k) for k in validated_keys] if is_mapping else validated_keys
         else:
             validated_keys = []
             for i, item in enumerate(actual_default):
+                validate_select_choice(item, param_path=f"{full_path}[{i}]", allow_none=allow_none)
                 validated_key = validator.validate_value(item, option_keys, options_only, f"{full_path}[{i}]")
                 validated_keys.append(validated_key)
 
@@ -350,7 +387,7 @@ class HP:
                 selected_value=validated_keys,
                 options=option_keys,
             )
-            return [option_map.get(k, k) for k in validated_keys]
+            return [option_map.get(k, k) for k in validated_keys] if is_mapping else validated_keys
 
     # --- Executor structures ---
     @dataclass(frozen=True)
@@ -365,6 +402,7 @@ class HP:
         max: Optional[Union[int, float]] = None
         track_called: bool = False
         use_validator_name: bool = True
+        allow_none: bool = False
 
     @dataclass(frozen=True)
     class MultiValueSpec:
@@ -376,20 +414,23 @@ class HP:
         strict: bool = False
         min: Optional[Union[int, float]] = None
         max: Optional[Union[int, float]] = None
+        allow_none: bool = False
 
     @dataclass(frozen=True)
     class SelectSingleSpec:
         name: str
-        options: Union[List[Any], Dict[Any, Any]]
-        default: Optional[Any] = None
+        options: Union[List[Any], Mapping[Any, Any]]
+        default: Any = _NO_DEFAULT
         options_only: bool = False
+        allow_none: bool = False
 
     @dataclass(frozen=True)
     class SelectMultiSpec:
         name: str
-        options: Union[List[Any], Dict[Any, Any]]
+        options: Union[List[Any], Mapping[Any, Any]]
         default: Optional[List[Any]] = None
         options_only: bool = False
+        allow_none: bool = False
 
     # --- Unified executors ---
     def _execute_single(self, spec: "HP.SingleValueSpec") -> Any:
@@ -402,6 +443,7 @@ class HP:
             strict=spec.strict,
             min=spec.min,
             max=spec.max,
+            allow_none=spec.allow_none,
             track_called=spec.track_called,
             use_validator_name=spec.use_validator_name,
         )
@@ -416,6 +458,7 @@ class HP:
             strict=spec.strict,
             min=spec.min,
             max=spec.max,
+            allow_none=spec.allow_none,
         )
 
     def _execute_select_single(self, spec: "HP.SelectSingleSpec") -> Any:
@@ -424,6 +467,7 @@ class HP:
             name=spec.name,
             default=spec.default,
             options_only=spec.options_only,
+            allow_none=spec.allow_none,
         )
 
     def _execute_select_multi(self, spec: "HP.SelectMultiSpec") -> List[Any]:
@@ -432,6 +476,7 @@ class HP:
             name=spec.name,
             default=spec.default,
             options_only=spec.options_only,
+            allow_none=spec.allow_none,
         )
 
     # Composition
@@ -452,6 +497,7 @@ class HP:
         # Validate name
         if name is None:
             raise HPCallError(full_path, "requires 'name' for nesting")
+        validate_identifier_name(name, kind="nest name")
 
         # Disallow nesting under a prefix that already has parameters defined by the parent
         # but allow repeated nesting with the same name to surface duplicate param errors later
@@ -473,18 +519,14 @@ class HP:
                 nested_key = key[len(prefix) :]
                 nested_values[nested_key] = value
 
-        # If an explicit nested dict is provided under the name key, it overrides dotted keys
-        if name in self.values and isinstance(self.values[name], dict):
-            nested_values.update(self.values[name])
-
         # Merge with explicit values if provided
         if values:
-            nested_values.update(values)
+            nested_values.update(normalize_values(values))
 
         # Create new HP instance for nested call with namespace
         self._record_nest(path=full_path, name=name)
 
-        nested_hp = self.__class__(nested_values, exploration_tracker=self.exploration_tracker)
+        nested_hp = self.__class__(nested_values, parameter_tracker=self.parameter_tracker)
         nested_hp.namespace_stack = self.namespace_stack + [name]
         nested_hp.called_params = self.called_params  # Share called_params tracking
 
@@ -540,6 +582,7 @@ class HP:
     # --- Public API methods ---
     # Use underscore prefix to avoid conflicts with built-in names
 
+    @overload
     def _int(
         self,
         default: int,
@@ -548,8 +591,34 @@ class HP:
         min: Optional[int] = None,
         max: Optional[int] = None,
         strict: bool = False,
+        allow_none: Literal[False] = False,
         hpo_spec: "HpoInt | None" = None,
-    ) -> int:
+    ) -> int: ...
+
+    @overload
+    def _int(
+        self,
+        default: Optional[int],
+        *,
+        name: str,
+        min: Optional[int] = None,
+        max: Optional[int] = None,
+        strict: bool = False,
+        allow_none: Literal[True],
+        hpo_spec: "HpoInt | None" = None,
+    ) -> Optional[int]: ...
+
+    def _int(
+        self,
+        default: Optional[int],
+        *,
+        name: str,
+        min: Optional[int] = None,
+        max: Optional[int] = None,
+        strict: bool = False,
+        allow_none: bool = False,
+        hpo_spec: "HpoInt | None" = None,
+    ) -> Optional[int]:
         """Integer parameter with optional bounds validation."""
         spec = HP.SingleValueSpec(
             name=name,
@@ -560,11 +629,13 @@ class HP:
             strict=strict,
             min=min,
             max=max,
+            allow_none=allow_none,
             track_called=True,
             use_validator_name=True,
         )
         return self._execute_single(spec)
 
+    @overload
     def _float(
         self,
         default: float,
@@ -573,8 +644,34 @@ class HP:
         min: Optional[float] = None,
         max: Optional[float] = None,
         strict: bool = False,
+        allow_none: Literal[False] = False,
         hpo_spec: "HpoFloat | None" = None,
-    ) -> float:
+    ) -> float: ...
+
+    @overload
+    def _float(
+        self,
+        default: Optional[float],
+        *,
+        name: str,
+        min: Optional[float] = None,
+        max: Optional[float] = None,
+        strict: bool = False,
+        allow_none: Literal[True],
+        hpo_spec: "HpoFloat | None" = None,
+    ) -> Optional[float]: ...
+
+    def _float(
+        self,
+        default: Optional[float],
+        *,
+        name: str,
+        min: Optional[float] = None,
+        max: Optional[float] = None,
+        strict: bool = False,
+        allow_none: bool = False,
+        hpo_spec: "HpoFloat | None" = None,
+    ) -> Optional[float]:
         """Float parameter with optional bounds validation."""
         spec = HP.SingleValueSpec(
             name=name,
@@ -585,12 +682,19 @@ class HP:
             strict=strict,
             min=min,
             max=max,
+            allow_none=allow_none,
             track_called=True,
             use_validator_name=True,
         )
         return self._execute_single(spec)
 
-    def _text(self, default: str, *, name: str) -> str:
+    @overload
+    def _text(self, default: str, *, name: str, allow_none: Literal[False] = False) -> str: ...
+
+    @overload
+    def _text(self, default: Optional[str], *, name: str, allow_none: Literal[True]) -> Optional[str]: ...
+
+    def _text(self, default: Optional[str], *, name: str, allow_none: bool = False) -> Optional[str]:
         """Text parameter."""
         spec = HP.SingleValueSpec(
             name=name,
@@ -598,12 +702,19 @@ class HP:
             param_type="text",
             validator=TextValidator(),
             supports_strict=False,
+            allow_none=allow_none,
             track_called=True,
             use_validator_name=True,
         )
         return self._execute_single(spec)
 
-    def _bool(self, default: bool, *, name: str) -> bool:
+    @overload
+    def _bool(self, default: bool, *, name: str, allow_none: Literal[False] = False) -> bool: ...
+
+    @overload
+    def _bool(self, default: Optional[bool], *, name: str, allow_none: Literal[True]) -> Optional[bool]: ...
+
+    def _bool(self, default: Optional[bool], *, name: str, allow_none: bool = False) -> Optional[bool]:
         """Boolean parameter."""
         spec = HP.SingleValueSpec(
             name=name,
@@ -611,6 +722,7 @@ class HP:
             param_type="bool",
             validator=BoolValidator(),
             supports_strict=False,
+            allow_none=allow_none,
             track_called=True,
             use_validator_name=True,
         )
@@ -618,15 +730,22 @@ class HP:
 
     def _select(
         self,
-        options: Union[List[Any], Dict[Any, Any]],
+        options: Union[List[Any], Mapping[Any, Any]],
         *,
         name: str,
-        default: Optional[Any] = None,
+        default: Any = _NO_DEFAULT,
         options_only: bool = False,
+        allow_none: bool = False,
         hpo_spec: "HpoCategorical | None" = None,
     ) -> Any:
         """Selection parameter from options."""
-        spec = HP.SelectSingleSpec(name=name, options=options, default=default, options_only=options_only)
+        spec = HP.SelectSingleSpec(
+            name=name,
+            options=options,
+            default=default,
+            options_only=options_only,
+            allow_none=allow_none,
+        )
         return self._execute_select_single(spec)
 
     def _multi_int(
@@ -637,6 +756,7 @@ class HP:
         min: Optional[int] = None,
         max: Optional[int] = None,
         strict: bool = False,
+        allow_none: bool = False,
     ) -> List[int]:
         """Multi-integer parameter with optional bounds validation."""
         spec = HP.MultiValueSpec(
@@ -648,6 +768,7 @@ class HP:
             strict=strict,
             min=min,
             max=max,
+            allow_none=allow_none,
         )
         return self._execute_multi(spec)
 
@@ -659,6 +780,7 @@ class HP:
         min: Optional[float] = None,
         max: Optional[float] = None,
         strict: bool = False,
+        allow_none: bool = False,
     ) -> List[float]:
         """Multi-float parameter with optional bounds validation."""
         spec = HP.MultiValueSpec(
@@ -670,10 +792,11 @@ class HP:
             strict=strict,
             min=min,
             max=max,
+            allow_none=allow_none,
         )
         return self._execute_multi(spec)
 
-    def _multi_text(self, default: List[str], *, name: str) -> List[str]:
+    def _multi_text(self, default: List[str], *, name: str, allow_none: bool = False) -> List[str]:
         """Multi-text parameter."""
         spec = HP.MultiValueSpec(
             name=name,
@@ -681,10 +804,11 @@ class HP:
             param_type="multi_text",
             element_validator=TextValidator(),
             supports_strict=False,
+            allow_none=allow_none,
         )
         return self._execute_multi(spec)
 
-    def _multi_bool(self, default: List[bool], *, name: str) -> List[bool]:
+    def _multi_bool(self, default: List[bool], *, name: str, allow_none: bool = False) -> List[bool]:
         """Multi-boolean parameter."""
         spec = HP.MultiValueSpec(
             name=name,
@@ -692,19 +816,27 @@ class HP:
             param_type="multi_bool",
             element_validator=BoolValidator(),
             supports_strict=False,
+            allow_none=allow_none,
         )
         return self._execute_multi(spec)
 
     def _multi_select(
         self,
-        options: Union[List[Any], Dict[Any, Any]],
+        options: Union[List[Any], Mapping[Any, Any]],
         *,
         name: str,
         default: Optional[List[Any]] = None,
         options_only: bool = False,
+        allow_none: bool = False,
     ) -> List[Any]:
         """Multi-selection parameter from options."""
-        spec = HP.SelectMultiSpec(name=name, options=options, default=default, options_only=options_only)
+        spec = HP.SelectMultiSpec(
+            name=name,
+            options=options,
+            default=default,
+            options_only=options_only,
+            allow_none=allow_none,
+        )
         return self._execute_select_multi(spec)
 
     # Map public API names to internal methods

@@ -6,10 +6,11 @@ Hypster provides boolean parameter configuration through `bool` and `multi_bool`
 
 ```python
 def bool(
-    default: bool,
+    default: Optional[bool],
     *,
-    name: str
-) -> bool
+    name: str,
+    allow_none: bool = False
+) -> Optional[bool]
 
 def multi_bool(
     default: List[bool] = [],
@@ -17,6 +18,18 @@ def multi_bool(
     name: str
 ) -> List[bool]
 ```
+
+## Nullable boolean values
+
+Use `allow_none=True` when `None` is an intentional tri-state value:
+
+```python
+def stream_config(hp: HP):
+    stream = hp.bool(None, name="stream", allow_none=True)
+    return {"stream": stream}
+```
+
+Nullable elements are not supported for `multi_bool`; use `multi_select(..., allow_none=True)` for nullable categorical lists.
 
 ## Usage Examples
 
