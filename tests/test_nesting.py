@@ -2,6 +2,8 @@
 
 from typing import Any, Dict
 
+import pytest
+
 from hypster import HP, instantiate
 
 
@@ -67,8 +69,8 @@ def test_conditional_nesting() -> None:
     assert result == {"model": {"type": "B", "param": 3.0}}
 
 
-def test_nested_dict_override_precedence() -> None:
-    """Test that nested dict values take precedence over dotted keys."""
+def test_duplicate_dotted_and_nested_values_raise() -> None:
+    """Test that one parameter path cannot be provided in both values forms."""
 
     def child(hp: HP) -> Dict[str, int]:
         x = hp.int(10, name="x")
@@ -78,12 +80,27 @@ def test_nested_dict_override_precedence() -> None:
     def parent(hp: HP) -> Dict[str, int]:
         return hp.nest(child, name="child")
 
-    # Both dotted and nested dict notation - nested dict wins
-    result = instantiate(
-        parent,
-        values={
-            "child.x": 100,  # dotted notation
-            "child": {"x": 200},  # nested dict notation
-        },
-    )
-    assert result == {"x": 200, "y": 20}  # nested dict wins
+    with pytest.raises(ValueError) as exc_info:
+        instantiate(
+            parent,
+            values={
+                "child.x": 100,
+                "child": {"x": 100},
+            },
+        )
+
+    assert "Duplicate value for 'child.x'" in str(exc_info.value)
+    assert "dotted key 'child.x'" in str(exc_info.value)
+    assert "nested dict 'child' -> 'x'" in str(exc_info.value)
+    assert "Use only one form" in str(exc_info.value)
+
+
+def test_nested_values_keys_must_be_identifier_segments() -> None:
+    def child(hp: HP) -> Dict[str, int]:
+        return {"x": hp.int(10, name="x")}
+
+    def parent(hp: HP) -> Dict[str, int]:
+        return hp.nest(child, name="child")
+
+    with pytest.raises(ValueError, match="nested values key"):
+        instantiate(parent, values={"child": {"x.y": 100}})

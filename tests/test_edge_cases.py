@@ -100,5 +100,22 @@ def test_reserved_prefix_collision() -> None:
         nested = hp.nest(child, name="model")
         return {"bad": bad, "nested": nested}
 
-    with pytest.raises(ValueError, match="prefix 'model' reserved"):
+    with pytest.raises(ValueError, match="valid Python identifiers"):
         instantiate(parent)
+
+
+def test_hp_names_must_be_python_identifiers() -> None:
+    def bad_param(hp: HP) -> int:
+        return hp.int(1, name="bad-name")
+
+    with pytest.raises(ValueError, match="valid Python identifiers"):
+        instantiate(bad_param)
+
+    def bad_nest(hp: HP) -> Dict[str, int]:
+        def child(hp: HP) -> int:
+            return hp.int(1, name="value")
+
+        return {"child": hp.nest(child, name="class")}
+
+    with pytest.raises(ValueError, match="Python keyword"):
+        instantiate(bad_nest)

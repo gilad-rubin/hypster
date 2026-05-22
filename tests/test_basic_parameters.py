@@ -113,3 +113,50 @@ def test_bool_parameter() -> None:
     # Type validation
     with pytest.raises(ValueError, match="expected boolean"):
         instantiate(config, values={"flag": "true"})
+
+
+def test_allow_none_scalar_params_make_none_explicit() -> None:
+    """None defaults and overrides require allow_none=True for reproducible params."""
+
+    def config(hp: HP) -> Dict[str, object]:
+        return {
+            "depth": hp.int(None, name="depth", allow_none=True),
+            "temperature": hp.float(0.2, name="temperature", allow_none=True),
+            "label": hp.text("baseline", name="label", allow_none=True),
+            "enabled": hp.bool(True, name="enabled", allow_none=True),
+        }
+
+    assert instantiate(config) == {
+        "depth": None,
+        "temperature": 0.2,
+        "label": "baseline",
+        "enabled": True,
+    }
+    assert instantiate(
+        config,
+        values={
+            "depth": 3,
+            "temperature": None,
+            "label": None,
+            "enabled": None,
+        },
+    ) == {
+        "depth": 3,
+        "temperature": None,
+        "label": None,
+        "enabled": None,
+    }
+
+
+def test_none_requires_allow_none_for_scalar_params() -> None:
+    def none_default(hp: HP) -> object:
+        return hp.int(None, name="depth")
+
+    with pytest.raises(ValueError, match="allow_none=True"):
+        instantiate(none_default)
+
+    def none_override(hp: HP) -> object:
+        return hp.float(0.1, name="temperature")
+
+    with pytest.raises(ValueError, match="allow_none=True"):
+        instantiate(none_override, values={"temperature": None})

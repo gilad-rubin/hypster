@@ -1,17 +1,51 @@
 """The Core API for instantiating configurations."""
 
 import warnings
-from typing import Any, Dict, Literal, Optional, Protocol, Tuple, TypeVar
+from dataclasses import dataclass, field
+from typing import Any, Dict, Generic, Literal, Optional, Protocol, Tuple, TypeVar
 
 from .hp import HP
 from .hp_calls import HPCallError
-from .utils import suggest_similar_names, validate_config_func_signature
+from .utils import normalize_values, suggest_similar_names, validate_config_func_signature
 
 T = TypeVar("T", covariant=True)
+UnknownPolicy = Literal["warn", "raise", "ignore"]
 
 
 class ConfigFunc(Protocol[T]):
     def __call__(self, hp: HP, *args: Any, **kwargs: Any) -> T: ...
+
+
+@dataclass(frozen=True)
+class InstantiationOutput(Generic[T]):
+    """Output of a config execution with its selected params sidecar."""
+
+    value: T
+    params: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "params", dict(self.params))
+
+
+class ParamsTracker:
+    """Collect selected params from HP's parameter-recording hook."""
+
+    def __init__(self) -> None:
+        self.params: Dict[str, Any] = {}
+
+    def record_parameter(
+        self,
+        *,
+        path: str,
+        name: str,
+        kind: str,
+        default_value: Any,
+        selected_value: Any,
+        options: Optional[list[Any]] = None,
+        minimum: Optional[int | float] = None,
+        maximum: Optional[int | float] = None,
+    ) -> None:
+        self.params[path] = selected_value
 
 
 def instantiate(
@@ -20,7 +54,7 @@ def instantiate(
     values: Optional[Dict[str, Any]] = None,
     args: Tuple[Any, ...] = (),
     kwargs: Optional[Dict[str, Any]] = None,
-    on_unknown: Literal["warn", "raise", "ignore"] = "warn",
+    on_unknown: UnknownPolicy = "raise",
 ) -> T:
     """
     Execute a config function with the given values.
@@ -31,8 +65,8 @@ def instantiate(
         args: Additional positional arguments for func
         kwargs: Additional keyword arguments for func
         on_unknown: How to handle unknown/unreachable parameters:
-            - 'warn': Issue warning and continue (default)
-            - 'raise': Raise ValueError
+            - 'raise': Raise ValueError (default)
+            - 'warn': Issue warning and continue
             - 'ignore': Silently ignore unknown parameters
 
     Returns:
@@ -42,31 +76,39 @@ def instantiate(
         ValueError: If func doesn't have hp: HP as first parameter
         ValueError: If unknown parameters in values and on_unknown='raise'
     """
-    # Validate function signature
+    return _run_config(func, values=values, args=args, kwargs=kwargs, on_unknown=on_unknown)
+
+
+def _validate_on_unknown(on_unknown: str) -> None:
+    """Validate unknown-parameter policy at the API boundary."""
+    if on_unknown not in {"warn", "raise", "ignore"}:
+        raise ValueError("on_unknown must be one of 'raise', 'warn', or 'ignore'.")
+
+
+def _run_config(
+    func: ConfigFunc[T],
+    *,
+    values: Optional[Dict[str, Any]] = None,
+    args: Tuple[Any, ...] = (),
+    kwargs: Optional[Dict[str, Any]] = None,
+    on_unknown: UnknownPolicy = "raise",
+    parameter_tracker: Optional[Any] = None,
+) -> T:
+    """Execute a config function through the shared instantiation path."""
     validate_config_func_signature(func)
+    _validate_on_unknown(on_unknown)
 
-    # Prepare values
-    values = values or {}
+    normalized_values = normalize_values(values)
     kwargs = kwargs or {}
-
-    # Create HP instance
-    hp = HP(values)
-
-    # Track called parameters during execution
+    hp = HP(normalized_values, parameter_tracker=parameter_tracker)
     original_called_params = hp.called_params.copy()
 
     try:
-        # Execute the function
         result = func(hp, *args, **kwargs)
-
-        # Check for unknown/unreachable parameters
         called_params = hp.called_params - original_called_params
-        _handle_unknown_parameters(values, called_params, on_unknown)
-
+        _handle_unknown_parameters(normalized_values, called_params, on_unknown)
         return result
-
     except HPCallError as e:
-        # Re-raise HP errors as ValueError for cleaner API
         raise ValueError(str(e)) from e
 
 
@@ -98,9 +140,39 @@ def _handle_unknown_parameters(provided_values: Dict[str, Any], called_params: s
         else:
             error_lines.append(f"  - '{param}': Unknown parameter")
 
+    error_lines.append("")
+    error_lines.append("Run explore(config, values=...) to inspect the active branch.")
+    error_lines.append(
+        "Nested dict values are interpreted as parameter paths; use dict-backed select keys for objects."
+    )
     error_message = "\n".join(error_lines)
 
     if on_unknown == "raise":
         raise ValueError(error_message)
     elif on_unknown == "warn":
         warnings.warn(error_message, UserWarning, stacklevel=3)
+
+
+def instantiate_with_params(
+    func: ConfigFunc[T],
+    *,
+    values: Optional[Dict[str, Any]] = None,
+    args: Tuple[Any, ...] = (),
+    kwargs: Optional[Dict[str, Any]] = None,
+    on_unknown: UnknownPolicy = "raise",
+) -> InstantiationOutput[T]:
+    """
+    Execute a config function and return its value with selected params.
+
+    Args mirror instantiate().
+    """
+    tracker = ParamsTracker()
+    result = _run_config(
+        func,
+        values=values,
+        args=args,
+        kwargs=kwargs,
+        on_unknown=on_unknown,
+        parameter_tracker=tracker,
+    )
+    return InstantiationOutput(value=result, params=tracker.params)

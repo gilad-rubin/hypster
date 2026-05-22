@@ -1,209 +1,112 @@
-# 🪆 Nested Configurations
+# Nested Configurations
 
-Hypster enables hierarchical configuration management through the `hp.nest()` method, allowing you to compose complex configurations from smaller, reusable components.
-
-> For an in depth tutorial, please check out the article on Medium: [**Implementing Modular-RAG using Haystack and Hypster**](https://towardsdatascience.com/implementing-modular-rag-with-haystack-and-hypster-d2f0ecc88b8f)
-
-## `nest` Function Signature
+Use `hp.nest()` to compose a configuration function from smaller configuration functions while keeping parameter paths stable and replayable.
 
 ```python
-def nest(
-    config_func: Union[str, Path, "Hypster"],
-    *,
-    name: Optional[str] = None,
-    final_vars: List[str] = [],
-    exclude_vars: List[str] = [],
-    values: Dict[str, Any] = {}
-) -> Dict[str, Any]
-```
+from hypster import HP, instantiate
 
-#### Parameters
 
-* `config_func`: Either a path to a saved configuration or a Hypster config object
-* `name`: Optional name for the nested configuration (used in dot notation)
-* `final_vars`: List of variables that cannot be modified by parent configs
-* `exclude_vars`: List of variables to exclude from the configuration
-* `values`: Dictionary of values to override in the nested configuration
-
-## Steps for nesting
-
-{% stepper %}
-{% step %}
-#### Define a reusable config
-
-```python
-from hypster import config, HP
-
-@config
 def llm_config(hp: HP):
-    model = hp.select({
-        "haiku": "claude-3-haiku-20240307",
-        "sonnet": "claude-3-sonnet-20240229"
-    }, default="haiku")
-    temperature = hp.number(0.7, min=0, max=1)
-```
-{% endstep %}
+    provider = hp.select(["openai", "gemini"], name="provider", default="openai")
+    temperature = hp.float(0.2, name="temperature", min=0.0, max=2.0)
+    return {"provider": provider, "temperature": temperature}
 
-{% step %}
-#### Save it
 
-```python
-llm_config.save("configs/llm.py")
-```
-{% endstep %}
+def pipeline_config(hp: HP):
+    llm = hp.nest(llm_config, name="llm")
+    max_tokens = hp.int(4096, name="max_tokens", min=1)
+    return {"llm": llm, "max_tokens": max_tokens}
 
-{% step %}
-#### Define a parent config and use `hp.nest`
 
-```python
-@config
-def qa_config(hp: HP):
-    # Load and nest LLM configuration
-    llm = hp.nest("configs/llm.py")
-
-    # Add QA-specific parameters
-    max_context_length = hp.int(1000, min=100, max=2000)
-
-    # Combine LLM and QA parameters
-    qa_pipeline = QAPipeline(
-        model=llm["model"],
-        temperature=llm["temperature"],
-        max_context_length=max_context_length
-    )
-```
-{% endstep %}
-
-{% step %}
-#### Instantiate using dot notation
-
-```python
-qa_config(values={
-    "llm.model": "sonnet",
-    "llm.temperature": 0.5,
-    "max_context_length": 1500
-})
-```
-{% endstep %}
-{% endstepper %}
-
-## Configuration Sources
-
-`hp.nest()` accepts two types of sources:
-
-### Path to Configuration File
-
-```python
-llm = hp.nest("configs/llm.py")
-```
-
-### Direct Configuration Object
-
-```python
-from hypster import load
-
-# Load the configuration
-llm_config = load("configs/llm.py")
-
-# Use the loaded config
-qa_config = hp.nest(llm_config)
-```
-
-## Value Assignment
-
-Values for nested configurations can be set using either dot notation or nested dictionaries:
-
-```python
-# Using dot notation
-qa_config(values={
-    "llm.model": "sonnet",
-    "llm.temperature": 0.5,
-    "max_context_length": 1500
-})
-
-# Using nested dictionary
-qa_config(values={
-    "llm": {
-        "model": "sonnet",
-        "temperature": 0.5
-    },
-    "max_context_length": 1500
-})
-```
-
-## Hierarchical Nesting
-
-Configurations can be nested multiple times to create modular, reusable components:
-
-```python
-@config
-def indexing_config(hp: HP):
-    # Reuse LLM config for document processing
-    llm = hp.nest("configs/llm.py")
-
-    # Indexing-specific parameters
-    embedding_dim = hp.int(512, min=128, max=1024)
-
-    # Process documents with LLM
-    enriched_docs = process_documents(
-        llm=llm["model"],
-        temperature=llm["temperature"],
-        embedding_dim=embedding_dim
-    )
-
-@config
-def rag_config(hp: HP):
-    # Reuse indexing config (which includes LLM config)
-    indexing = hp.nest("configs/indexing.py")
-
-    # Add retrieval configuration
-    retrieval = hp.nest("configs/retrieval.py")
-```
-
-## Passing Values to Nested Configs
-
-Use the `values` parameter to pass dependent values to nested configuration values:
-
-```python
-retrieval = hp.nest(
-    "configs/retrieval.py",
-    values={
-        "embedding_dim": indexing["embedding_dim"],
-        "top_k": 5
-    }
+run = instantiate(
+    pipeline_config,
+    values={"llm.provider": "gemini", "max_tokens": 8192},
 )
 ```
 
-`final_vars` and `exclude_vars` are also supported.
+## Signature
 
-## Best Practices
+```python
+def nest(
+    child: Callable,
+    *,
+    name: str,
+    values: dict[str, Any] | None = None,
+    args: tuple = (),
+    kwargs: dict[str, Any] | None = None,
+) -> Any
+```
 
-1. **Modular Design**
-   * Create small, focused configurations for specific components
-   * Combine configurations only when there are clear dependencies
-   * Keep configurations reusable across different use cases
-2.  **Clear Naming**
+`name` is required. It must be a valid Python identifier, and it cannot contain dots, spaces, hyphens, or Python keywords. Hypster owns dotted path construction from nested names.
 
-    ```python
-    # Use descriptive names for nestd configs
-    llm = hp.nest("configs/llm.py", name="llm")
-    indexer = hp.nest("configs/indexer.py", name="indexer")
-    ```
-3.  **Value Dependencies**
+## Values
 
-    ```python
-    # Explicitly pass dependent values
+Nested overrides can be provided with dotted keys:
+
+```python
+instantiate(pipeline_config, values={"llm.temperature": 0.7})
+```
+
+Or with nested dictionaries:
+
+```python
+instantiate(pipeline_config, values={"llm": {"temperature": 0.7}})
+```
+
+These are two spellings of the same parameter path. Do not provide both forms for the same leaf:
+
+```python
+instantiate(
+    pipeline_config,
+    values={
+        "llm.temperature": 0.7,
+        "llm": {"temperature": 0.7},
+    },
+)
+# ValueError: Duplicate value for 'llm.temperature'
+```
+
+Nested dictionary keys are individual name segments, so they must be valid Python identifiers. Use dotted keys at the top level when you want to spell a full path.
+
+## Passing Values To Children
+
+Use the `values=` argument on `hp.nest()` when the parent config needs to derive child values:
+
+```python
+def retriever_config(hp: HP):
+    return {"top_k": hp.int(5, name="top_k")}
+
+
+def rag_config(hp: HP):
+    documents = hp.int(100, name="documents")
     retriever = hp.nest(
-        "configs/retriever.py",
-        values={"embedding_dim": embedder["embedding_dim"]}
+        retriever_config,
+        name="retriever",
+        values={"top_k": max(1, documents // 20)},
     )
-    ```
-4.  **File Organization**
+    return {"documents": documents, "retriever": retriever}
+```
 
-    ```python
-    # Keep related configs in a dedicated directory
-    configs/
-    ├── llm.py
-    ├── indexing.py
-    ├── retrieval.py
-    └── rag.py
-    ```
+Explicit child `values=` are normalized with the same dotted/nested rules as top-level `values=`.
+
+## Conditional Nesting
+
+Nested configs can be selected conditionally. Unknown or unreachable values raise by default, so branch-specific overrides must match the active branch.
+
+```python
+def openai_config(hp: HP):
+    return {"model": hp.select(["gpt-4o-mini", "gpt-4.1"], name="model")}
+
+
+def gemini_config(hp: HP):
+    return {"model": hp.select(["flash-lite", "pro"], name="model")}
+
+
+def model_config(hp: HP):
+    provider = hp.select(["openai", "gemini"], name="provider", default="openai")
+    if provider == "openai":
+        return hp.nest(openai_config, name="openai")
+    return hp.nest(gemini_config, name="gemini")
+```
+
+To inspect a branch before passing values to it, run `explore(model_config, values={"provider": "gemini"})`.

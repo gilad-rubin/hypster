@@ -86,7 +86,7 @@ This prints the reachable parameters, defaults, options, and nested scopes for t
 {% step %}
 #### Instantiation
 
-Execute your configuration and override parameters using `values=`. See "Values & Overrides" for dotted vs nested overrides and precedence.
+Execute your configuration and override parameters using `values=`. See "Values & Overrides" for dotted paths, nested dictionaries, and duplicate-key validation.
 
 ```python
 from hypster import instantiate
@@ -102,6 +102,6 @@ cfg = instantiate(
 # cfg -> {"model_name": "gpt-5", "temperature": 0.5, "max_tokens": 1024}
 ```
 
-Control unknown or unreachable values via `on_unknown`: `"warn"` (default), `"raise"`, or `"ignore"`.
+Unknown or unreachable values raise by default. Use `on_unknown="warn"` or `on_unknown="ignore"` only when you intentionally want softer handling.
 {% endstep %}
 {% endstepper %}

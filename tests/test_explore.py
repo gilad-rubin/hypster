@@ -165,18 +165,21 @@ def test_explore_values_select_a_different_branch() -> None:
     )
 
 
-def test_explore_warns_on_unknown_or_unreachable_values() -> None:
+def test_explore_raises_on_unknown_or_unreachable_values_by_default() -> None:
     def config(hp: HP) -> Dict[str, Any]:
         mode = hp.select(["a", "b"], name="mode", default="a")
         if mode == "a":
             hp.int(1, name="count")
         return {"mode": mode}
 
-    with pytest.warns(UserWarning, match="Unknown or unreachable parameters"):
+    with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
         explore(config, values={"missing": 123})
 
-    with pytest.warns(UserWarning, match="Unknown or unreachable parameters"):
+    with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
         explore(config, values={"mode": "b", "count": 9})
+
+    with pytest.warns(UserWarning, match="Unknown or unreachable parameters"):
+        explore(config, values={"missing": 123}, on_unknown="warn")
 
 
 def test_explore_can_raise_on_unknown_values() -> None:
@@ -188,13 +191,30 @@ def test_explore_can_raise_on_unknown_values() -> None:
         explore(config, values={"batchsize": 7}, on_unknown="raise")
 
 
+def test_explore_validates_on_unknown_before_execution() -> None:
+    calls = []
+
+    def config(hp: HP) -> Dict[str, Any]:
+        calls.append("executed")
+        return {"x": hp.int(1, name="x")}
+
+    with pytest.raises(ValueError, match="on_unknown must be one of"):
+        explore(config, on_unknown="silent")  # type: ignore[arg-type]
+
+    assert calls == []
+
+
 def test_explore_to_dict_is_json_serializable() -> None:
     class Provider(Enum):
         OPENAI = "openai"
         GEMINI = "gemini"
 
     def config(hp: HP) -> Dict[str, Any]:
-        provider = hp.select([Provider.OPENAI, Provider.GEMINI], name="provider", default=Provider.OPENAI)
+        provider = hp.select(
+            {"openai": Provider.OPENAI, "gemini": Provider.GEMINI},
+            name="provider",
+            default="openai",
+        )
         return {"provider": provider}
 
     info = explore(config, return_info=True)

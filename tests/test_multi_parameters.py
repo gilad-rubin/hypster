@@ -127,3 +127,25 @@ def test_multi_select_dict_mixed_usage() -> None:
     # Mix of preset keys and custom values
     result = instantiate(config, values={"configs": ["preset1", "custom", "preset2"]})
     assert result == ["config1", "custom", "config2"]
+
+
+def test_multi_select_none_choice_requires_allow_none() -> None:
+    def nullable_config(hp: HP) -> List[object]:
+        return hp.multi_select([None, "cache"], name="features", default=[None], allow_none=True)
+
+    assert instantiate(nullable_config) == [None]
+    assert instantiate(nullable_config, values={"features": [None, "cache"]}) == [None, "cache"]
+
+    def missing_allow_none(hp: HP) -> List[object]:
+        return hp.multi_select([None, "cache"], name="features", default=[None])
+
+    with pytest.raises(ValueError, match="allow_none=True"):
+        instantiate(missing_allow_none)
+
+
+def test_nullable_scalar_multi_params_are_not_supported_yet() -> None:
+    def config(hp: HP) -> List[int]:
+        return hp.multi_int([1, 2], name="depths", allow_none=True)
+
+    with pytest.raises(ValueError, match="not supported"):
+        instantiate(config)
