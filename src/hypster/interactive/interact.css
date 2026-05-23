@@ -1,59 +1,165 @@
 .hypster-widget {
+  --hypster-border: color-mix(in srgb, currentColor 14%, transparent);
+  --hypster-muted: color-mix(in srgb, currentColor 58%, transparent);
+  --hypster-surface: color-mix(in srgb, Canvas 96%, currentColor 4%);
+  --hypster-surface-strong: color-mix(in srgb, Canvas 90%, currentColor 10%);
+  border: 1px solid var(--hypster-border);
+  border-radius: 8px;
   display: grid;
-  gap: 10px;
+  gap: 14px;
   max-width: 640px;
-  padding: 4px 0;
-  color: inherit;
+  padding: 16px;
+  color: CanvasText;
+  background: Canvas;
   font: 14px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .hypster-title {
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 650;
 }
 
 .hypster-status {
-  color: rgba(127, 127, 127, 0.9);
+  border-radius: 999px;
+  justify-self: start;
+  padding: 3px 9px;
   font-size: 12px;
+  color: var(--hypster-muted);
+  background: var(--hypster-surface);
 }
 
 .hypster-status-error,
 .hypster-status-draft_error {
   color: #9f1d1d;
+  background: #fff1f1;
 }
 
 .hypster-group {
-  border: 1px solid rgba(127, 127, 127, 0.35);
+  border: 1px solid var(--hypster-border);
+  border-radius: 8px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin: 0;
-  padding: 10px 12px 12px;
+  padding: 14px;
 }
 
 .hypster-group > legend {
-  padding: 0 4px;
-  font-weight: 600;
+  padding: 0 5px;
+  font-weight: 650;
 }
 
 .hypster-field {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
 }
 
 .hypster-field-header {
-  font-weight: 600;
+  font-weight: 580;
 }
 
 .hypster-description {
-  color: rgba(127, 127, 127, 0.9);
+  color: var(--hypster-muted);
   font-size: 12px;
 }
 
 .hypster-field input,
 .hypster-field select {
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
   box-sizing: border-box;
+  min-height: 32px;
+  padding: 5px 8px;
+  color: inherit;
+  background: Canvas;
+}
+
+.hypster-choice {
+  position: relative;
+}
+
+.hypster-choice-trigger {
+  align-items: center;
+  background: Canvas;
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: inherit;
+  display: flex;
   font: inherit;
-  max-width: 100%;
+  justify-content: space-between;
+  min-height: 32px;
+  padding: 5px 8px;
+  width: 100%;
+}
+
+.hypster-choice-trigger:hover,
+.hypster-choice-open .hypster-choice-trigger {
+  background: var(--hypster-surface);
+}
+
+.hypster-choice-trigger:focus-visible,
+.hypster-choice-option:focus-visible {
+  outline: 2px solid color-mix(in srgb, Highlight 70%, transparent);
+  outline-offset: 2px;
+}
+
+.hypster-choice-value {
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hypster-choice-arrow {
+  border-bottom: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  display: inline-block;
+  height: 7px;
+  margin-left: 12px;
+  opacity: 0.58;
+  transform: translateY(-2px) rotate(45deg);
+  width: 7px;
+}
+
+.hypster-choice-menu {
+  background: Canvas;
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  box-shadow: 0 10px 24px color-mix(in srgb, CanvasText 16%, transparent);
+  box-sizing: border-box;
+  display: grid;
+  gap: 2px;
+  left: 0;
+  margin-top: 4px;
+  max-height: 220px;
+  min-width: 100%;
+  overflow: auto;
+  padding: 4px;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+}
+
+.hypster-choice-menu[hidden] {
+  display: none;
+}
+
+.hypster-choice-option {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  font: inherit;
+  min-height: 30px;
+  padding: 5px 8px;
+  text-align: left;
+}
+
+.hypster-choice-option:hover {
+  background: var(--hypster-surface-strong);
 }
 
 .hypster-field input[type="checkbox"] {
@@ -67,21 +173,16 @@
 }
 
 .hypster-actions button {
-  border: 1px solid rgba(127, 127, 127, 0.55);
-  border-radius: 2px;
-  padding: 2px 8px;
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  padding: 5px 10px;
   color: inherit;
-  background: rgba(127, 127, 127, 0.12);
+  background: var(--hypster-surface);
   cursor: pointer;
-  font: inherit;
 }
 
 .hypster-actions button:hover:not(:disabled) {
-  background: rgba(127, 127, 127, 0.18);
-}
-
-.hypster-actions button:active:not(:disabled) {
-  background: rgba(127, 127, 127, 0.24);
+  background: var(--hypster-surface-strong);
 }
 
 .hypster-actions button:disabled {

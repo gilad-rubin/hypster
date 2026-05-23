@@ -1,13 +1,13 @@
 # Interactive Snapshot and Modern Notebook Renderer
 
-Hypster's restored interactive UI will be built around a headless **Interactive Snapshot** controller contract rather than an ipywidgets-specific state model. The public API is `interact(config)`, which returns a live **Interactive Result** handle with `.value` and `.params` rather than returning the raw instantiation value. This avoids the misleading `interactive_explore` name and avoids a separate `interact_params` API, since the handle can expose selected params directly. The first-class UI target remains Jupyter notebooks, but the renderer should use a modern custom-widget approach such as anywidget while staying minimal, notebook-native, and easy to replace with future Streamlit or React renderers that consume the same snapshot and action contract. Renderers send **Interactive Actions** and render snapshots; Python remains the source of truth for branch reachability, validation, selected-param collection, and replay semantics.
+Hypster's restored interactive UI will be built around a headless **Interactive Snapshot** controller contract rather than an ipywidgets-specific state model. The public API is `interact(config)`, which returns a live **Interactive Result** handle with `.value` and `.params` rather than returning the raw instantiation value. This avoids the misleading `interactive_explore` name and avoids a separate `interact_params` API, since the handle can expose selected params directly. The first-class UI target remains Jupyter notebooks, but the renderer should use a modern custom-widget approach such as anywidget while staying small, theme-aware, and easy to replace with future Streamlit or React renderers that consume the same snapshot and action contract. Renderers send **Interactive Actions** and render snapshots; Python remains the source of truth for branch reachability, validation, selected-param collection, and replay semantics.
 
 ## Notebook renderer direction
 
-The first Jupyter renderer should use the smallest implementation that still feels clear and default:
+The first Jupyter renderer should use the smallest implementation that still feels clear and current:
 
 - Use one anywidget custom widget with file-backed JavaScript and CSS, such as `_esm = Path(...)` and `_css = Path(...)`.
-- Use vanilla JavaScript and native controls; do not introduce React, a bundler, generated HTML blobs, a default value preview, or a default params panel.
+- Use vanilla JavaScript with simple themed controls; do not introduce React, a bundler, generated HTML blobs, a default value preview, or a default params panel.
 - Sync only compact `snapshot` and `action` traits between Python and the frontend.
 - Keep the raw **Instantiation Value**, full branch history, and **Branch Choice Memory** Python-side in the **Interactive Result** controller.
 - Scope CSS under a Hypster-specific root class because anywidget CSS is loaded globally.
