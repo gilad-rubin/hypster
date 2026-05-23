@@ -11,6 +11,15 @@ function optionValue(option) {
   return JSON.parse(option.dataset.value);
 }
 
+function encodedValue(value) {
+  return JSON.stringify(value);
+}
+
+function decodedValue(element) {
+  if (element.dataset.value == null) return element.value;
+  return JSON.parse(element.dataset.value);
+}
+
 function valueFor(snapshot, parameter) {
   if (hasOwn(snapshot.draft_values, parameter.path)) {
     return snapshot.draft_values[parameter.path];
@@ -63,6 +72,14 @@ function labelFor(parameter) {
   return parameter.display_label || parameter.name;
 }
 
+function closeChoiceMenus(root) {
+  for (const choice of root.querySelectorAll(".hypster-choice-open")) {
+    choice.classList.remove("hypster-choice-open");
+    choice.querySelector(".hypster-choice-trigger")?.setAttribute("aria-expanded", "false");
+    choice.querySelector(".hypster-choice-menu")?.setAttribute("hidden", "");
+  }
+}
+
 function renderParameter(model, snapshot, parameter) {
   if (parameter.kind === "group") {
     const group = document.createElement("fieldset");
@@ -85,7 +102,7 @@ function renderParameter(model, snapshot, parameter) {
     return group;
   }
 
-  const field = document.createElement("label");
+  const field = document.createElement("div");
   field.className = "hypster-field";
 
   const header = document.createElement("span");
@@ -107,7 +124,11 @@ function renderParameter(model, snapshot, parameter) {
 function renderControl(snapshot, parameter) {
   const currentValue = valueFor(snapshot, parameter);
 
-  if (parameter.kind === "select" || parameter.kind === "multi_select") {
+  if (parameter.kind === "select") {
+    return renderChoiceControl(parameter, currentValue);
+  }
+
+  if (parameter.kind === "multi_select") {
     const select = document.createElement("select");
     select.dataset.path = parameter.path;
     select.dataset.kind = parameter.kind;
@@ -115,7 +136,7 @@ function renderControl(snapshot, parameter) {
     for (const optionValue of parameter.options || []) {
       const option = document.createElement("option");
       option.value = String(select.options.length);
-      option.dataset.value = JSON.stringify(optionValue);
+      option.dataset.value = encodedValue(optionValue);
       option.textContent = String(optionValue);
       option.selected = Array.isArray(currentValue)
         ? currentValue.some((selectedValue) => valuesEqual(selectedValue, optionValue))
@@ -149,6 +170,53 @@ function renderControl(snapshot, parameter) {
 
   input.type = "text";
   return input;
+}
+
+function renderChoiceControl(parameter, currentValue) {
+  const choice = document.createElement("div");
+  choice.className = "hypster-choice";
+  choice.dataset.path = parameter.path;
+  choice.dataset.kind = parameter.kind;
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "hypster-choice-trigger";
+  trigger.dataset.hypsterChoiceTrigger = "";
+  trigger.setAttribute("aria-haspopup", "listbox");
+  trigger.setAttribute("aria-expanded", "false");
+
+  const value = document.createElement("span");
+  value.className = "hypster-choice-value";
+  value.textContent = String(currentValue ?? "");
+  trigger.append(value);
+
+  const arrow = document.createElement("span");
+  arrow.className = "hypster-choice-arrow";
+  arrow.setAttribute("aria-hidden", "true");
+  trigger.append(arrow);
+
+  choice.append(trigger);
+
+  const menu = document.createElement("div");
+  menu.className = "hypster-choice-menu";
+  menu.setAttribute("role", "listbox");
+  menu.setAttribute("hidden", "");
+
+  for (const optionValue of parameter.options || []) {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "hypster-choice-option";
+    option.dataset.hypsterChoiceOption = "";
+    option.dataset.path = parameter.path;
+    option.dataset.value = encodedValue(optionValue);
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", valuesEqual(optionValue, currentValue) ? "true" : "false");
+    option.textContent = String(optionValue);
+    menu.append(option);
+  }
+
+  choice.append(menu);
+  return choice;
 }
 
 function renderStatus(snapshot) {
@@ -204,6 +272,39 @@ function render(model, el) {
 
 export default {
   render({ model, el }) {
+    el.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const option = target.closest("[data-hypster-choice-option]");
+      if (option instanceof HTMLElement && option.dataset.path) {
+        closeChoiceMenus(el);
+        send(model, {
+          type: "set_value",
+          path: option.dataset.path,
+          value: decodedValue(option),
+        });
+        return;
+      }
+
+      const trigger = target.closest("[data-hypster-choice-trigger]");
+      if (trigger instanceof HTMLElement) {
+        const choice = trigger.closest(".hypster-choice");
+        if (!(choice instanceof HTMLElement)) return;
+        const menu = choice.querySelector(".hypster-choice-menu");
+        const isOpen = choice.classList.contains("hypster-choice-open");
+        closeChoiceMenus(el);
+        if (!isOpen) {
+          choice.classList.add("hypster-choice-open");
+          trigger.setAttribute("aria-expanded", "true");
+          menu?.removeAttribute("hidden");
+        }
+        return;
+      }
+
+      closeChoiceMenus(el);
+    });
+
     el.addEventListener("change", (event) => {
       const target = event.target;
       if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
