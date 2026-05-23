@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Humanized display labels in explore schema metadata, such as rendering `top_k` as "Top K".
 
 ### Changed
-- The `jupyter` extra now installs `anywidget` for the custom notebook renderer.
+- The `jupyter` extra now installs `anywidget` and `jupyterlab_widgets` for the custom notebook renderer.
 - Interactive snapshots expose draft values, applied values, current status, and explicit exploration or instantiation errors for renderer-neutral UIs.
 
 ### Fixed

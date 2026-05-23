@@ -26,6 +26,7 @@ Dependencies:
 
 * [anywidget](https://github.com/manzt/anywidget)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
+* [jupyterlab_widgets](https://github.com/jupyter-widgets/ipywidgets/tree/main/python/jupyterlab_widgets)
 {% endtab %}
 
 {% tab title="Hyperparameter Optimization (uv)" %}
@@ -53,6 +54,7 @@ Dependencies:
 
 * [anywidget](https://github.com/manzt/anywidget)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
+* [jupyterlab_widgets](https://github.com/jupyter-widgets/ipywidgets/tree/main/python/jupyterlab_widgets)
 {% endtab %}
 
 {% tab title="Development (uv)" %}
@@ -68,6 +70,7 @@ Dependencies:
 
 * [anywidget](https://github.com/manzt/anywidget)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
+* [jupyterlab_widgets](https://github.com/jupyter-widgets/ipywidgets/tree/main/python/jupyterlab_widgets)
 * [ruff](https://github.com/astral-sh/ruff)
 * [mypy](https://github.com/python/mypy)
 * [pytest](https://github.com/pytest-dev/pytest)

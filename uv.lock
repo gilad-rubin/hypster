@@ -395,6 +395,7 @@ source = { editable = "." }
 jupyter = [
     { name = "anywidget" },
     { name = "ipywidgets" },
+    { name = "jupyterlab-widgets" },
 ]
 optuna = [
     { name = "optuna" },
@@ -405,6 +406,7 @@ dev = [
     { name = "anywidget" },
     { name = "coverage", extra = ["toml"] },
     { name = "ipywidgets" },
+    { name = "jupyterlab-widgets" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -428,6 +430,7 @@ test = [
 requires-dist = [
     { name = "anywidget", marker = "extra == 'jupyter'", specifier = ">=0.9.0" },
     { name = "ipywidgets", marker = "extra == 'jupyter'", specifier = ">=8.0.0" },
+    { name = "jupyterlab-widgets", marker = "extra == 'jupyter'", specifier = ">=3.0.0" },
     { name = "optuna", marker = "extra == 'optuna'", specifier = ">=3.6" },
 ]
 provides-extras = ["jupyter", "optuna"]
@@ -437,6 +440,7 @@ dev = [
     { name = "anywidget", specifier = ">=0.9.0" },
     { name = "coverage", extras = ["toml"], specifier = ">=7.0" },
     { name = "ipywidgets", specifier = ">=8.0.0" },
+    { name = "jupyterlab-widgets", specifier = ">=3.0.0" },
     { name = "mypy", specifier = ">=0.950" },
     { name = "pre-commit", specifier = ">=3.0" },
     { name = "pytest", specifier = ">=6.0" },
