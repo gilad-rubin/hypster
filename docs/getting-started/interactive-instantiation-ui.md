@@ -5,8 +5,16 @@ Use `interact()` in a Jupyter notebook when you want to instantiate a configurat
 Install the notebook renderer with the Jupyter extra:
 
 ```bash
+uv add "hypster[jupyter]"
+```
+
+or:
+
+```bash
 pip install "hypster[jupyter]"
 ```
+
+The extra is named `jupyter` because it installs the widget runtime needed by both JupyterLab and notebook frontends.
 
 ```python
 from hypster import HP, interact

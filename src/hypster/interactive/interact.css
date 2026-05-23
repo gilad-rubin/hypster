@@ -67,5 +67,24 @@
 }
 
 .hypster-actions button {
+  border: 1px solid rgba(127, 127, 127, 0.55);
+  border-radius: 2px;
+  padding: 2px 8px;
+  color: inherit;
+  background: rgba(127, 127, 127, 0.12);
+  cursor: pointer;
   font: inherit;
+}
+
+.hypster-actions button:hover:not(:disabled) {
+  background: rgba(127, 127, 127, 0.18);
+}
+
+.hypster-actions button:active:not(:disabled) {
+  background: rgba(127, 127, 127, 0.24);
+}
+
+.hypster-actions button:disabled {
+  cursor: default;
+  opacity: 0.55;
 }

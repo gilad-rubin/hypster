@@ -47,7 +47,7 @@ uv add optuna
 Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
 
 ```bash
-pip install hypster[jupyter]
+pip install "hypster[jupyter]"
 ```
 
 Dependencies:
