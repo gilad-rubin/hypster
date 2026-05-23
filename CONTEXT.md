@@ -135,6 +135,7 @@ _Avoid_: exploration error, validation error
 - Interactive UI renderers should derive **Display Labels** by humanizing names, such as rendering `top_k` as "Top K".
 - An **Interactive Snapshot** is produced by an interactive controller for one current widget state.
 - An **Interactive Snapshot** includes the current **Explore Schema**, **Draft Values**, **Applied Values**, current **Selected Params**, and any current exploration or instantiation error.
+- When an immediate interactive state cannot instantiate, an **Interactive Snapshot** uses `selected_params=None` so renderers do not confuse stale params with the current invalid state.
 - An **Interactive Snapshot** may include notebook-friendly display metadata for an **Instantiation Value**, but the raw **Instantiation Value** remains available through the returned proxy.
 - Remembered branch choices in an interactive session are UI input memory; they are not **Selected Params** until their parameter paths are reachable in the current **Interactive Snapshot**.
 - Notebook, Streamlit, and React renderers should consume the same **Interactive Snapshot** contract instead of each inventing a parameter metadata model.

@@ -1,6 +1,46 @@
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object || {}, key);
+}
+
+function valuesEqual(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function optionValue(option) {
+  if (option.dataset.value == null) return option.value;
+  return JSON.parse(option.dataset.value);
+}
+
+function valueFor(snapshot, parameter) {
+  if (hasOwn(snapshot.draft_values, parameter.path)) {
+    return snapshot.draft_values[parameter.path];
+  }
+  return parameter.selected_value;
+}
+
+function encodedControlValue(input) {
+  const kind = input.dataset.kind;
+  if (
+    kind === "int" ||
+    kind === "float" ||
+    ["multi_int", "multi_float", "multi_text", "multi_bool"].includes(kind)
+  ) {
+    return { encoded_value: { kind, value: input.value } };
+  }
+  return { value: controlValue(input) };
+}
+
+function actionId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 function controlValue(input) {
   if (input instanceof HTMLSelectElement && input.multiple) {
-    return Array.from(input.selectedOptions, (option) => option.value);
+    return Array.from(input.selectedOptions, optionValue);
+  }
+  if (input instanceof HTMLSelectElement) {
+    const option = input.selectedOptions[0];
+    return option ? optionValue(option) : null;
   }
   if (input.type === "checkbox") {
     return input.checked;
@@ -15,7 +55,7 @@ function controlValue(input) {
 }
 
 function send(model, action) {
-  model.set("action", { id: crypto.randomUUID(), ...action });
+  model.set("action", { id: actionId(), ...action });
   model.save_changes();
 }
 
@@ -23,7 +63,7 @@ function labelFor(parameter) {
   return parameter.display_label || parameter.name;
 }
 
-function renderParameter(model, parameter) {
+function renderParameter(model, snapshot, parameter) {
   if (parameter.kind === "group") {
     const group = document.createElement("fieldset");
     group.className = "hypster-group";
@@ -40,7 +80,7 @@ function renderParameter(model, parameter) {
     }
 
     for (const child of parameter.children || []) {
-      group.append(renderParameter(model, child));
+      group.append(renderParameter(model, snapshot, child));
     }
     return group;
   }
@@ -60,11 +100,13 @@ function renderParameter(model, parameter) {
     field.append(description);
   }
 
-  field.append(renderControl(model, parameter));
+  field.append(renderControl(snapshot, parameter));
   return field;
 }
 
-function renderControl(model, parameter) {
+function renderControl(snapshot, parameter) {
+  const currentValue = valueFor(snapshot, parameter);
+
   if (parameter.kind === "select" || parameter.kind === "multi_select") {
     const select = document.createElement("select");
     select.dataset.path = parameter.path;
@@ -72,11 +114,12 @@ function renderControl(model, parameter) {
     select.multiple = parameter.kind === "multi_select";
     for (const optionValue of parameter.options || []) {
       const option = document.createElement("option");
-      option.value = optionValue;
+      option.value = String(select.options.length);
+      option.dataset.value = JSON.stringify(optionValue);
       option.textContent = String(optionValue);
-      option.selected = Array.isArray(parameter.selected_value)
-        ? parameter.selected_value.includes(optionValue)
-        : optionValue === parameter.selected_value;
+      option.selected = Array.isArray(currentValue)
+        ? currentValue.some((selectedValue) => valuesEqual(selectedValue, optionValue))
+        : valuesEqual(optionValue, currentValue);
       select.append(option);
     }
     return select;
@@ -85,7 +128,7 @@ function renderControl(model, parameter) {
   if (parameter.kind === "bool") {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.checked = Boolean(parameter.selected_value);
+    checkbox.checked = Boolean(currentValue);
     checkbox.dataset.path = parameter.path;
     checkbox.dataset.kind = parameter.kind;
     return checkbox;
@@ -94,7 +137,7 @@ function renderControl(model, parameter) {
   const input = document.createElement("input");
   input.dataset.path = parameter.path;
   input.dataset.kind = parameter.kind;
-  input.value = parameter.selected_value ?? "";
+  input.value = parameter.kind.startsWith("multi_") ? JSON.stringify(currentValue ?? []) : (currentValue ?? "");
 
   if (parameter.kind === "int" || parameter.kind === "float") {
     input.type = "number";
@@ -134,7 +177,7 @@ function render(model, el) {
   root.append(renderStatus(snapshot));
 
   for (const parameter of snapshot.schema?.parameters || []) {
-    root.append(renderParameter(model, parameter));
+    root.append(renderParameter(model, snapshot, parameter));
   }
 
   const actions = document.createElement("div");
@@ -169,7 +212,7 @@ export default {
       send(model, {
         type: "set_value",
         path: target.dataset.path,
-        value: controlValue(target),
+        ...encodedControlValue(target),
       });
     });
 

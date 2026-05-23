@@ -131,6 +131,23 @@ def test_interact_manual_apply_keeps_value_on_last_applied_state_until_apply() -
     assert snapshot["status"] == "applied"
 
 
+def test_interact_manual_apply_preserves_sibling_drafts_after_exploration_error() -> None:
+    def config(hp: HP) -> Dict[str, int]:
+        return {
+            "count": hp.int(1, name="count", min=1, max=5),
+            "width": hp.int(2, name="width", min=1, max=5),
+        }
+
+    result = interact(config, auto_apply=False)
+
+    result.dispatch({"type": "set_value", "path": "width", "value": 4})
+    snapshot = result.dispatch({"type": "set_value", "path": "count", "value": 9})
+
+    assert snapshot["status"] == "draft_error"
+    assert snapshot["draft_values"] == {"count": 9, "width": 4}
+    assert result.value == {"count": 1, "width": 2}
+
+
 def test_interact_immediate_apply_exposes_errors_until_fixed() -> None:
     def config(hp: HP) -> Dict[str, int]:
         return {"count": hp.int(1, name="count", min=1, max=5)}
@@ -142,6 +159,9 @@ def test_interact_immediate_apply_exposes_errors_until_fixed() -> None:
     assert snapshot["status"] == "error"
     assert snapshot["error"]["kind"] == "exploration"
     assert "exceeds maximum bound" in snapshot["error"]["message"]
+    assert snapshot["draft_values"] == {"count": 9}
+    assert snapshot["applied_values"] == {"count": 1}
+    assert snapshot["selected_params"] is None
     with pytest.raises(RuntimeError, match="exceeds maximum bound"):
         result.value
     with pytest.raises(RuntimeError, match="exceeds maximum bound"):
@@ -155,6 +175,50 @@ def test_interact_immediate_apply_exposes_errors_until_fixed() -> None:
     assert result.params == {"count": 4}
 
 
+def test_interact_reset_reports_errors_without_stale_value() -> None:
+    state = {"fail": False}
+
+    def config(hp: HP) -> Dict[str, int]:
+        count = hp.int(1, name="count", min=1, max=5)
+        if state["fail"]:
+            raise RuntimeError("reset failed")
+        return {"count": count}
+
+    result = interact(config)
+    result.dispatch({"type": "set_value", "path": "count", "value": 3})
+
+    state["fail"] = True
+    snapshot = result.dispatch({"type": "reset"})
+
+    assert snapshot["status"] == "error"
+    assert snapshot["error"] == {"kind": "exploration", "message": "reset failed"}
+    assert snapshot["selected_params"] is None
+    with pytest.raises(RuntimeError, match="reset failed"):
+        result.value
+
+
+def test_interact_branch_memory_rejects_incompatible_multi_value_history() -> None:
+    def config(hp: HP) -> Dict[str, Any]:
+        mode = hp.select(["a", "b"], name="mode", default="a")
+        if mode == "a":
+            values = hp.multi_int([1], name="values", min=0, max=5)
+            return {"mode": mode, "values": values}
+        return {"mode": mode, "enabled": hp.bool(True, name="enabled")}
+
+    result = interact(config)
+
+    snapshot = result.dispatch({"type": "set_value", "path": "values", "value": [99]})
+
+    assert snapshot["status"] == "error"
+
+    result.dispatch({"type": "set_value", "path": "mode", "value": "b"})
+    snapshot = result.dispatch({"type": "set_value", "path": "mode", "value": "a"})
+
+    assert snapshot["status"] == "applied"
+    assert result.value == {"mode": "a", "values": [1]}
+    assert result.params == {"mode": "a", "values": [1]}
+
+
 def test_interact_widget_view_dispatches_actions_to_same_session() -> None:
     def config(hp: HP) -> Dict[str, int]:
         return {"count": hp.int(1, name="count", min=1, max=5)}
@@ -166,6 +230,44 @@ def test_interact_widget_view_dispatches_actions_to_same_session() -> None:
 
     assert widget.snapshot["selected_params"] == {"count": 2}
     assert result.value == {"count": 2}
+
+
+def test_interact_widget_decodes_numeric_transport_values() -> None:
+    def child(hp: HP) -> Dict[str, float]:
+        return {"temperature": hp.float(0.5, name="temperature", min=0.0, max=2.0)}
+
+    def config(hp: HP) -> Dict[str, Any]:
+        return {"child": hp.nest(child, name="child")}
+
+    result = interact(config)
+    widget = result.interact()
+
+    widget.action = {
+        "id": "test-action",
+        "type": "set_value",
+        "path": "child.temperature",
+        "encoded_value": {"kind": "float", "value": "1"},
+    }
+
+    assert result.params == {"child.temperature": 1.0}
+    assert isinstance(result.params["child.temperature"], float)
+
+
+def test_interact_widget_decodes_empty_multi_value_transport_as_empty_list() -> None:
+    def config(hp: HP) -> Dict[str, list[int]]:
+        return {"values": hp.multi_int([1, 2], name="values", min=0, max=5)}
+
+    result = interact(config)
+    widget = result.interact()
+
+    widget.action = {
+        "id": "test-action",
+        "type": "set_value",
+        "path": "values",
+        "encoded_value": {"kind": "multi_int", "value": ""},
+    }
+
+    assert result.params == {"values": []}
 
 
 def test_interact_multiple_widget_views_share_session_updates() -> None:

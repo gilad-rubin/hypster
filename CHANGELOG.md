@@ -3,6 +3,27 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-05-23
+
+### Added
+- `interact()` for live Jupyter notebook instantiation through an `InteractiveResult` handle with `.value`, `.params`, `.snapshot`, and `.interact()`.
+- A minimal anywidget renderer for interactive instantiation, using file-backed vanilla JavaScript and scoped CSS instead of React or inline HTML blobs.
+- In-memory branch choice memory for interactive sessions, so branch-specific selections are restored when users switch away and back.
+- `auto_apply=False` manual apply mode for staging widget edits before updating `result.value` and `result.params`.
+- Optional `description=` metadata for hyperparameters and `hp.nest(...)`, surfaced in explore schemas and the notebook UI.
+- Humanized display labels in explore schema metadata, such as rendering `top_k` as "Top K".
+
+### Changed
+- The `jupyter` extra now installs `anywidget` for the custom notebook renderer.
+- Interactive snapshots expose draft values, applied values, current status, and explicit exploration or instantiation errors for renderer-neutral UIs.
+
+### Fixed
+- The notebook renderer preserves non-string select values instead of letting HTML option values coerce everything to strings.
+- Multi-select and empty multi-value widget edits now round-trip through the notebook transport correctly.
+- Interactive errors no longer expose stale selected params in snapshots while `result.params` is raising.
+- Branch choice memory skips incompatible remembered multi-value inputs instead of replaying invalid hidden state.
+- Reset now reports exploration or instantiation errors in the snapshot instead of leaking stale values or raising out of the widget action.
+
 ## [0.4.0] - 2026-05-22
 
 ### Added

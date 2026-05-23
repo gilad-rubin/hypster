@@ -24,6 +24,7 @@ uv add "hypster[jupyter]"
 
 Dependencies:
 
+* [anywidget](https://github.com/manzt/anywidget)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
 {% endtab %}
 
@@ -50,6 +51,7 @@ pip install hypster[jupyter]
 
 Dependencies:
 
+* [anywidget](https://github.com/manzt/anywidget)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
 {% endtab %}
 
@@ -64,6 +66,7 @@ uv sync --all-extras --dev
 
 Dependencies:
 
+* [anywidget](https://github.com/manzt/anywidget)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
 * [ruff](https://github.com/astral-sh/ruff)
 * [mypy](https://github.com/python/mypy)

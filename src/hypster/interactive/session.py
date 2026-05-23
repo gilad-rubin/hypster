@@ -78,7 +78,7 @@ class InteractiveSession(Generic[T]):
             "schema": self._schema.to_dict() if self._schema is not None else None,
             "draft_values": dict(self._draft_values),
             "applied_values": dict(self._applied_values),
-            "selected_params": dict(self._params),
+            "selected_params": None if self._applied_error is not None else dict(self._params),
             "mode": {"auto_apply": self.auto_apply},
             "status": self._status(),
             "error": self._snapshot_error(),
@@ -139,12 +139,13 @@ class InteractiveSession(Generic[T]):
         try:
             schema, selected_values = self._build_values(prefix_values)
         except Exception as exc:
-            self._draft_values = dict(prefix_values)
+            self._draft_values = {**self._draft_values, **prefix_values}
             self._draft_error = InteractiveError(kind="exploration", message=str(exc))
             if self.auto_apply:
                 self._applied_error = self._draft_error
             return
 
+        self._memory.remember_many(selected_values)
         self._draft_error = None
         if self.auto_apply:
             try:
@@ -161,11 +162,26 @@ class InteractiveSession(Generic[T]):
 
     def _reset(self) -> None:
         self._memory = BranchChoiceMemory()
-        schema, selected_values = self._build_values(dict(self._baseline_values))
+        try:
+            schema, selected_values = self._build_values(dict(self._baseline_values))
+        except Exception as exc:
+            baseline_values = dict(self._baseline_values)
+            self._draft_values = baseline_values
+            self._applied_values = baseline_values
+            self._draft_error = InteractiveError(kind="exploration", message=str(exc))
+            self._applied_error = self._draft_error
+            return
+
         self._memory.remember_many(selected_values)
         self._draft_error = None
         self._applied_error = None
-        self._apply(schema, selected_values)
+        try:
+            self._apply(schema, selected_values)
+        except Exception as exc:
+            self._schema = schema
+            self._draft_values = dict(selected_values)
+            self._applied_values = dict(selected_values)
+            self._applied_error = InteractiveError(kind="instantiation", message=str(exc))
 
     def _apply_current_draft(self) -> None:
         if self._schema is None:

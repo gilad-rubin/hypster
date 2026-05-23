@@ -2,6 +2,12 @@
 
 Use `interact()` in a Jupyter notebook when you want to instantiate a configuration through a live widget UI.
 
+Install the notebook renderer with the Jupyter extra:
+
+```bash
+pip install "hypster[jupyter]"
+```
+
 ```python
 from hypster import HP, interact
 
@@ -45,6 +51,8 @@ result = interact(model_cfg, auto_apply=False)
 ```
 
 In manual mode, the UI continues to explore draft values so dependent controls stay current, but `result.value` and `result.params` keep returning the last applied state until Apply succeeds.
+
+If a widget selection is invalid, the UI shows the current error. In auto-apply mode, `result.value` and `result.params` raise that error until the widget state is fixed; snapshots report `selected_params=None` so renderer code does not confuse stale params with the current invalid state.
 
 ## Continuing An Interaction
 

@@ -38,13 +38,30 @@ def _is_compatible(parameter: ParameterInfo, value: Any) -> bool:
         return isinstance(value, float) and _matches_bounds(value, parameter)
     if parameter.kind == "text":
         return isinstance(value, str)
+    if parameter.kind == "multi_int":
+        return isinstance(value, list) and all(
+            isinstance(item, int) and _matches_bounds(item, parameter) for item in value
+        )
+    if parameter.kind == "multi_float":
+        return isinstance(value, list) and all(
+            isinstance(item, float) and _matches_bounds(item, parameter) for item in value
+        )
+    if parameter.kind == "multi_text":
+        return isinstance(value, list) and all(isinstance(item, str) for item in value)
+    if parameter.kind == "multi_bool":
+        return isinstance(value, list) and all(isinstance(item, bool) for item in value)
     return True
 
 
 def _matches_options(kind: str, value: Any, options: Iterable[Any]) -> bool:
     option_set = set(options)
     if kind == "multi_select":
-        return isinstance(value, list) and set(value).issubset(option_set)
+        if not isinstance(value, list):
+            return False
+        try:
+            return set(value).issubset(option_set)
+        except TypeError:
+            return False
     return value in option_set
 
 
