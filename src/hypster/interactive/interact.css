@@ -1,0 +1,91 @@
+.hypster-widget {
+  --hypster-border: color-mix(in srgb, currentColor 14%, transparent);
+  --hypster-muted: color-mix(in srgb, currentColor 58%, transparent);
+  --hypster-surface: color-mix(in srgb, Canvas 96%, currentColor 4%);
+  border: 1px solid var(--hypster-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  max-width: 640px;
+  padding: 16px;
+  color: CanvasText;
+  background: Canvas;
+  font: 14px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.hypster-title {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.hypster-status {
+  border-radius: 999px;
+  justify-self: start;
+  padding: 3px 9px;
+  font-size: 12px;
+  color: var(--hypster-muted);
+  background: var(--hypster-surface);
+}
+
+.hypster-status-error,
+.hypster-status-draft_error {
+  color: #9f1d1d;
+  background: #fff1f1;
+}
+
+.hypster-group {
+  border: 1px solid var(--hypster-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+}
+
+.hypster-group > legend {
+  padding: 0 5px;
+  font-weight: 650;
+}
+
+.hypster-field {
+  display: grid;
+  gap: 6px;
+}
+
+.hypster-field-header {
+  font-weight: 580;
+}
+
+.hypster-description {
+  color: var(--hypster-muted);
+  font-size: 12px;
+}
+
+.hypster-field input,
+.hypster-field select {
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 5px 8px;
+  color: inherit;
+  background: Canvas;
+}
+
+.hypster-field input[type="checkbox"] {
+  justify-self: start;
+  min-height: auto;
+}
+
+.hypster-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.hypster-actions button {
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: inherit;
+  background: var(--hypster-surface);
+}

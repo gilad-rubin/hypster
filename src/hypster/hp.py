@@ -34,6 +34,7 @@ class ParameterTracker(Protocol):
         options: Optional[List[Any]] = None,
         minimum: Optional[Union[int, float]] = None,
         maximum: Optional[Union[int, float]] = None,
+        description: Optional[str] = None,
     ) -> None: ...
 
 
@@ -94,6 +95,7 @@ class HP:
         options: Optional[List[Any]] = None,
         minimum: Optional[Union[int, float]] = None,
         maximum: Optional[Union[int, float]] = None,
+        description: Optional[str] = None,
     ) -> None:
         if self.parameter_tracker is None:
             return
@@ -109,15 +111,16 @@ class HP:
                 options=options,
                 minimum=minimum,
                 maximum=maximum,
+                description=description,
             )
 
-    def _record_nest(self, *, path: str, name: str) -> None:
+    def _record_nest(self, *, path: str, name: str, description: Optional[str] = None) -> None:
         if self.parameter_tracker is None:
             return
 
         record = getattr(self.parameter_tracker, "record_nest", None)
         if callable(record):
-            record(path=path, name=name)
+            record(path=path, name=name, description=description)
 
     def _get_value_for_param(self, name: str) -> tuple[Any, bool]:
         """Get value for parameter, returns (value, found)."""
@@ -159,6 +162,7 @@ class HP:
         allow_none: bool = False,
         track_called: bool = False,
         use_validator_name: bool = True,
+        description: Optional[str] = None,
     ) -> Any:
         full_path = self._get_full_param_path(name)
 
@@ -211,6 +215,7 @@ class HP:
             selected_value=validated_value,
             minimum=min,
             maximum=max,
+            description=description,
         )
 
         return validated_value
@@ -227,6 +232,7 @@ class HP:
         min: Optional[Union[int, float]] = None,
         max: Optional[Union[int, float]] = None,
         allow_none: bool = False,
+        description: Optional[str] = None,
     ) -> List[Any]:
         full_path = self._get_full_param_path(name)
 
@@ -268,6 +274,7 @@ class HP:
             selected_value=validated_values,
             minimum=min,
             maximum=max,
+            description=description,
         )
 
         return validated_values
@@ -280,6 +287,7 @@ class HP:
         default: Any = _NO_DEFAULT,
         options_only: bool = False,
         allow_none: bool = False,
+        description: Optional[str] = None,
     ) -> Any:
         validator = SelectValidator()
         full_path = self._get_full_param_path(name)
@@ -307,6 +315,7 @@ class HP:
                 default_value=actual_default,
                 selected_value=validated_key,
                 options=option_keys,
+                description=description,
             )
             return option_map.get(validated_key, validated_key) if is_mapping else validated_key
         else:
@@ -325,6 +334,7 @@ class HP:
                 default_value=actual_default,
                 selected_value=validated_key,
                 options=option_keys,
+                description=description,
             )
             return option_map.get(validated_key, validated_key) if is_mapping else validated_key
 
@@ -336,6 +346,7 @@ class HP:
         default: Optional[List[Any]] = None,
         options_only: bool = False,
         allow_none: bool = False,
+        description: Optional[str] = None,
     ) -> List[Any]:
         validator = SelectValidator()
         full_path = self._get_full_param_path(name)
@@ -370,6 +381,7 @@ class HP:
                 default_value=actual_default,
                 selected_value=validated_keys,
                 options=option_keys,
+                description=description,
             )
             return [option_map.get(k, k) for k in validated_keys] if is_mapping else validated_keys
         else:
@@ -386,6 +398,7 @@ class HP:
                 default_value=actual_default,
                 selected_value=validated_keys,
                 options=option_keys,
+                description=description,
             )
             return [option_map.get(k, k) for k in validated_keys] if is_mapping else validated_keys
 
@@ -403,6 +416,7 @@ class HP:
         track_called: bool = False
         use_validator_name: bool = True
         allow_none: bool = False
+        description: Optional[str] = None
 
     @dataclass(frozen=True)
     class MultiValueSpec:
@@ -415,6 +429,7 @@ class HP:
         min: Optional[Union[int, float]] = None
         max: Optional[Union[int, float]] = None
         allow_none: bool = False
+        description: Optional[str] = None
 
     @dataclass(frozen=True)
     class SelectSingleSpec:
@@ -423,6 +438,7 @@ class HP:
         default: Any = _NO_DEFAULT
         options_only: bool = False
         allow_none: bool = False
+        description: Optional[str] = None
 
     @dataclass(frozen=True)
     class SelectMultiSpec:
@@ -431,6 +447,7 @@ class HP:
         default: Optional[List[Any]] = None
         options_only: bool = False
         allow_none: bool = False
+        description: Optional[str] = None
 
     # --- Unified executors ---
     def _execute_single(self, spec: "HP.SingleValueSpec") -> Any:
@@ -446,6 +463,7 @@ class HP:
             allow_none=spec.allow_none,
             track_called=spec.track_called,
             use_validator_name=spec.use_validator_name,
+            description=spec.description,
         )
 
     def _execute_multi(self, spec: "HP.MultiValueSpec") -> List[Any]:
@@ -459,6 +477,7 @@ class HP:
             min=spec.min,
             max=spec.max,
             allow_none=spec.allow_none,
+            description=spec.description,
         )
 
     def _execute_select_single(self, spec: "HP.SelectSingleSpec") -> Any:
@@ -468,6 +487,7 @@ class HP:
             default=spec.default,
             options_only=spec.options_only,
             allow_none=spec.allow_none,
+            description=spec.description,
         )
 
     def _execute_select_multi(self, spec: "HP.SelectMultiSpec") -> List[Any]:
@@ -477,6 +497,7 @@ class HP:
             default=spec.default,
             options_only=spec.options_only,
             allow_none=spec.allow_none,
+            description=spec.description,
         )
 
     # Composition
@@ -488,6 +509,7 @@ class HP:
         values: Optional[Dict[str, Any]] = None,
         args: tuple = (),
         kwargs: Optional[Dict[str, Any]] = None,
+        description: Optional[str] = None,
     ) -> Any:
         """Nest another configuration function."""
         from .utils import validate_config_func_signature
@@ -524,7 +546,7 @@ class HP:
             nested_values.update(normalize_values(values))
 
         # Create new HP instance for nested call with namespace
-        self._record_nest(path=full_path, name=name)
+        self._record_nest(path=full_path, name=name, description=description)
 
         nested_hp = self.__class__(nested_values, parameter_tracker=self.parameter_tracker)
         nested_hp.namespace_stack = self.namespace_stack + [name]
@@ -593,6 +615,7 @@ class HP:
         strict: bool = False,
         allow_none: Literal[False] = False,
         hpo_spec: "HpoInt | None" = None,
+        description: Optional[str] = None,
     ) -> int: ...
 
     @overload
@@ -606,6 +629,7 @@ class HP:
         strict: bool = False,
         allow_none: Literal[True],
         hpo_spec: "HpoInt | None" = None,
+        description: Optional[str] = None,
     ) -> Optional[int]: ...
 
     def _int(
@@ -618,6 +642,7 @@ class HP:
         strict: bool = False,
         allow_none: bool = False,
         hpo_spec: "HpoInt | None" = None,
+        description: Optional[str] = None,
     ) -> Optional[int]:
         """Integer parameter with optional bounds validation."""
         spec = HP.SingleValueSpec(
@@ -630,6 +655,7 @@ class HP:
             min=min,
             max=max,
             allow_none=allow_none,
+            description=description,
             track_called=True,
             use_validator_name=True,
         )
@@ -646,6 +672,7 @@ class HP:
         strict: bool = False,
         allow_none: Literal[False] = False,
         hpo_spec: "HpoFloat | None" = None,
+        description: Optional[str] = None,
     ) -> float: ...
 
     @overload
@@ -659,6 +686,7 @@ class HP:
         strict: bool = False,
         allow_none: Literal[True],
         hpo_spec: "HpoFloat | None" = None,
+        description: Optional[str] = None,
     ) -> Optional[float]: ...
 
     def _float(
@@ -671,6 +699,7 @@ class HP:
         strict: bool = False,
         allow_none: bool = False,
         hpo_spec: "HpoFloat | None" = None,
+        description: Optional[str] = None,
     ) -> Optional[float]:
         """Float parameter with optional bounds validation."""
         spec = HP.SingleValueSpec(
@@ -683,18 +712,40 @@ class HP:
             min=min,
             max=max,
             allow_none=allow_none,
+            description=description,
             track_called=True,
             use_validator_name=True,
         )
         return self._execute_single(spec)
 
     @overload
-    def _text(self, default: str, *, name: str, allow_none: Literal[False] = False) -> str: ...
+    def _text(
+        self,
+        default: str,
+        *,
+        name: str,
+        allow_none: Literal[False] = False,
+        description: Optional[str] = None,
+    ) -> str: ...
 
     @overload
-    def _text(self, default: Optional[str], *, name: str, allow_none: Literal[True]) -> Optional[str]: ...
+    def _text(
+        self,
+        default: Optional[str],
+        *,
+        name: str,
+        allow_none: Literal[True],
+        description: Optional[str] = None,
+    ) -> Optional[str]: ...
 
-    def _text(self, default: Optional[str], *, name: str, allow_none: bool = False) -> Optional[str]:
+    def _text(
+        self,
+        default: Optional[str],
+        *,
+        name: str,
+        allow_none: bool = False,
+        description: Optional[str] = None,
+    ) -> Optional[str]:
         """Text parameter."""
         spec = HP.SingleValueSpec(
             name=name,
@@ -703,18 +754,40 @@ class HP:
             validator=TextValidator(),
             supports_strict=False,
             allow_none=allow_none,
+            description=description,
             track_called=True,
             use_validator_name=True,
         )
         return self._execute_single(spec)
 
     @overload
-    def _bool(self, default: bool, *, name: str, allow_none: Literal[False] = False) -> bool: ...
+    def _bool(
+        self,
+        default: bool,
+        *,
+        name: str,
+        allow_none: Literal[False] = False,
+        description: Optional[str] = None,
+    ) -> bool: ...
 
     @overload
-    def _bool(self, default: Optional[bool], *, name: str, allow_none: Literal[True]) -> Optional[bool]: ...
+    def _bool(
+        self,
+        default: Optional[bool],
+        *,
+        name: str,
+        allow_none: Literal[True],
+        description: Optional[str] = None,
+    ) -> Optional[bool]: ...
 
-    def _bool(self, default: Optional[bool], *, name: str, allow_none: bool = False) -> Optional[bool]:
+    def _bool(
+        self,
+        default: Optional[bool],
+        *,
+        name: str,
+        allow_none: bool = False,
+        description: Optional[str] = None,
+    ) -> Optional[bool]:
         """Boolean parameter."""
         spec = HP.SingleValueSpec(
             name=name,
@@ -723,6 +796,7 @@ class HP:
             validator=BoolValidator(),
             supports_strict=False,
             allow_none=allow_none,
+            description=description,
             track_called=True,
             use_validator_name=True,
         )
@@ -737,6 +811,7 @@ class HP:
         options_only: bool = False,
         allow_none: bool = False,
         hpo_spec: "HpoCategorical | None" = None,
+        description: Optional[str] = None,
     ) -> Any:
         """Selection parameter from options."""
         spec = HP.SelectSingleSpec(
@@ -745,6 +820,7 @@ class HP:
             default=default,
             options_only=options_only,
             allow_none=allow_none,
+            description=description,
         )
         return self._execute_select_single(spec)
 
@@ -757,6 +833,7 @@ class HP:
         max: Optional[int] = None,
         strict: bool = False,
         allow_none: bool = False,
+        description: Optional[str] = None,
     ) -> List[int]:
         """Multi-integer parameter with optional bounds validation."""
         spec = HP.MultiValueSpec(
@@ -769,6 +846,7 @@ class HP:
             min=min,
             max=max,
             allow_none=allow_none,
+            description=description,
         )
         return self._execute_multi(spec)
 
@@ -781,6 +859,7 @@ class HP:
         max: Optional[float] = None,
         strict: bool = False,
         allow_none: bool = False,
+        description: Optional[str] = None,
     ) -> List[float]:
         """Multi-float parameter with optional bounds validation."""
         spec = HP.MultiValueSpec(
@@ -793,10 +872,18 @@ class HP:
             min=min,
             max=max,
             allow_none=allow_none,
+            description=description,
         )
         return self._execute_multi(spec)
 
-    def _multi_text(self, default: List[str], *, name: str, allow_none: bool = False) -> List[str]:
+    def _multi_text(
+        self,
+        default: List[str],
+        *,
+        name: str,
+        allow_none: bool = False,
+        description: Optional[str] = None,
+    ) -> List[str]:
         """Multi-text parameter."""
         spec = HP.MultiValueSpec(
             name=name,
@@ -805,10 +892,18 @@ class HP:
             element_validator=TextValidator(),
             supports_strict=False,
             allow_none=allow_none,
+            description=description,
         )
         return self._execute_multi(spec)
 
-    def _multi_bool(self, default: List[bool], *, name: str, allow_none: bool = False) -> List[bool]:
+    def _multi_bool(
+        self,
+        default: List[bool],
+        *,
+        name: str,
+        allow_none: bool = False,
+        description: Optional[str] = None,
+    ) -> List[bool]:
         """Multi-boolean parameter."""
         spec = HP.MultiValueSpec(
             name=name,
@@ -817,6 +912,7 @@ class HP:
             element_validator=BoolValidator(),
             supports_strict=False,
             allow_none=allow_none,
+            description=description,
         )
         return self._execute_multi(spec)
 
@@ -828,6 +924,7 @@ class HP:
         default: Optional[List[Any]] = None,
         options_only: bool = False,
         allow_none: bool = False,
+        description: Optional[str] = None,
     ) -> List[Any]:
         """Multi-selection parameter from options."""
         spec = HP.SelectMultiSpec(
@@ -836,6 +933,7 @@ class HP:
             default=default,
             options_only=options_only,
             allow_none=allow_none,
+            description=description,
         )
         return self._execute_select_multi(spec)
 

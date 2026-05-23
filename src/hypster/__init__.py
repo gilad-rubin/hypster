@@ -6,6 +6,7 @@ from importlib.metadata import version as _pkg_version
 from .core import ConfigFunc, InstantiationOutput, instantiate, instantiate_with_params
 from .explore import explore
 from .hp import HP
+from .interactive import InteractiveResult, interact
 
 try:
     # Resolve version from installed package metadata; __name__ == "hypster" at package top-level
@@ -19,7 +20,9 @@ __all__ = [
     "instantiate",
     "instantiate_with_params",
     "InstantiationOutput",
+    "InteractiveResult",
     "explore",
+    "interact",
     "ConfigFunc",
     "__version__",
 ]

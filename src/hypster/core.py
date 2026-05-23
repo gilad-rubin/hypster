@@ -44,6 +44,7 @@ class ParamsTracker:
         options: Optional[list[Any]] = None,
         minimum: Optional[int | float] = None,
         maximum: Optional[int | float] = None,
+        description: Optional[str] = None,
     ) -> None:
         self.params[path] = selected_value
 

@@ -22,7 +22,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-jupyter = ["ipywidgets>=8.0.0"]
+jupyter = ["anywidget>=0.9.0", "ipywidgets>=8.0.0"]
 optuna = ["optuna>=3.6"]
 
 [project.urls]
@@ -84,6 +84,7 @@ include = [
 dev = [
     { include-group = "lint" },
     { include-group = "test" },
+    "anywidget>=0.9.0",
     "ipywidgets>=8.0.0",
 ]
 lint = [
