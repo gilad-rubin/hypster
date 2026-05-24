@@ -19,15 +19,15 @@ layout:
 
 <div data-full-width="false"><figure><picture><source srcset=".gitbook/assets/hypster_text_white_text.png" media="(prefers-color-scheme: dark)"><img src=".gitbook/assets/hypster_with_text (1).png" alt=""></picture><figcaption></figcaption></figure></div>
 
+### Hypster is a lightweight configuration framework for managing and **optimizing AI & ML workflows**
+
 ## Key Features
 
-* :snake: **Pure Python, Not a DSL**: Use normal functions, `if` statements, loops, helper functions, imports, and real object construction
-* :nesting\_dolls: **Hierarchical, Conditional Configurations**: Support for nested and swappable runtime components
+* :snake: **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
+* :nesting\_dolls: **Hierarchical, Conditional Configurations**: Support for nested and swappable configurations
 * :triangular\_ruler: **Type Safety**: Built-in type hints and validation
 * :mag: **Schema Exploration**: Inspect parameters, defaults, and active branches with `explore()`
 * :test_tube: **Hyperparameter Optimization Built-In**: Native, first-class optuna support
-
-Hypster configs are ordinary Python functions rather than a separate configuration language. That keeps them flexible and readable, but it also means Hypster discovers the available parameters by executing the function. Keep config functions fast and side-effect-free: avoid paid API calls, network calls, file writes, training, database access, and costly initialization in code paths used by `explore()`, HPO, or interactive UIs.
 
 > Show your support by giving us a [star](https://github.com/gilad-rubin/hypster)! ⭐
 
