@@ -64,6 +64,10 @@ Or using pip:
 
 ```bash
 pip install hypster
+# optional notebook visualization UI
+pip install 'hypster[viz]'
+# optional HPO backend
+pip install 'hypster[optuna]'
 ```
 
 ## Quick Start

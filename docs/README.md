@@ -99,6 +99,14 @@ uv add 'hypster[optuna]'
 ```
 {% endcode %}
 
+For the notebook visualization UI:
+
+{% code overflow="wrap" %}
+```bash
+uv add 'hypster[viz]'
+```
+{% endcode %}
+
 ## Where To Go Next
 
 <table data-view="cards"><thead><tr><th></th><th></th><th data-hidden data-card-target data-type="content-ref"></th></tr></thead><tbody><tr><td><strong>Getting Started</strong></td><td>Install Hypster, define your first config, explore branches, and instantiate values.</td><td><a href="getting-started/installation.md">installation.md</a></td></tr><tr><td><strong>Examples</strong></td><td>Copy patterns for ML, data processing, AI workflows, nested configs, UI generation, and experiment tracking.</td><td><a href="examples/">examples</a></td></tr><tr><td><strong>Reference</strong></td><td>Exact public API signatures, parameter behavior, error handling, and Optuna integration facts.</td><td><a href="reference/api.md">api.md</a></td></tr></tbody></table>
