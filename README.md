@@ -36,9 +36,6 @@
   </em>
 </p>
 
-> ⚠️ Hypster is in active development and not yet battle-tested in production.
-> If you’re gaining value and want to promote it to production, please reach out!
-
 ## Key Features
 
 - 🐍 **Pure Python, Not a DSL**: Use normal functions, `if` statements, loops, lists, helper functions, imports, and runtime objects
