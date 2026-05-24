@@ -5,11 +5,6 @@ tracking, and replay.
 
 ## Current Status
 
-`instantiate_with_params` exists on the `codex/reproducible-instantiation-params`
-branch, not in the current `master` checkout I inspected.
-
-On that branch:
-
 - `instantiate_with_params(func, values=...)` returns an `InstantiationOutput`.
 - `InstantiationOutput.value` is the same runtime value the normal config would
   return.
@@ -73,9 +68,6 @@ the concrete value your application needs plus the selected parameter dictionary
 your observability stack needs.
 
 ## Example Shape
-
-This is intentionally illustrative. Public docs should update it to the current
-API before publishing.
 
 ```python
 run = instantiate_with_params(rag_config, values={

@@ -108,8 +108,8 @@ README language:
 
 ### Reproducibility And Observability
 
-The `instantiate_with_params` branch adds a dedicated API for returning the
-normal instantiated value plus a replayable params sidecar.
+`instantiate_with_params` returns the normal instantiated value plus a replayable
+params sidecar.
 
 Payoff:
 

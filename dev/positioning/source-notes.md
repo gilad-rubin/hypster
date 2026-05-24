@@ -15,7 +15,7 @@ Local paths inspected:
 - `docs/in-depth/nest.md`
 - `docs/in-depth/basic-best-practices.md`
 - `docs/in-depth/performing-hyperparameter-optimization.md`
-- placeholder reproducibility pages under `docs/reproducibility/`
+- reproducibility pages under `docs/reproducibility/`
 
 Extracted ideas:
 
@@ -29,10 +29,7 @@ Extracted ideas:
 
 Open issues before public positioning:
 
-- Reproducibility pages are placeholders.
-- Interactive docs say the UI was removed, but source/tests include
-  `interactive_explore`.
-- Some philosophy pages are placeholders.
+- Some philosophy pages may still need deeper narrative polish.
 
 ## "Introducing HyPSTER" Article
 
@@ -109,13 +106,7 @@ Public copy translation:
 - "Use nested configs for indexing, retrieval, generation, and evaluation."
 - "Let query type, customer segment, or product mode choose a concrete workflow."
 
-## Reproducible Instantiation Branch
-
-Branch inspected:
-
-- `codex/reproducible-instantiation-params`
-
-Files inspected via `git show`/`git grep`:
+## Reproducible Instantiation
 
 - `src/hypster/core.py`
 - `src/hypster/__init__.py`
@@ -132,11 +123,6 @@ Extracted ideas:
   values should not be silently logged.
 - This API is ideal for MLflow, W&B, Langfuse, OpenTelemetry, or custom
   observability metadata.
-
-Public copy caveat:
-
-- Do not put this in public README as current API until the branch lands on the
-  release branch.
 
 ## Architecture Learning: Hypster Plus Execution Graphs
 

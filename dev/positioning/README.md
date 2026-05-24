@@ -49,14 +49,11 @@ need it.
 
 ## Current Product Truths To Check Before Public Copy
 
-- The current checkout exposes `instantiate`, `explore`, `interactive_explore`,
-  and `apply_vscode_theme`.
-- `instantiate_with_params` exists on the `codex/reproducible-instantiation-params`
-  branch, not in the current `master` checkout.
-- Current docs still have placeholder pages under `docs/reproducibility/`.
-- Current docs mention that interactive UI was removed, while the current source
-  includes `interactive_explore`. Public copy should reconcile this before
-  making interactive UI a headline feature.
+- The current public API exposes `instantiate`, `instantiate_with_params`,
+  `explore`, and `interact`.
+- The notebook UI is installed with the `viz` extra: `hypster[viz]`.
+- Reproducibility docs now cover `instantiate_with_params`, serialization,
+  experiment tracking, observing past runs, and production deployment.
 - Older articles use legacy API names such as `@config`, `hp.number`, automatic
   naming, `final_vars`, `save`, and `load`. Reuse the ideas, but translate
   examples into the current API before publishing.
