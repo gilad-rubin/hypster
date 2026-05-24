@@ -1,6 +1,7 @@
 .hypster-widget {
   --hypster-border: color-mix(in srgb, currentColor 14%, transparent);
   --hypster-muted: color-mix(in srgb, currentColor 58%, transparent);
+  --hypster-menu-shadow: 0 8px 18px rgb(0 0 0 / 18%);
   --hypster-surface: color-mix(in srgb, Canvas 96%, currentColor 4%);
   --hypster-surface-strong: color-mix(in srgb, Canvas 90%, currentColor 10%);
   border: 1px solid var(--hypster-border);
@@ -127,7 +128,7 @@
   background: Canvas;
   border: 1px solid var(--hypster-border);
   border-radius: 6px;
-  box-shadow: 0 10px 24px color-mix(in srgb, CanvasText 16%, transparent);
+  box-shadow: var(--hypster-menu-shadow);
   box-sizing: border-box;
   display: grid;
   gap: 2px;
