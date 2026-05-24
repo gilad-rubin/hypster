@@ -222,10 +222,11 @@ function renderChoiceControl(parameter, currentValue) {
 function renderStatus(snapshot) {
   const status = document.createElement("div");
   status.className = `hypster-status hypster-status-${snapshot.status}`;
-  status.textContent = snapshot.status === "pending" ? "Pending changes" : "Up to date";
+  status.textContent = snapshot.status === "pending" ? "Pending changes" : "Applied";
 
   if (snapshot.error) {
-    status.textContent = snapshot.error.message;
+    status.textContent = `Error: ${snapshot.error.message}`;
+    status.title = snapshot.error.message;
   }
 
   return status;
@@ -238,11 +239,15 @@ function render(model, el) {
   const root = document.createElement("div");
   root.className = "hypster-widget";
 
+  const header = document.createElement("div");
+  header.className = "hypster-header";
+
   const title = document.createElement("div");
   title.className = "hypster-title";
-  title.textContent = snapshot.schema?.name || "Hypster";
-  root.append(title);
-  root.append(renderStatus(snapshot));
+  title.textContent = snapshot.schema?.display_label || snapshot.schema?.name || "Hypster";
+  header.append(title);
+  header.append(renderStatus(snapshot));
+  root.append(header);
 
   for (const parameter of snapshot.schema?.parameters || []) {
     root.append(renderParameter(model, snapshot, parameter));

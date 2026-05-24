@@ -114,6 +114,7 @@ class ConfigSchema:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "name": self.name,
+            "display_label": _humanize_name(self.name),
             "parameters": [parameter.to_dict() for parameter in self.parameters],
         }
 

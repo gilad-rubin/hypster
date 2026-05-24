@@ -53,7 +53,7 @@ Optional human-written helper text attached to a parameter for lightweight displ
 _Avoid_: docstring, tooltip-only text
 
 **Display Label**:
-A human-readable label derived from a parameter or group name unless explicitly provided by schema metadata.
+A human-readable label derived from a config, parameter, or group name unless explicitly provided by schema metadata.
 _Avoid_: parameter path, description
 
 **Interactive Snapshot**:

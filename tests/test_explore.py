@@ -63,6 +63,7 @@ def test_explore_returns_schema_info_and_defaults() -> None:
     }
     assert info.to_dict() == {
         "name": "config",
+        "display_label": "Config",
         "parameters": [
             {
                 "name": "batching",
@@ -121,6 +122,7 @@ def test_explore_includes_descriptions_and_display_labels() -> None:
     group = schema["parameters"][0]
     top_k = group["children"][0]
 
+    assert schema["display_label"] == "Config"
     assert group["display_label"] == "Retrieval"
     assert group["description"] == "Retrieval settings used before generation."
     assert top_k["display_label"] == "Top K"
@@ -259,6 +261,7 @@ def test_explore_to_dict_is_json_serializable() -> None:
     assert info is not None
     assert info.to_dict() == {
         "name": "config",
+        "display_label": "Config",
         "parameters": [
             {
                 "name": "provider",
