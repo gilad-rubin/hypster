@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated lockfile-only vulnerable dependencies for Mako, pytest, and Pygments.
 
 ### Removed
-- Removed the README production-readiness warning block.
+- Removed production-readiness warning blocks from the README and docs.
 
 ## [0.5.2] - 2026-05-24
 
