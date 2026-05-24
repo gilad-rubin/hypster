@@ -1,44 +1,69 @@
-# 🔧 Values & Overrides
+# Values & Overrides
 
-This page explains how to provide overrides to a configuration function using dotted keys and nested dictionaries.
-
-## Basics
-
-A configuration function receives an `HP` object and returns anything (dict, dataclass, model, etc.). Parameters are named explicitly using `name=...`:
+`values=` is the dictionary you pass to `instantiate()`, `instantiate_with_params()`, or `explore()` to select concrete parameter values.
 
 ```python
 from hypster import HP, instantiate
 
 def child(hp: HP):
-    x = hp.int(10, name="x")
-    y = hp.int(20, name="y")
-    return {"x": x, "y": y}
+    return {
+        "x": hp.int(10, name="x"),
+        "y": hp.int(20, name="y"),
+    }
 
 def parent(hp: HP):
-    return hp.nest(child, name="child")
+    return {"child": hp.nest(child, name="child")}
 ```
 
-## Dotted keys
+## Top-Level Values
 
-Use dotted keys to override nested parameters:
+```python
+def config(hp: HP):
+    return {"batch_size": hp.int(32, name="batch_size")}
+
+instantiate(config, values={"batch_size": 64})
+# => {"batch_size": 64}
+```
+
+## Dotted Keys
+
+Use dotted keys for nested parameters:
 
 ```python
 instantiate(parent, values={"child.x": 15})
-# => {"x": 15, "y": 20}
+# => {"child": {"x": 15, "y": 20}}
 ```
 
-## Nested dicts
+## Nested Dictionaries
 
-Provide a nested dict under the nested scope name:
+Nested dictionaries are normalized to the same dotted paths:
 
 ```python
 instantiate(parent, values={"child": {"x": 25}})
-# => {"x": 25, "y": 20}
+# => {"child": {"x": 25, "y": 20}}
 ```
 
-## Duplicate paths
+You can mix dotted keys and nested dictionaries as long as each final parameter path appears once.
 
-Dotted keys and nested dictionaries are two ways to spell the same parameter path. Do not provide the same path twice. Hypster raises even when both values are identical, because duplicate input is ambiguous for logging and replay.
+## Nested Scope Names Are Not Leaves
+
+A nested scope name is a prefix for child parameters, not a parameter leaf by itself. These forms are valid because they target `child.x`:
+
+```python
+instantiate(parent, values={"child.x": 15})
+instantiate(parent, values={"child": {"x": 15}})
+```
+
+This raises because `child` is a scope, not a selectable parameter:
+
+```python
+instantiate(parent, values={"child": 123})
+# ValueError: Unknown or unreachable parameters
+```
+
+## Duplicate Paths
+
+This raises because both entries target `child.x`:
 
 ```python
 instantiate(
@@ -51,19 +76,56 @@ instantiate(
 # ValueError: Duplicate value for 'child.x'
 ```
 
-## Deeply nested
+Hypster raises even when the duplicate values are identical. A single canonical path keeps experiment logs and replay payloads unambiguous.
 
-Dotted keys can target deeper levels, and nested dictionaries can express the same shape. You can mix both forms as long as each final parameter path appears once.
+## Conditional Reachability
+
+Only parameters touched by the active branch may appear in `values=`.
 
 ```python
-instantiate(parent, values={"child": {"x": 25}, "other.y": 30})
+def model_config(hp: HP):
+    family = hp.select(["linear", "forest"], name="family", default="linear", options_only=True)
+
+    if family == "linear":
+        return {"alpha": hp.float(0.1, name="alpha", min=0.0, max=10.0)}
+
+    return {"n_estimators": hp.int(200, name="n_estimators", min=10)}
+
+instantiate(model_config, values={"family": "linear", "n_estimators": 500})
+# ValueError: Unknown or unreachable parameters
 ```
 
-## Unknown and unreachable parameters
+Use `explore(model_config, values={"family": "forest"})` to inspect the branch before instantiating it.
 
-* Unknown or unreachable values (values for parameters on a branch that wasn’t taken) are handled by `on_unknown` in `instantiate`:
-  * `on_unknown="raise"` (default): raise an error
-  * `on_unknown="warn"`: issue a warning
-  * `on_unknown="ignore"`: silently ignore
+## Unknown Policies
 
-Nested dictionaries participate in the same unknown/unreachable check as dotted paths. Hypster includes helpful suggestions when a name looks like a typo, and errors guide you to run `explore(config, values=...)` to inspect the active branch.
+`instantiate()`, `instantiate_with_params()`, and `explore()` accept the same `on_unknown` policy:
+
+| Policy | Behavior |
+| --- | --- |
+| `"raise"` | Default. Raise on unknown or unreachable values. |
+| `"warn"` | Emit a warning and continue. |
+| `"ignore"` | Ignore unknown or unreachable values. |
+
+Prefer the default for experiments and production replay. Softer policies are useful when migrating old payloads or rendering exploratory UIs.
+
+## Select Keys vs Complex Values
+
+Nested dictionaries inside `values=` are interpreted as nested parameter paths. If you need a select option whose runtime value is a dictionary, use dict-backed `select`:
+
+```python
+def config(hp: HP):
+    return hp.select(
+        {
+            "small": {"layers": 2},
+            "large": {"layers": 4},
+        },
+        name="model",
+        default="small",
+    )
+
+instantiate(config, values={"model": "large"})
+# => {"layers": 4}
+```
+
+Do not pass `values={"model": {"layers": 4}}`; Hypster will treat that as a nested parameter path.

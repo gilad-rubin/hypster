@@ -1,8 +1,5 @@
-# 🪄 Usage Examples
+# Usage Examples
 
-Hypster's configuration system can be applied to various domains. Here are practical examples showing how to create type-safe, modular configurations for different use cases.
+The examples section moved to [Examples Overview](../../examples/README.md).
 
-Check out the following tutorials for basic examples:
-
-1. [Machine Learning](basic-example.md)
-2. [LLM Generation](llms-and-generative-ai.md)
+Start there for current examples covering machine learning, data processing, AI workflows, nested configs, interactive UIs, and experiment tracking.

@@ -1,72 +1,84 @@
-# 🧪 Performing Hyperparameter Optimization
+# Performing Hyperparameter Optimization
 
-This page shows how to run HPO using Hypster’s define-by-run configs and typed HPO specs. The examples use Optuna.
+Hypster's Optuna integration lets the same config function define both runtime configuration and a branch-aware search space.
 
-## Concepts
+For the task recipe, see [Perform Hyperparameter Optimization](../how-to/perform-hyperparameter-optimization.md). This page explains the model.
 
-* Define-by-run: your config executes conditionally; only touched parameters are suggested.
-* Inline HPO specs (optional): pass `hpo_spec=` to encode search semantics (log/step/ordered) next to each parameter. If you omit it, sensible defaults are used: linear scale, no quantization (step=None), and unordered categoricals (ordered=False).
+## Mental Model
 
-HPO spec classes (backend-agnostic):
+1. A config function calls `hp.int`, `hp.float`, and `hp.select`.
+2. `suggest_values(trial, config=...)` runs that config with a trial-backed `HP` proxy.
+3. The proxy asks Optuna for values and returns a `values` dictionary.
+4. You pass that dictionary to `instantiate(config, values=values)`.
+5. Your objective evaluates the instantiated runtime object.
 
-* `HpoInt(step=None, scale="linear"|"log", base=10.0, include_max=True)`
-* `HpoFloat(step=None, scale="linear"|"log", base=10.0, distribution=None|"uniform"|"loguniform"|"normal"|"lognormal", center=None, spread=None)`
-* `HpoCategorical(ordered=False, weights=None)`
+Because the config is executed normally, conditionals work naturally. If Optuna samples `family="linear"`, only the linear parameters are suggested.
 
-## Installation
+## Search Semantics Live Next To Parameters
 
-```bash
-uv add 'hypster[optuna]'
-# or
-uv add optuna
-```
-
-## Minimal example (Optuna)
+Use `hpo_spec=` to document search semantics where the parameter is defined:
 
 ```python
-import optuna
-from sklearn.datasets import make_classification
-from sklearn.model_selection import cross_val_score
-from sklearn.ensemble import RandomForestClassifier, LogisticRegression
+from hypster import HP
+from hypster.hpo.types import HpoFloat, HpoInt
 
-from hypster import HP, instantiate
-from hypster.hpo.types import HpoInt, HpoFloat, HpoCategorical
-from hypster.hpo.optuna import suggest_values
-
-
-def model_cfg(hp: HP):
-    # hpo_spec is optional; defaults are linear scale and unordered categoricals
-    kind = hp.select(["rf", "lr"], name="kind")
-
-    if kind == "rf":
-        # with explicit hpo_spec (quantized int and 0.5 step float)
-        n = hp.int(100, name="n_estimators", min=50, max=300, hpo_spec=HpoInt(step=50))
-        d = hp.float(10.0, name="max_depth", min=2.0, max=30.0, hpo_spec=HpoFloat(step=0.5))
-        return RandomForestClassifier(n_estimators=n, max_depth=d, random_state=42)
-
-    else:
-        # without hpo_spec: float uses linear scale by default
-        C = hp.float(1.0, name="C", min=1e-5, max=10.0)
-        # with explicit hpo_spec (categorical ordered flag)
-        solver = hp.select(["lbfgs", "saga"], name="solver", hpo_spec=HpoCategorical(ordered=False))
-        return LogisticRegression(C=C, solver=solver, max_iter=2000, random_state=42)
-
-
-def objective(trial: optuna.Trial) -> float:
-    values = suggest_values(trial, config=model_cfg)
-    model = instantiate(model_cfg, values=values)
-    X, y = make_classification(n_samples=400, n_features=20, n_informative=10, random_state=42)
-    return cross_val_score(model, X, y, cv=3, n_jobs=-1).mean()
-
-
-study = optuna.create_study(direction="maximize")
-study.optimize(objective, n_trials=30)
-print(study.best_value, study.best_params)
+def config(hp: HP):
+    return {
+        "learning_rate": hp.float(
+            0.001,
+            name="learning_rate",
+            min=1e-6,
+            max=1.0,
+            hpo_spec=HpoFloat(scale="log"),
+        ),
+        "batch_size": hp.int(
+            64,
+            name="batch_size",
+            min=16,
+            max=512,
+            hpo_spec=HpoInt(step=16),
+        ),
+    }
 ```
 
-## Notes
+Normal `instantiate()` ignores `hpo_spec`; the Optuna adapter consumes it.
 
-* Supported params: `hp.int`, `hp.float`, `hp.select`.
-* Multi-value params exist in Hypster but are not expanded for HPO in the Optuna integration yet.
-* It’s straightforward to add other backends (e.g., Ray Tune). If you’re interested, please open an issue or PR.
-* For Optuna-specific details and ask-and-tell examples, see the Integrations section.
+## Supported Surface
+
+The current Optuna adapter supports:
+
+* `hp.int`
+* `hp.float`
+* `hp.select`
+* `hp.nest`
+
+It does not expand multi-value parameters such as `hp.multi_select`. Model those choices as individual scalar or categorical parameters when they need to be optimized.
+
+The adapter rejects `hpo_spec` fields that Optuna cannot honor rather than silently ignoring them:
+
+* `HpoInt(step=..., scale="linear"|"log", include_max=...)` is supported; custom `base=...` is rejected.
+* `HpoFloat(step=..., scale="linear"|"log")` is supported.
+* `HpoFloat(distribution="uniform")` maps to non-log `suggest_float()`.
+* `HpoFloat(distribution="loguniform")` maps to `suggest_float(..., log=True)`.
+* `HpoFloat(distribution="normal"|"lognormal")`, `center=...`, `spread=...`, and custom `base=...` are rejected.
+* `HpoCategorical(ordered=False, weights=None)` is supported; `ordered=True` and `weights=...` are rejected.
+
+Nested HPO paths behave like normal nested values. Explicit child-local overrides passed with `hp.nest(..., values=...)` are validated before `suggest_values()` returns.
+
+## Nullable Values
+
+Nullable numeric HPO parameters are not supported directly. Model the nullable choice as a categorical branch:
+
+```python
+def tree_config(hp: HP):
+    depth_mode = hp.select(["unlimited", "bounded"], name="depth_mode", default="bounded", options_only=True)
+
+    if depth_mode == "unlimited":
+        return {"max_depth": None}
+
+    return {"max_depth": hp.int(12, name="max_depth", min=1, max=64)}
+```
+
+## Exact API
+
+See [Optuna HPO API](../reference/optuna-hpo.md) for signatures and supported spec fields.

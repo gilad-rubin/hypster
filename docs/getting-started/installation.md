@@ -1,83 +1,128 @@
-# 🖥️ Installation
+# Installation
 
-Hypster is a lightweight package with minimal dependencies.
+Hypster's core package has no runtime dependencies and supports Python 3.10, 3.11, and 3.12.
 
-{% tabs %}
-{% tab title="Basic Installation (uv)" %}
+## Install With uv
+
 ```bash
 uv add hypster
 ```
-{% endtab %}
 
-{% tab title="Basic Installation (pip)" %}
+Install Optuna support when you want hyperparameter optimization:
+
 ```bash
-pip install hypster
+uv add "hypster[optuna]"
 ```
-{% endtab %}
 
-{% tab title="Interactive Visualization UI (uv)" %}
-Hypster comes with an interactive **notebook UI** to make instantiation as easy as :pie:
+Install the notebook visualization extra when you want Hypster's interactive instantiation UI:
 
 ```bash
 uv add "hypster[viz]"
 ```
 
-Dependencies:
+The `viz` extra installs `anywidget`, `ipywidgets`, and `jupyterlab_widgets` for Jupyter Notebook, JupyterLab, and VS Code notebooks.
 
-* [anywidget](https://github.com/manzt/anywidget)
-* [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
-* [jupyterlab_widgets](https://github.com/jupyter-widgets/ipywidgets/tree/main/python/jupyterlab_widgets)
-{% endtab %}
-
-{% tab title="Hyperparameter Optimization (uv)" %}
-Install Hypster with Optuna extras:
+If you are starting a notebook project from scratch, install the notebook frontend and Hypster widget runtime together:
 
 ```bash
-uv add 'hypster[optuna]'
+uv add "hypster[viz]" jupyterlab
 ```
 
-Or add Optuna directly:
+## Install With pip
+
+Check that `python` points at a supported interpreter first:
 
 ```bash
-uv add optuna
+python --version
 ```
-{% endtab %}
 
-{% tab title="Interactive Visualization UI (pip)" %}
-Hypster comes with an interactive **notebook UI** to make instantiation as easy as :pie:
+Hypster supports Python 3.10, 3.11, and 3.12.
 
 ```bash
+pip install hypster
+```
+
+Optional extras:
+
+```bash
+pip install "hypster[optuna]"
 pip install "hypster[viz]"
 ```
 
-Dependencies:
+For a new JupyterLab environment:
 
-* [anywidget](https://github.com/manzt/anywidget)
-* [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
-* [jupyterlab_widgets](https://github.com/jupyter-widgets/ipywidgets/tree/main/python/jupyterlab_widgets)
-{% endtab %}
+```bash
+python -m pip install "hypster[viz]" jupyterlab
+```
 
-{% tab title="Development (uv)" %}
-Interested in **contributing to Hypster?** Go ahead and install the full development suite using:
+## Verify The Install
+
+Run a smoke test in the same environment where your project runs:
+
+```python
+from dataclasses import dataclass
+
+from hypster import HP, explore, instantiate
+
+
+@dataclass(frozen=True)
+class DataSettings:
+    path: str
+    batch_size: int
+
+
+def config(hp: HP) -> DataSettings:
+    return DataSettings(
+        path=hp.text("data/train.csv", name="path"),
+        batch_size=hp.int(32, name="batch_size", min=1),
+    )
+
+
+explore(config)
+settings = instantiate(config, values={"batch_size": 64})
+assert settings.batch_size == 64
+```
+
+Expected tree:
+
+```text
+config
+├── path: text = 'data/train.csv'
+└── batch_size: int = 32  (min: 1)
+```
+
+## Check The Version
+
+With uv:
+
+```bash
+uv run python -c "import hypster; print(hypster.__version__)"
+```
+
+With pip or a manually managed interpreter:
+
+```bash
+python -c "import hypster; print(hypster.__version__)"
+```
+
+Inside Python:
+
+```python
+import hypster
+
+print(hypster.__version__)
+```
+
+## Development Setup
 
 ```bash
 git clone https://github.com/gilad-rubin/hypster.git
 cd hypster
 uv sync --all-extras --dev
+uv run pytest
 ```
 
-Dependencies:
-
-* [anywidget](https://github.com/manzt/anywidget)
-* [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
-* [jupyterlab_widgets](https://github.com/jupyter-widgets/ipywidgets/tree/main/python/jupyterlab_widgets)
-* [ruff](https://github.com/astral-sh/ruff)
-* [mypy](https://github.com/python/mypy)
-* [pytest](https://github.com/pytest-dev/pytest)
-{% endtab %}
-
-{% tab title="Development (pip)" %}
-Hypster's maintainer tooling lives in local `uv` dependency groups rather than a published `dev` extra, so a `pip`-based setup installs runtime extras and maintainer tools separately.
+Hypster's maintainer tooling lives in local `uv` dependency groups rather than a published `dev` extra, so a `pip`-based setup installs runtime extras and maintainer tools separately:
 
 ```bash
 git clone https://github.com/gilad-rubin/hypster.git
@@ -87,73 +132,45 @@ python -m pip install pytest pytest-cov "coverage[toml]" ruff mypy pre-commit py
 ```
 
 Adjust the extras in the first command if you only need a subset of the optional runtime integrations.
-{% endtab %}
-{% endtabs %}
-
-## Verification
-
-After installation, you can verify your setup by running:
-
-```python
-import hypster
-print(hypster.__version__)
-```
-
-## System Requirements
-
-* Python 3.10 or higher
-* Optional: Jupyter Notebook, JupyterLab, or VS Code notebooks for interactive features
 
 ## Troubleshooting
 
-If you encounter any installation issues:
-
-### With uv (recommended):
-
-1. Ensure uv is up to date:
+If `import hypster` fails, check that your package manager installed Hypster into the interpreter running your code:
 
 ```bash
-uv self update
+python -m pip show hypster
+python -c "import hypster; print(hypster.__version__)"
 ```
 
-2. Ensure `hypster` is up to date
+If Optuna imports fail, install the optional extra:
 
 ```bash
-uv add --upgrade hypster
+python -m pip install "hypster[optuna]"
 ```
 
-3. For notebook UI issues, make sure your notebook frontend is properly installed:
+If `interact()` says the visualization extra is missing, install the notebook widget extra and restart the notebook kernel:
 
 ```bash
-# For JupyterLab
+python -m pip install "hypster[viz]"
+```
+
+For notebook UI issues, make sure your notebook frontend is installed:
+
+```bash
+# JupyterLab
 uv add jupyterlab
 
-# Or 'classic' Jupyter Notebook
+# Classic Jupyter Notebook
 uv add notebook
 ```
 
-### With pip:
-
-1. Ensure your pip is up to date:
+With pip:
 
 ```bash
-pip install -U pip
+python -m pip install -U jupyterlab
+python -m pip install -U notebook
 ```
 
-2. Ensure `hypster` is up to date
+In VS Code notebooks, the Jupyter extension may ask to enable downloads for `anywidget` support files the first time the widget renders. Accept that prompt, then rerun the cell.
 
-```bash
-pip install -U hypster
-```
-
-3. For notebook UI issues, make sure your notebook frontend is properly installed:
-
-```bash
-# For JupyterLab
-pip install -U jupyterlab
-
-# Or 'classic' Jupyter Notebook
-pip install -U notebook
-```
-
-3. If you're still having problems, please [open an issue](https://github.com/gilad-rubin/hypster/issues) on our GitHub repository.
+Hypster config functions are plain Python. No CLI, project initialization, or config file format is required.

@@ -1,150 +1,108 @@
-# 🔎 Exploring a Configuration Space
+# Explore A Configuration Space
 
-Use `explore(func, values=...)` to inspect which parameters a configuration exposes before you instantiate it.
+Use `explore()` to inspect the parameters that are reachable for the active branch of a config function. Because Hypster configs are pure Python rather than a declarative DSL, exploration discovers the schema by executing the config with a schema-recording `HP`. It follows the same Python conditionals, loops, and helper calls as `instantiate()`.
 
-* **See the shape first** - Print a tree of parameters, defaults, bounds, and options.
-* **Follow real branches** - Pass `values=` to inspect the branch that would execute for a specific choice.
-* **Use the same override format** - `explore()` accepts the same dotted keys you already use with `instantiate()`.
-* **Get structured metadata** - Return a `ConfigSchema` object for programmatic tooling.
+That execution should be cheap and safe. Keep side effects, paid API calls, database work, file writes, training, and costly object construction outside the config paths you explore.
 
-## Print the parameter tree
+## Print The Parameter Tree
 
 ```python
 from hypster import HP, explore
 
-
-def openai(hp: HP):
-    model = hp.select(["gpt-4o-mini", "gpt-4.1"], name="model", default="gpt-4o-mini")
-    temperature = hp.float(0.2, name="temperature", min=0.0, max=2.0)
-    return {"model": model, "temperature": temperature}
-
-
-def gemini(hp: HP):
-    model = hp.select(["flash-lite", "pro"], name="model", default="flash-lite")
-    thinking_level = hp.select(
-        [None, "minimal", "elevated"],
-        name="thinking_level",
-        default=None,
-        allow_none=True,
-    )
-    return {"model": model, "thinking_level": thinking_level}
-
-
-def query_llm(hp: HP):
-    provider = hp.select(["gemini", "openai"], name="provider", default="gemini")
-
-    if provider == "gemini":
-        provider_config = hp.nest(gemini, name="gemini")
-    else:
-        provider_config = hp.nest(openai, name="openai")
-
-    return {"provider": provider, "config": provider_config}
-
-
-def query_graph_config(hp: HP):
-    output_mode = hp.select(["text", "structured"], name="output_mode", default="text")
-    max_tokens = hp.int(100000, name="max_tokens", min=1000)
-    query_model = hp.nest(query_llm, name="query_llm")
-    system_prompt = hp.text("", name="system_prompt")
+def local_backend(hp: HP):
     return {
-        "output_mode": output_mode,
-        "max_tokens": max_tokens,
-        "query_llm": query_model,
-        "system_prompt": system_prompt,
+        "threads": hp.int(4, name="threads", min=1, max=64),
+        "cache": hp.bool(True, name="cache"),
     }
 
+def remote_backend(hp: HP):
+    return {
+        "endpoint": hp.text("https://api.example.com", name="endpoint"),
+        "timeout": hp.float(10.0, name="timeout", min=0.1, max=120.0),
+    }
 
-explore(query_graph_config)
+def app_config(hp: HP):
+    backend = hp.select(["local", "remote"], name="backend", default="local", options_only=True)
+
+    if backend == "local":
+        settings = hp.nest(local_backend, name="local")
+    else:
+        settings = hp.nest(remote_backend, name="remote")
+
+    return {"backend": backend, "settings": settings}
+
+explore(app_config)
 ```
 
-Output:
+Expected output:
 
 ```text
-query_graph_config
-├── output_mode: select = "text"  (options: ["text", "structured"])
-├── max_tokens: int = 100000  (min: 1000)
-├── query_llm
-│   ├── provider: select = "gemini"  (options: ["gemini", "openai"])
-│   └── gemini
-│       ├── model: select = "flash-lite"  (options: ["flash-lite", "pro"])
-│       └── thinking_level: select = None  (options: [None, "minimal", "elevated"])
-└── system_prompt: text = ""
+app_config
+├── backend: select = "local"  (options: ["local", "remote"])
+└── local
+    ├── threads: int = 4  (1-64)
+    └── cache: bool = True
 ```
 
-Use this when you want to answer questions like:
+## Explore A Different Conditional Branch
 
-* Which parameters exist on this branch?
-* What is the default value?
-* Which options are valid?
-* Which knobs are nested under a child config?
-
-## Explore a different conditional branch
-
-Pass the same dotted overrides you would use with `instantiate()`:
+Pass `values=` to choose a branch before tracing it:
 
 ```python
 explore(
-    query_graph_config,
-    values={"query_llm.provider": "openai", "query_llm.openai.temperature": 0.7},
+    app_config,
+    values={"backend": "remote", "remote.timeout": 30.0},
 )
 ```
 
-Output:
+Expected output:
 
 ```text
-query_graph_config
-├── output_mode: select = "text"  (options: ["text", "structured"])
-├── max_tokens: int = 100000  (min: 1000)
-├── query_llm
-│   ├── provider: select = "openai"  (options: ["gemini", "openai"])
-│   └── openai
-│       ├── model: select = "gpt-4o-mini"  (options: ["gpt-4o-mini", "gpt-4.1"])
-│       └── temperature: float = 0.7  (0.0-2.0)
-└── system_prompt: text = ""
+app_config
+├── backend: select = "remote"  (options: ["local", "remote"])
+└── remote
+    ├── endpoint: text = "https://api.example.com"
+    └── timeout: float = 30.0  (0.1-120.0)
 ```
 
-This is useful for conditional configs where different branches expose different parameters.
-
-## Get structured metadata
+## Get Structured Metadata
 
 Use `return_info=True` when you want to inspect the schema in code:
 
 ```python
-info = explore(query_graph_config, return_info=True)
+info = explore(app_config, return_info=True)
 
-info.defaults()
-# {
-#     "output_mode": "text",
-#     "max_tokens": 100000,
-#     "query_llm.provider": "gemini",
-#     "query_llm.gemini.model": "flash-lite",
-#     "query_llm.gemini.thinking_level": None,
-#     "system_prompt": "",
-# }
-
-info.to_dict()
-# JSON-serializable nested structure
+print(info.defaults())
+print(info.to_dict())
 ```
+
+For programmatic inspection before instantiation, use `schema = explore(config, return_info=True)` and read `schema.to_dict()["parameters"]`. Use plain `explore(config)` when a printed tree is enough.
+
+`defaults()` returns a flat dictionary of the active branch's default parameter values:
+
+```python
+{
+    "backend": "local",
+    "local.threads": 4,
+    "local.cache": True,
+}
+```
+
+## When To Use `explore()` vs `instantiate()`
+
+| Use | API |
+| --- | --- |
+| Print the active tree | `explore(config)` |
+| Build a UI or schema export | `explore(config, return_info=True)` |
+| Inspect a conditional branch | `explore(config, values={...})` |
+| Get the runtime object | `instantiate(config, values={...})` |
 
 By default, `explore()` raises when `values=` contains unknown names or overrides for a branch that was not reached. Pass `on_unknown="warn"` to inspect while warning, or `on_unknown="ignore"` to silence it.
 
-## When to use `explore()` vs `instantiate()`
-
-Use `explore()` to understand the configuration space.
-
-Call `instantiate()` when you need the actual object, dict, or workflow your config returns.
-
-```python
-from hypster import instantiate
-
-cfg = instantiate(
-    query_graph_config,
-    values={"query_llm.provider": "openai", "query_llm.openai.model": "gpt-4.1"},
-)
-```
-
 ## Notes
 
-* `explore()` only shows the branch that executes for the provided `values`.
-* Nested configs appear as groups, and parameter paths use dotted names such as `query_llm.provider`.
-* The `values=` argument follows the same override rules documented in [Values & Overrides](../in-depth/values-and-overrides.md).
+* Exploration runs your config function. Keep config functions fast and side-effect-free, just like you would for HPO or interactive UI generation.
+* Avoid paid API calls, database calls, file writes, training loops, and costly resource initialization in code paths that `explore()` will execute.
+* `explore()` records `hp.*` parameters, nested groups, defaults, selected values, options, and numeric bounds.
+* Select choices are converted to JSON-friendly values in `to_dict()`.
+* `explore()` does not instantiate external services unless your config function does so directly.

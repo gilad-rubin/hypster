@@ -1,44 +1,72 @@
 # Optuna
 
-Optuna is a popular black-box optimizer. This page shows how to use Optuna with Hypster.
+Optuna is the first supported HPO backend for Hypster. The integration lives in `hypster.hpo.optuna`.
 
-## Installation
+## Install
 
 ```bash
 uv add 'hypster[optuna]'
-# or
-uv add optuna
 ```
 
-## Usage
+or:
 
-See Advanced → [Performing Hyperparameter Optimization](../in-depth/performing-hyperparameter-optimization.md) for a full example. Summary:
+```bash
+pip install 'hypster[optuna]'
+```
 
-1. Define your Hypster config (hpo\_spec is optional; defaults are sensible).
-2. In your objective, call `hypster.hpo.optuna.suggest_values(trial, config=...)` to get a values dict.
-3. Instantiate your config with those values and evaluate.
+## Basic Pattern
 
 ```python
 import optuna
 from hypster import HP, instantiate
 from hypster.hpo.optuna import suggest_values
+from hypster.hpo.types import HpoFloat, HpoInt
 
+def model_config(hp: HP):
+    family = hp.select(["linear", "forest"], name="family", default="forest", options_only=True)
 
-def model_cfg(hp: HP):
-    kind = hp.select(["rf", "lr"], name="kind")  # hpo_spec omitted: linear/unordered defaults
-    # ... conditional params ...
-    return {"model": ("rf", 100, 10.0)}
+    if family == "linear":
+        alpha = hp.float(
+            0.1,
+            name="alpha",
+            min=1e-4,
+            max=10.0,
+            hpo_spec=HpoFloat(scale="log"),
+        )
+        return {"family": family, "alpha": alpha}
 
+    n_estimators = hp.int(
+        200,
+        name="n_estimators",
+        min=50,
+        max=1000,
+        hpo_spec=HpoInt(step=50),
+    )
+    return {"family": family, "n_estimators": n_estimators}
 
 def objective(trial: optuna.Trial) -> float:
-    values = suggest_values(trial, config=model_cfg)
-    cfg = instantiate(model_cfg, values=values)
-    # ... train/evaluate with cfg["model"] ...
-    return 0.0
+    values = suggest_values(trial, config=model_config)
+    cfg = instantiate(model_config, values=values)
+    return train_and_score(cfg)
+
+study = optuna.create_study(direction="maximize")
+study.optimize(objective, n_trials=30)
 ```
 
-## Notes
+## What Is Supported
 
-* Supports scalar parameters: `hp.int`, `hp.float`, `hp.select`.
-* Multi-\* parameters are not expanded in the Optuna adapter (use booleans or explicit scalars if needed).
-* It’s easy to add other backends (e.g., Ray Tune). Please open an issue or PR if you’re interested.
+* `hp.int`, backed by `trial.suggest_int`
+* `hp.float`, backed by `trial.suggest_float`
+* `hp.select`, backed by `trial.suggest_categorical`
+* `hp.nest`, which prefixes nested parameter paths
+
+Multi-value HP calls are not expanded by the current adapter.
+
+The adapter only accepts HPO spec fields that Optuna can represent. Supported fields include `HpoInt(step=..., scale=..., include_max=...)`, `HpoFloat(step=..., scale=...)`, `HpoFloat(distribution="uniform"|"loguniform")`, and `HpoCategorical(ordered=False, weights=None)`. Unsupported fields such as custom `base=...`, normal/lognormal float distributions, `center=...`, `spread=...`, ordered categoricals, and categorical weights raise instead of being ignored.
+
+Nested explicit overrides passed through `hp.nest(..., values=...)` are validated before `suggest_values()` returns.
+
+## More
+
+* [Perform Hyperparameter Optimization](../how-to/perform-hyperparameter-optimization.md)
+* [Optuna HPO API](../reference/optuna-hpo.md)

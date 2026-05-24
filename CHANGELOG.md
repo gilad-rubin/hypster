@@ -3,6 +3,13 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-05-24
+
+### Changed
+- Overhauled the GitBook documentation with updated getting-started, examples, how-to, reference, integration, and reproducibility pages.
+- Clarified that Hypster configs are ordinary Python functions rather than a DSL, including the define-by-run implications for `explore()`, `interact()`, HPO, and custom UIs.
+- Documented the preferred typed-runtime-object return pattern across quickstart and best-practice examples.
+
 ## [0.5.1] - 2026-05-24
 
 ### Fixed

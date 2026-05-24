@@ -2,6 +2,8 @@
 
 Use `interact()` in a notebook when you want to instantiate a configuration through a live widget UI.
 
+`interact()` uses the same pure-Python define-by-run model as `explore()`: it runs the config to discover the currently reachable controls. In auto-apply mode it can rerun the config on every valid widget change, and in manual mode it still explores draft changes so dependent controls stay current. Keep configs used with `interact()` fast and side-effect-free.
+
 Install the notebook renderer with the visualization extra:
 
 ```bash
@@ -14,39 +16,55 @@ or:
 pip install "hypster[viz]"
 ```
 
-The `viz` extra installs the widget runtime needed by Jupyter Notebook, JupyterLab, and VS Code notebooks.
+The `viz` extra installs the widget runtime needed by Jupyter Notebook, JupyterLab, and VS Code notebooks. In VS Code, the Jupyter extension may ask to enable downloads for `anywidget` support files the first time a widget is displayed. Accept that prompt, then rerun the cell.
 
-In VS Code, the Jupyter extension may ask to **Enable Downloads** for `anywidget` support files the first time a widget is displayed. Accept that prompt, then rerun the cell.
+## Start An Interaction
 
 ```python
+from dataclasses import dataclass
+
 from hypster import HP, interact
 
 
-def model_cfg(hp: HP):
+@dataclass(frozen=True)
+class ModelSettings:
+    provider: str
+    model: str
+    temperature: float
+    cache: bool
+
+
+def model_config(hp: HP) -> ModelSettings:
     provider = hp.select(
-        ["openai", "gemini"],
+        ["openai", "anthropic"],
         name="provider",
         default="openai",
         description="Chooses which provider branch is active.",
     )
-    if provider == "gemini":
-        model = hp.select(["flash-lite", "pro"], name="model", default="flash-lite")
+    if provider == "anthropic":
+        model = hp.select(["claude-haiku", "claude-sonnet"], name="model")
     else:
-        model = hp.select(["gpt-4o-mini", "gpt-4.1"], name="model", default="gpt-4o-mini")
+        model = hp.select(["gpt-4o-mini", "gpt-4.1"], name="model")
 
-    temperature = hp.float(0.2, name="temperature", min=0.0, max=1.0)
-    return {"provider": provider, "model": model, "temperature": temperature}
+    return ModelSettings(
+        provider=provider,
+        model=model,
+        temperature=hp.float(0.2, name="temperature", min=0.0, max=1.0),
+        cache=hp.bool(True, name="cache"),
+    )
 
 
-result = interact(model_cfg)
+result = interact(model_config)
 ```
 
 `interact()` returns an interactive result handle, not the raw configured object. After changing the widget, read the current applied object and replayable selected params from Python:
 
 ```python
-result.value
-result.params
+settings = result.value
+params = result.params
 ```
+
+`result.value` has the same type as the config function return value. In this example it is a `ModelSettings` instance.
 
 `result.params` is a flat dotted-path dictionary that can be replayed through `instantiate(..., values=result.params)` or logged to experiment-tracking tools.
 
@@ -57,12 +75,21 @@ By default, widget changes apply immediately. Valid changes update `result.value
 Use manual apply mode when you want to stage widget edits before updating the applied result:
 
 ```python
-result = interact(model_cfg, auto_apply=False)
+result = interact(model_config, auto_apply=False)
 ```
 
 In manual mode, the UI continues to explore draft values so dependent controls stay current, but `result.value` and `result.params` keep returning the last applied state until Apply succeeds.
 
 If a widget selection is invalid, the UI shows the current error. In auto-apply mode, `result.value` and `result.params` raise that error until the widget state is fixed; snapshots report `selected_params=None` so renderer code does not confuse stale params with the current invalid state.
+
+| State | What the widget shows | `result.value` / `result.params` |
+| --- | --- | --- |
+| Auto-apply, valid edit | The edit is applied immediately. | Updated to the new applied value and params. |
+| Auto-apply, invalid edit | The UI shows the validation error. | Raise `RuntimeError` until the state is fixed. |
+| Manual mode, valid draft edit | Controls update and dependent branches are explored. | Keep returning the last applied value and params until Apply succeeds. |
+| Manual mode, invalid draft edit | The UI shows a draft error and disables Apply. | Keep returning the last successfully applied value and params. |
+| Manual mode, Apply succeeds | The draft becomes the applied state. | Updated to the new applied value and params. |
+| Manual mode, Apply fails during instantiation | The UI shows the apply error. | Raise `RuntimeError` until a valid state is applied. |
 
 ## Continuing An Interaction
 
@@ -75,5 +102,7 @@ result.interact()
 To start a fresh session from a previous selection, pass selected params explicitly:
 
 ```python
-result2 = interact(model_cfg, values=result.params)
+result2 = interact(model_config, values=result.params)
 ```
+
+For framework-specific UIs outside notebooks, use the schema returned by `explore(..., return_info=True)`. See [Build an Interactive UI](../how-to/build-an-interactive-ui.md).
