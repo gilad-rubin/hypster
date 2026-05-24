@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
 from typing import Any, Dict, Generic, Mapping, Optional, Tuple, TypeVar
 
@@ -10,6 +11,17 @@ from hypster.utils import normalize_values
 from .branch_memory import BranchChoiceMemory
 
 T = TypeVar("T")
+
+_VIZ_EXTRA_ERROR = (
+    "Hypster interactive widgets require the visualization extra. "
+    'Install it with `uv add "hypster[viz]"` or `pip install "hypster[viz]"`, '
+    "then restart the notebook kernel."
+)
+
+
+def _ensure_viz_extra() -> None:
+    if importlib.util.find_spec("anywidget") is None:
+        raise RuntimeError(_VIZ_EXTRA_ERROR)
 
 
 def _parameters(schema: ConfigSchema) -> list[ParameterInfo]:
@@ -296,6 +308,7 @@ def interact(
     on_unknown: UnknownPolicy = "raise",
     auto_apply: bool = True,
 ) -> InteractiveResult[T]:
+    _ensure_viz_extra()
     session: InteractiveSession[T] = InteractiveSession(
         func=func,
         values=values,

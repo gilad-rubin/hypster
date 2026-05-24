@@ -2,19 +2,21 @@
 
 Use `interact()` in a Jupyter notebook when you want to instantiate a configuration through a live widget UI.
 
-Install the notebook renderer with the Jupyter extra:
+Install the notebook renderer with the visualization extra:
 
 ```bash
-uv add "hypster[jupyter]"
+uv add "hypster[viz]"
 ```
 
 or:
 
 ```bash
-pip install "hypster[jupyter]"
+pip install "hypster[viz]"
 ```
 
-The extra is named `jupyter` because it installs the widget runtime needed by both JupyterLab and notebook frontends.
+`hypster[jupyter]` is also available as a compatibility alias. The `viz` extra installs the widget runtime needed by JupyterLab, VS Code notebooks, and notebook frontends.
+
+In VS Code, the Jupyter extension may ask to **Enable Downloads** for `anywidget` support files the first time a widget is displayed. Accept that prompt, then rerun the cell.
 
 ```python
 from hypster import HP, interact

@@ -10,11 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A minimal anywidget renderer for interactive instantiation, using file-backed vanilla JavaScript and scoped CSS instead of React or inline HTML blobs.
 - In-memory branch choice memory for interactive sessions, so branch-specific selections are restored when users switch away and back.
 - `auto_apply=False` manual apply mode for staging widget edits before updating `result.value` and `result.params`.
+- The `viz` extra for installing interactive notebook widget dependencies; `jupyter` remains available as a compatibility alias.
 - Optional `description=` metadata for hyperparameters and `hp.nest(...)`, surfaced in explore schemas and the notebook UI.
 - Humanized display labels in explore schema metadata, such as rendering `top_k` as "Top K".
 
 ### Changed
-- The `jupyter` extra now installs `anywidget` and `jupyterlab_widgets` for the custom notebook renderer.
+- Interactive widget setup errors now tell users to install `hypster[viz]` when widget dependencies are missing.
 - Interactive snapshots expose draft values, applied values, current status, and explicit exploration or instantiation errors for renderer-neutral UIs.
 
 ### Fixed

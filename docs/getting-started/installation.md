@@ -15,12 +15,14 @@ pip install hypster
 ```
 {% endtab %}
 
-{% tab title="Interactive Jupyter UI (uv)" %}
+{% tab title="Interactive Visualization UI (uv)" %}
 Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
 
 ```bash
-uv add "hypster[jupyter]"
+uv add "hypster[viz]"
 ```
+
+`hypster[jupyter]` is also available as a compatibility alias.
 
 Dependencies:
 
@@ -43,12 +45,14 @@ uv add optuna
 ```
 {% endtab %}
 
-{% tab title="Interactive Jupyter UI (pip)" %}
+{% tab title="Interactive Visualization UI (pip)" %}
 Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
 
 ```bash
-pip install "hypster[jupyter]"
+pip install "hypster[viz]"
 ```
+
+`hypster[jupyter]` is also available as a compatibility alias.
 
 Dependencies:
 
@@ -82,7 +86,7 @@ Hypster's maintainer tooling lives in local `uv` dependency groups rather than a
 ```bash
 git clone https://github.com/gilad-rubin/hypster.git
 cd hypster
-python -m pip install -e ".[jupyter,optuna]"
+python -m pip install -e ".[viz,optuna]"
 python -m pip install pytest pytest-cov "coverage[toml]" ruff mypy pre-commit pytest-codspeed
 ```
 

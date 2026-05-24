@@ -7,6 +7,16 @@ import pytest
 from hypster import HP, instantiate_with_params, interact
 
 
+def test_interact_requires_viz_extra(monkeypatch: pytest.MonkeyPatch) -> None:
+    def config(hp: HP) -> Dict[str, int]:
+        return {"count": hp.int(1, name="count", min=1, max=5)}
+
+    monkeypatch.setattr("hypster.interactive.session.importlib.util.find_spec", lambda name: None)
+
+    with pytest.raises(RuntimeError, match=r"hypster\[viz\]"):
+        interact(config)
+
+
 def test_interact_returns_live_result_matching_instantiate_with_params() -> None:
     def openai(hp: HP) -> Dict[str, Any]:
         return {

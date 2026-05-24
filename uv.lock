@@ -400,6 +400,11 @@ jupyter = [
 optuna = [
     { name = "optuna" },
 ]
+viz = [
+    { name = "anywidget" },
+    { name = "ipywidgets" },
+    { name = "jupyterlab-widgets" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -429,11 +434,14 @@ test = [
 [package.metadata]
 requires-dist = [
     { name = "anywidget", marker = "extra == 'jupyter'", specifier = ">=0.9.0" },
+    { name = "anywidget", marker = "extra == 'viz'", specifier = ">=0.9.0" },
     { name = "ipywidgets", marker = "extra == 'jupyter'", specifier = ">=8.0.0" },
+    { name = "ipywidgets", marker = "extra == 'viz'", specifier = ">=8.0.0" },
     { name = "jupyterlab-widgets", marker = "extra == 'jupyter'", specifier = ">=3.0.0" },
+    { name = "jupyterlab-widgets", marker = "extra == 'viz'", specifier = ">=3.0.0" },
     { name = "optuna", marker = "extra == 'optuna'", specifier = ">=3.6" },
 ]
-provides-extras = ["jupyter", "optuna"]
+provides-extras = ["jupyter", "viz", "optuna"]
 
 [package.metadata.requires-dev]
 dev = [
