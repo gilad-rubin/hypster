@@ -1,0 +1,234 @@
+.hypster-widget {
+  --hypster-border: color-mix(in srgb, currentColor 14%, transparent);
+  --hypster-error: color-mix(in srgb, #d93025 76%, CanvasText 24%);
+  --hypster-error-border: color-mix(in srgb, #d93025 30%, transparent);
+  --hypster-error-surface: color-mix(in srgb, #d93025 12%, Canvas 88%);
+  --hypster-muted: color-mix(in srgb, currentColor 58%, transparent);
+  --hypster-menu-shadow: 0 8px 18px rgb(0 0 0 / 18%);
+  --hypster-surface: color-mix(in srgb, Canvas 96%, currentColor 4%);
+  --hypster-surface-strong: color-mix(in srgb, Canvas 90%, currentColor 10%);
+  border: 1px solid var(--hypster-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 14px;
+  max-width: 640px;
+  padding: 16px;
+  color: CanvasText;
+  background: Canvas;
+  font: 14px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.hypster-theme-light {
+  color-scheme: light;
+}
+
+.hypster-theme-dark {
+  color-scheme: dark;
+}
+
+.hypster-header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.hypster-title {
+  font-size: 15px;
+  font-weight: 650;
+  min-width: 0;
+}
+
+.hypster-status {
+  border: 1px solid transparent;
+  border-radius: 5px;
+  max-width: 60%;
+  padding: 3px 9px;
+  font-size: 12px;
+  color: var(--hypster-muted);
+  background: var(--hypster-surface);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hypster-status-error,
+.hypster-status-draft_error {
+  border-color: var(--hypster-error-border);
+  color: var(--hypster-error);
+  background: var(--hypster-error-surface);
+}
+
+.hypster-group {
+  border: 1px solid var(--hypster-border);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+}
+
+.hypster-group > legend {
+  padding: 0 5px;
+  font-weight: 650;
+}
+
+.hypster-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.hypster-field-header {
+  font-weight: 580;
+}
+
+.hypster-description {
+  color: var(--hypster-muted);
+  font-size: 12px;
+}
+
+.hypster-field input,
+.hypster-field select {
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 5px 8px;
+  color: inherit;
+  background: Canvas;
+}
+
+.hypster-choice {
+  position: relative;
+}
+
+.hypster-choice-trigger {
+  align-items: center;
+  background: Canvas;
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: inherit;
+  display: flex;
+  font: inherit;
+  justify-content: space-between;
+  min-height: 32px;
+  padding: 5px 8px;
+  width: 100%;
+}
+
+.hypster-choice-trigger:hover,
+.hypster-choice-open .hypster-choice-trigger {
+  background: var(--hypster-surface);
+}
+
+.hypster-choice-trigger:focus-visible,
+.hypster-choice-option:focus-visible {
+  outline: 2px solid color-mix(in srgb, Highlight 70%, transparent);
+  outline-offset: 2px;
+}
+
+.hypster-choice-value {
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hypster-choice-arrow {
+  border-bottom: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  display: inline-block;
+  height: 7px;
+  margin-left: 12px;
+  opacity: 0.58;
+  transform: translateY(-2px) rotate(45deg);
+  width: 7px;
+}
+
+.hypster-choice-menu {
+  background: Canvas;
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  box-shadow: var(--hypster-menu-shadow);
+  box-sizing: border-box;
+  display: grid;
+  gap: 2px;
+  left: 0;
+  margin-top: 4px;
+  max-height: 220px;
+  min-width: 100%;
+  overflow: auto;
+  padding: 4px;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+}
+
+.hypster-choice-menu[hidden] {
+  display: none;
+}
+
+.hypster-choice-option {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: inherit;
+  font: inherit;
+  min-height: 30px;
+  padding: 5px 8px;
+  text-align: left;
+}
+
+.hypster-choice-option:hover {
+  background: var(--hypster-surface-strong);
+}
+
+.hypster-field input[type="checkbox"] {
+  justify-self: start;
+  min-height: auto;
+}
+
+.hypster-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.hypster-actions button {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  box-sizing: border-box;
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 25px;
+  min-width: 52px;
+  padding: 4px 10px;
+  color: color-mix(in srgb, currentColor 72%, transparent);
+  background: var(--hypster-surface);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+.hypster-actions button:hover:not(:disabled) {
+  border-color: var(--hypster-border);
+  background: var(--hypster-surface-strong);
+}
+
+.hypster-actions button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.hypster-actions button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}

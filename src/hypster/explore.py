@@ -33,6 +33,22 @@ def _to_jsonable(value: Any) -> Any:
     return repr(value)
 
 
+def _humanize_name(name: str) -> str:
+    acronyms = {
+        "api": "API",
+        "hp": "HP",
+        "hpo": "HPO",
+        "id": "ID",
+        "k": "K",
+        "llm": "LLM",
+        "mlflow": "MLflow",
+        "openai": "OpenAI",
+        "ui": "UI",
+        "url": "URL",
+    }
+    return " ".join(acronyms.get(part, part.capitalize()) for part in name.split("_"))
+
+
 @dataclass
 class ParameterInfo:
     name: str
@@ -43,6 +59,7 @@ class ParameterInfo:
     options: Optional[List[Any]] = None
     minimum: Optional[int | float] = None
     maximum: Optional[int | float] = None
+    description: Optional[str] = None
     children: List["ParameterInfo"] = field(default_factory=list)
 
     def is_group(self) -> bool:
@@ -58,6 +75,8 @@ class ParameterInfo:
             "options": _to_jsonable(self.options),
             "minimum": _to_jsonable(self.minimum),
             "maximum": _to_jsonable(self.maximum),
+            "description": self.description,
+            "display_label": _humanize_name(self.name),
             "children": [child.to_dict() for child in self.children],
         }
 
@@ -95,6 +114,7 @@ class ConfigSchema:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "name": self.name,
+            "display_label": _humanize_name(self.name),
             "parameters": [parameter.to_dict() for parameter in self.parameters],
         }
 
@@ -135,8 +155,9 @@ class SchemaTracer(HP):
             self._schema = tracker._schema
             self._nodes_by_path = tracker._nodes_by_path
 
-    def record_nest(self, *, path: str, name: str) -> None:
-        self._ensure_group(path, name)
+    def record_nest(self, *, path: str, name: str, description: Optional[str] = None) -> None:
+        group = self._ensure_group(path, name)
+        group.description = description
 
     def record_parameter(
         self,
@@ -149,6 +170,7 @@ class SchemaTracer(HP):
         options: Optional[List[Any]] = None,
         minimum: Optional[int | float] = None,
         maximum: Optional[int | float] = None,
+        description: Optional[str] = None,
     ) -> None:
         parent_path = path.rpartition(".")[0]
         container = self._schema.parameters if not parent_path else self._ensure_group_path(parent_path).children
@@ -162,6 +184,7 @@ class SchemaTracer(HP):
             options=options,
             minimum=minimum,
             maximum=maximum,
+            description=description,
         )
         existing = self._nodes_by_path.get(path)
         if existing is None:
@@ -175,6 +198,7 @@ class SchemaTracer(HP):
         existing.options = options
         existing.minimum = minimum
         existing.maximum = maximum
+        existing.description = description
 
     def build_schema(self, root_name: str) -> ConfigSchema:
         self._schema.name = root_name
@@ -215,8 +239,8 @@ def explore(
     validate_config_func_signature(func)
     _validate_on_unknown(on_unknown)
 
-    values = normalize_values(values)
-    tracer = SchemaTracer(values)
+    normalized_values: Dict[str, Any] = normalize_values(values)
+    tracer = SchemaTracer(normalized_values)
     kwargs = kwargs or {}
     original_called_params = tracer.called_params.copy()
 
@@ -226,7 +250,7 @@ def explore(
         raise ValueError(str(e)) from e
 
     called_params = tracer.called_params - original_called_params
-    _handle_unknown_parameters(values, called_params, on_unknown)
+    _handle_unknown_parameters(normalized_values, called_params, on_unknown)
 
     schema = tracer.build_schema(getattr(func, "__name__", func.__class__.__name__))
 

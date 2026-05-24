@@ -63,6 +63,7 @@ def test_explore_returns_schema_info_and_defaults() -> None:
     }
     assert info.to_dict() == {
         "name": "config",
+        "display_label": "Config",
         "parameters": [
             {
                 "name": "batching",
@@ -73,6 +74,8 @@ def test_explore_returns_schema_info_and_defaults() -> None:
                 "options": ["single", "split"],
                 "minimum": None,
                 "maximum": None,
+                "description": None,
+                "display_label": "Batching",
                 "children": [],
             },
             {
@@ -84,10 +87,46 @@ def test_explore_returns_schema_info_and_defaults() -> None:
                 "options": None,
                 "minimum": 0.0,
                 "maximum": 2.0,
+                "description": None,
+                "display_label": "Temperature",
                 "children": [],
             },
         ],
     }
+
+
+def test_explore_includes_descriptions_and_display_labels() -> None:
+    def retrieval(hp: HP) -> Dict[str, Any]:
+        top_k = hp.int(
+            8,
+            name="top_k",
+            min=1,
+            max=20,
+            description="Number of documents to return.",
+        )
+        return {"top_k": top_k}
+
+    def config(hp: HP) -> Dict[str, Any]:
+        return {
+            "retrieval": hp.nest(
+                retrieval,
+                name="retrieval",
+                description="Retrieval settings used before generation.",
+            )
+        }
+
+    info = explore(config, return_info=True)
+
+    assert info is not None
+    schema = info.to_dict()
+    group = schema["parameters"][0]
+    top_k = group["children"][0]
+
+    assert schema["display_label"] == "Config"
+    assert group["display_label"] == "Retrieval"
+    assert group["description"] == "Retrieval settings used before generation."
+    assert top_k["display_label"] == "Top K"
+    assert top_k["description"] == "Number of documents to return."
 
 
 def test_explore_tracks_nested_defaults_with_prefixed_paths() -> None:
@@ -222,6 +261,7 @@ def test_explore_to_dict_is_json_serializable() -> None:
     assert info is not None
     assert info.to_dict() == {
         "name": "config",
+        "display_label": "Config",
         "parameters": [
             {
                 "name": "provider",
@@ -232,6 +272,8 @@ def test_explore_to_dict_is_json_serializable() -> None:
                 "options": ["openai", "gemini"],
                 "minimum": None,
                 "maximum": None,
+                "description": None,
+                "display_label": "Provider",
                 "children": [],
             }
         ],

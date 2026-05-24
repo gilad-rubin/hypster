@@ -52,6 +52,8 @@ You can install Hypster using uv:
 
 ```bash
 uv add hypster
+# optional notebook visualization UI
+uv add 'hypster[viz]'
 # optional HPO backend
 uv add 'hypster[optuna]'
 ```

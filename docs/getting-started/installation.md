@@ -15,16 +15,18 @@ pip install hypster
 ```
 {% endtab %}
 
-{% tab title="Interactive Jupyter UI (uv)" %}
-Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
+{% tab title="Interactive Visualization UI (uv)" %}
+Hypster comes with an interactive **notebook UI** to make instantiation as easy as :pie:
 
 ```bash
-uv add "hypster[jupyter]"
+uv add "hypster[viz]"
 ```
 
 Dependencies:
 
+* [anywidget](https://github.com/manzt/anywidget)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
+* [jupyterlab_widgets](https://github.com/jupyter-widgets/ipywidgets/tree/main/python/jupyterlab_widgets)
 {% endtab %}
 
 {% tab title="Hyperparameter Optimization (uv)" %}
@@ -41,16 +43,18 @@ uv add optuna
 ```
 {% endtab %}
 
-{% tab title="Interactive Jupyter UI (pip)" %}
-Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
+{% tab title="Interactive Visualization UI (pip)" %}
+Hypster comes with an interactive **notebook UI** to make instantiation as easy as :pie:
 
 ```bash
-pip install hypster[jupyter]
+pip install "hypster[viz]"
 ```
 
 Dependencies:
 
+* [anywidget](https://github.com/manzt/anywidget)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
+* [jupyterlab_widgets](https://github.com/jupyter-widgets/ipywidgets/tree/main/python/jupyterlab_widgets)
 {% endtab %}
 
 {% tab title="Development (uv)" %}
@@ -64,7 +68,9 @@ uv sync --all-extras --dev
 
 Dependencies:
 
+* [anywidget](https://github.com/manzt/anywidget)
 * [ipywidgets](https://github.com/jupyter-widgets/ipywidgets)
+* [jupyterlab_widgets](https://github.com/jupyter-widgets/ipywidgets/tree/main/python/jupyterlab_widgets)
 * [ruff](https://github.com/astral-sh/ruff)
 * [mypy](https://github.com/python/mypy)
 * [pytest](https://github.com/pytest-dev/pytest)
@@ -76,7 +82,7 @@ Hypster's maintainer tooling lives in local `uv` dependency groups rather than a
 ```bash
 git clone https://github.com/gilad-rubin/hypster.git
 cd hypster
-python -m pip install -e ".[jupyter,optuna]"
+python -m pip install -e ".[viz,optuna]"
 python -m pip install pytest pytest-cov "coverage[toml]" ruff mypy pre-commit pytest-codspeed
 ```
 
@@ -96,7 +102,7 @@ print(hypster.__version__)
 ## System Requirements
 
 * Python 3.10 or higher
-* Optional: Jupyter Notebook/Lab for interactive features
+* Optional: Jupyter Notebook, JupyterLab, or VS Code notebooks for interactive features
 
 ## Troubleshooting
 
@@ -116,7 +122,7 @@ uv self update
 uv add --upgrade hypster
 ```
 
-3. For Jupyter-related issues, make sure Jupyter is properly installed:
+3. For notebook UI issues, make sure your notebook frontend is properly installed:
 
 ```bash
 # For JupyterLab
@@ -140,7 +146,7 @@ pip install -U pip
 pip install -U hypster
 ```
 
-3. For Jupyter-related issues, make sure Jupyter is properly installed:
+3. For notebook UI issues, make sure your notebook frontend is properly installed:
 
 ```bash
 # For JupyterLab
