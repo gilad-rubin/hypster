@@ -9,8 +9,65 @@ except Exception:  # pragma: no cover
     _optuna = None
 
 from .._sentinels import NO_DEFAULT as _NO_DEFAULT
+from ..core import _handle_unknown_parameters
+from ..hp_calls import FloatValidator, IntValidator
 from ..utils import normalize_values, validate_identifier_name, validate_select_choice
 from .types import HpoCategorical, HpoFloat, HpoInt
+
+
+def _exclusive_high_for_int(low: int, high: int, step: int | None) -> int:
+    actual_step = step or 1
+    if actual_step <= 0:
+        raise ValueError("HpoInt(step=...) must be positive.")
+    if high <= low:
+        raise ValueError("HpoInt(include_max=False) leaves no valid integer values below max.")
+    return low + ((high - low - 1) // actual_step) * actual_step
+
+
+def _validate_int_spec(full: str, hpo_spec: HpoInt | None) -> None:
+    if hpo_spec is None:
+        return
+    if hpo_spec.base != 10.0:
+        raise ValueError(f"Parameter '{full}': HpoInt(base=...) is not supported by the Optuna suggest_int adapter.")
+
+
+def _float_log_flag(full: str, hpo_spec: HpoFloat | None) -> bool:
+    if hpo_spec is None:
+        return False
+    if hpo_spec.base != 10.0:
+        raise ValueError(
+            f"Parameter '{full}': HpoFloat(base=...) is not supported by the Optuna suggest_float adapter."
+        )
+    if hpo_spec.center is not None or hpo_spec.spread is not None:
+        raise ValueError(
+            f"Parameter '{full}': HpoFloat(center=..., spread=...) is only meaningful for normal/lognormal "
+            "distributions, which are not supported by the Optuna suggest_float adapter."
+        )
+    if hpo_spec.distribution in {"normal", "lognormal"}:
+        raise ValueError(
+            f"Parameter '{full}': HpoFloat(distribution={hpo_spec.distribution!r}) is not supported by the "
+            "Optuna suggest_float adapter."
+        )
+    if hpo_spec.distribution == "uniform":
+        return False
+    if hpo_spec.distribution == "loguniform":
+        return True
+    return hpo_spec.scale == "log"
+
+
+def _validate_categorical_spec(full: str, hpo_spec: HpoCategorical | None) -> None:
+    if hpo_spec is None:
+        return
+    if hpo_spec.ordered:
+        raise ValueError(
+            f"Parameter '{full}': HpoCategorical(ordered=True) is not supported by the Optuna "
+            "suggest_categorical adapter."
+        )
+    if hpo_spec.weights is not None:
+        raise ValueError(
+            f"Parameter '{full}': HpoCategorical(weights=...) is not supported by the Optuna "
+            "suggest_categorical adapter."
+        )
 
 
 class _HPProxy:
@@ -43,6 +100,7 @@ class _HPProxy:
         hpo_spec: HpoInt | None = None,
     ) -> int:
         full = self._full(name)
+        _validate_int_spec(full, hpo_spec)
         if allow_none:
             raise ValueError(
                 f"Parameter '{full}': allow_none=True is not supported for HPO numeric suggestions yet.\n\n"
@@ -58,7 +116,9 @@ class _HPProxy:
                 raise ValueError(
                     f"Parameter '{full}': None overrides are not supported for HPO numeric suggestions yet."
                 )
-            val = int(self.overrides[full])
+            validator = IntValidator()
+            val = validator.validate_value(self.overrides[full], full, strict=strict)
+            validator.validate_bounds(val, min, max, full)
             self.collector[full] = val
             return val
         low = default if min is None else min
@@ -66,7 +126,7 @@ class _HPProxy:
         step = hpo_spec.step if hpo_spec else None
         log = (hpo_spec.scale == "log") if hpo_spec else False
         if hpo_spec and not hpo_spec.include_max and high is not None:
-            high = high - (step or 1)
+            high = _exclusive_high_for_int(low, high, step)
         val = self.trial.suggest_int(full, low, high, step=step, log=log)
         self.collector[full] = val
         return val
@@ -84,6 +144,7 @@ class _HPProxy:
         hpo_spec: HpoFloat | None = None,
     ) -> float:
         full = self._full(name)
+        log = _float_log_flag(full, hpo_spec)
         if allow_none:
             raise ValueError(
                 f"Parameter '{full}': allow_none=True is not supported for HPO numeric suggestions yet.\n\n"
@@ -99,13 +160,14 @@ class _HPProxy:
                 raise ValueError(
                     f"Parameter '{full}': None overrides are not supported for HPO numeric suggestions yet."
                 )
-            val = float(self.overrides[full])
+            validator = FloatValidator()
+            val = validator.validate_value(self.overrides[full], full, strict=strict)
+            validator.validate_bounds(val, min, max, full)
             self.collector[full] = val
             return val
         low = default if min is None else min
         high = default if max is None else max
         step = hpo_spec.step if hpo_spec else None
-        log = (hpo_spec.scale == "log") if hpo_spec else False
         val = self.trial.suggest_float(full, low, high, step=step, log=log)
         self.collector[full] = val
         return val
@@ -122,6 +184,7 @@ class _HPProxy:
         hpo_spec: HpoCategorical | None = None,
     ) -> Any:
         full = self._full(name)
+        _validate_categorical_spec(full, hpo_spec)
         if isinstance(options, Mapping):
             keys = list(options.keys())
         else:
@@ -168,13 +231,18 @@ class _HPProxy:
     ) -> Any:
         validate_identifier_name(name, kind="nest name")
         overrides = dict(self.overrides)
+        prefixed_values = {}
         if values:
             flat = normalize_values(values)
             for k, v in flat.items():
-                overrides[f"{self._full(name)}.{k}"] = v
+                prefixed_key = f"{self._full(name)}.{k}"
+                overrides[prefixed_key] = v
+                prefixed_values[prefixed_key] = v
         nested = _HPProxy(self.trial, self.collector, ns=self.ns + [name], overrides=overrides)
         kwargs = kwargs or {}
-        return child(nested, *args, **kwargs)
+        result = child(nested, *args, **kwargs)
+        _handle_unknown_parameters(prefixed_values, set(self.collector), "raise")
+        return result
 
 
 def suggest_values(trial: Any, *, config, args: tuple = (), kwargs: Dict[str, Any] | None = None) -> Dict[str, Any]:

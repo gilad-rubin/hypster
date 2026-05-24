@@ -34,6 +34,10 @@ def validate_config_func_signature(func: Callable) -> None:
     _validate_config_func_signature_cached(func)
 
 
+def _callable_display_name(func: Callable) -> str:
+    return getattr(func, "__name__", func.__class__.__name__)
+
+
 @lru_cache(maxsize=1024)
 def _validate_config_func_signature_cached(func: Callable) -> None:
     """Cached signature validation for repeat executions of the same config."""
@@ -42,20 +46,25 @@ def _validate_config_func_signature_cached(func: Callable) -> None:
 
 def _validate_config_func_signature_uncached(func: Callable) -> None:
     """Validate a config function signature without assuming hashability."""
+    func_name = _callable_display_name(func)
     try:
         sig = inspect.signature(func)
         params = list(sig.parameters.values())
 
         if not params:
             raise ValueError(
-                f"Configuration function '{func.__name__}' must have 'hp: HP' as first parameter. "
-                f"Got: {func.__name__}() - no parameters"
+                f"Configuration function '{func_name}' must have 'hp: HP' as first parameter. "
+                f"Got: {func_name}() - no parameters"
             )
 
         first_param = params[0]
         if first_param.name != "hp":
             raise ValueError(
-                f"Configuration function '{func.__name__}' first param must be named 'hp'. Got: {first_param.name}"
+                f"Configuration function '{func_name}' first param must be named 'hp'. Got: {first_param.name}"
+            )
+        if first_param.kind is inspect.Parameter.KEYWORD_ONLY:
+            raise ValueError(
+                f"Configuration function '{func_name}' first param 'hp' must be positional so Hypster can pass it."
             )
 
         # Check type annotation if present
@@ -64,14 +73,14 @@ def _validate_config_func_signature_uncached(func: Callable) -> None:
             annotation_str = str(first_param.annotation)
             if "HP" not in annotation_str:
                 raise ValueError(
-                    f"Configuration function '{func.__name__}' first parameter must be typed as 'hp: HP'. "
+                    f"Configuration function '{func_name}' first parameter must be typed as 'hp: HP'. "
                     f"Got: hp: {annotation_str}"
                 )
 
     except Exception as e:
         if isinstance(e, ValueError):
             raise
-        raise ValueError(f"Error validating configuration function '{func.__name__}': {str(e)}")
+        raise ValueError(f"Error validating configuration function '{func_name}': {str(e)}")
 
 
 def validate_identifier_name(name: Any, *, kind: str = "name") -> str:
