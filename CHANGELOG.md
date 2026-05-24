@@ -6,11 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.5.0] - 2026-05-23
 
 ### Added
-- `interact()` for live Jupyter notebook instantiation through an `InteractiveResult` handle with `.value`, `.params`, `.snapshot`, and `.interact()`.
+- `interact()` for live notebook instantiation through an `InteractiveResult` handle with `.value`, `.params`, `.snapshot`, and `.interact()`.
 - A minimal anywidget renderer for interactive instantiation, using file-backed vanilla JavaScript and scoped CSS instead of React or inline HTML blobs.
 - In-memory branch choice memory for interactive sessions, so branch-specific selections are restored when users switch away and back.
 - `auto_apply=False` manual apply mode for staging widget edits before updating `result.value` and `result.params`.
-- The `viz` extra for installing interactive notebook widget dependencies; `jupyter` remains available as a compatibility alias.
+- The `viz` extra for installing interactive notebook widget dependencies across Jupyter Notebook, JupyterLab, and VS Code notebooks.
 - Optional `description=` metadata for hyperparameters and `hp.nest(...)`, surfaced in explore schemas and the notebook UI.
 - Humanized display labels in explore schema metadata, such as rendering `top_k` as "Top K".
 

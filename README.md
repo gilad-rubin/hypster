@@ -52,7 +52,7 @@ You can install Hypster using uv:
 
 ```bash
 uv add hypster
-# optional Jupyter notebook/lab UI
+# optional notebook visualization UI
 uv add 'hypster[viz]'
 # optional HPO backend
 uv add 'hypster[optuna]'

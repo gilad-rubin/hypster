@@ -1,6 +1,6 @@
 # Interactive Instantiation UI
 
-Use `interact()` in a Jupyter notebook when you want to instantiate a configuration through a live widget UI.
+Use `interact()` in a notebook when you want to instantiate a configuration through a live widget UI.
 
 Install the notebook renderer with the visualization extra:
 
@@ -14,7 +14,7 @@ or:
 pip install "hypster[viz]"
 ```
 
-`hypster[jupyter]` is also available as a compatibility alias. The `viz` extra installs the widget runtime needed by JupyterLab, VS Code notebooks, and notebook frontends.
+The `viz` extra installs the widget runtime needed by Jupyter Notebook, JupyterLab, and VS Code notebooks.
 
 In VS Code, the Jupyter extension may ask to **Enable Downloads** for `anywidget` support files the first time a widget is displayed. Accept that prompt, then rerun the cell.
 

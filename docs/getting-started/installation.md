@@ -16,13 +16,11 @@ pip install hypster
 {% endtab %}
 
 {% tab title="Interactive Visualization UI (uv)" %}
-Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
+Hypster comes with an interactive **notebook UI** to make instantiation as easy as :pie:
 
 ```bash
 uv add "hypster[viz]"
 ```
-
-`hypster[jupyter]` is also available as a compatibility alias.
 
 Dependencies:
 
@@ -46,13 +44,11 @@ uv add optuna
 {% endtab %}
 
 {% tab title="Interactive Visualization UI (pip)" %}
-Hypster comes with an interactive **Jupyter Notebook UI** to make instantiation as easy as :pie:
+Hypster comes with an interactive **notebook UI** to make instantiation as easy as :pie:
 
 ```bash
 pip install "hypster[viz]"
 ```
-
-`hypster[jupyter]` is also available as a compatibility alias.
 
 Dependencies:
 
@@ -106,7 +102,7 @@ print(hypster.__version__)
 ## System Requirements
 
 * Python 3.10 or higher
-* Optional: Jupyter Notebook/Lab for interactive features
+* Optional: Jupyter Notebook, JupyterLab, or VS Code notebooks for interactive features
 
 ## Troubleshooting
 
@@ -126,7 +122,7 @@ uv self update
 uv add --upgrade hypster
 ```
 
-3. For Jupyter-related issues, make sure Jupyter is properly installed:
+3. For notebook UI issues, make sure your notebook frontend is properly installed:
 
 ```bash
 # For JupyterLab
@@ -150,7 +146,7 @@ pip install -U pip
 pip install -U hypster
 ```
 
-3. For Jupyter-related issues, make sure Jupyter is properly installed:
+3. For notebook UI issues, make sure your notebook frontend is properly installed:
 
 ```bash
 # For JupyterLab
