@@ -160,3 +160,28 @@ def test_none_requires_allow_none_for_scalar_params() -> None:
 
     with pytest.raises(ValueError, match="allow_none=True"):
         instantiate(none_override, values={"temperature": None})
+
+
+def test_numeric_parameters_reject_bool_values() -> None:
+    """Boolean values should not be treated as numeric values."""
+
+    def config(hp: HP) -> Dict[str, object]:
+        return {
+            "depth": hp.int(1, name="depth"),
+            "strict_depth": hp.int(1, name="strict_depth", strict=True),
+            "temperature": hp.float(0.1, name="temperature"),
+            "depths": hp.multi_int([1], name="depths"),
+            "temperatures": hp.multi_float([0.1], name="temperatures"),
+        }
+
+    invalid_values = [
+        {"depth": True},
+        {"strict_depth": True},
+        {"temperature": False},
+        {"depths": [True]},
+        {"temperatures": [False]},
+    ]
+
+    for values in invalid_values:
+        with pytest.raises(ValueError, match="expected .* but got bool"):
+            instantiate(config, values=values)

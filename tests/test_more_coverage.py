@@ -4,13 +4,22 @@ from hypster import HP, instantiate
 from hypster.hp_calls import ParameterValidator
 
 
-def test_float_strict_nested_path_error():
+def test_nested_float_accepts_int_when_not_strict():
     def cfg(hp: HP):
-        return {"x": hp.nest(lambda hp: hp.float(1.0, name="lr"), name="model")}
+        def child(hp: HP):
+            return {
+                "lr": hp.float(1.0, name="lr"),
+                "lrs": hp.multi_float([1.0], name="lrs"),
+            }
 
-    # int value at nested path should trigger FloatValidator branch with "." in path
-    with pytest.raises(ValueError, match="expected float but got int"):
-        instantiate(cfg, values={"model.lr": 1})
+        return {"x": hp.nest(child, name="model")}
+
+    assert instantiate(cfg, values={"model.lr": 1, "model.lrs": [2]}) == {
+        "x": {
+            "lr": 1.0,
+            "lrs": [2.0],
+        }
+    }
 
 
 def test_select_multi_non_list_error():

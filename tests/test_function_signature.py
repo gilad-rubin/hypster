@@ -44,3 +44,25 @@ def test_extra_args_allowed() -> None:
 
     result = instantiate(config, kwargs={"multiplier": 3})
     assert result == 30
+
+
+def test_keyword_only_hp_is_rejected_during_signature_validation() -> None:
+    calls = []
+
+    def bad_config(*, hp: HP) -> int:
+        calls.append("executed")
+        return hp.int(10, name="value")
+
+    with pytest.raises(ValueError, match="positional"):
+        instantiate(bad_config)
+
+    assert calls == []
+
+
+def test_callable_object_signature_errors_use_class_name() -> None:
+    class BadConfig:
+        def __call__(self) -> int:
+            return 10
+
+    with pytest.raises(ValueError, match="BadConfig"):
+        instantiate(BadConfig())

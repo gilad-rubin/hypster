@@ -4,7 +4,8 @@ from typing import Any, Dict
 
 import pytest
 
-from hypster import HP, instantiate
+from hypster import HP, instantiate, instantiate_with_params
+from hypster.explore import explore
 
 
 def test_basic_nesting() -> None:
@@ -104,3 +105,34 @@ def test_nested_values_keys_must_be_identifier_segments() -> None:
 
     with pytest.raises(ValueError, match="nested values key"):
         instantiate(parent, values={"child": {"x.y": 100}})
+
+
+def test_nested_scope_value_is_not_a_parameter_leaf() -> None:
+    def child(hp: HP) -> Dict[str, int]:
+        return {"x": hp.int(10, name="x")}
+
+    def parent(hp: HP) -> Dict[str, int]:
+        return hp.nest(child, name="child")
+
+    with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
+        instantiate(parent, values={"child": 123})
+
+    with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
+        instantiate_with_params(parent, values={"child": 123})
+
+    with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
+        explore(parent, values={"child": 123}, return_info=True)
+
+
+def test_explicit_nested_values_raise_for_unknown_child_parameters() -> None:
+    def child(hp: HP) -> Dict[str, int]:
+        return {"x": hp.int(10, name="x")}
+
+    def parent(hp: HP) -> Dict[str, int]:
+        return hp.nest(child, name="child", values={"typo": 100})
+
+    with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
+        instantiate(parent)
+
+    with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
+        explore(parent, return_info=True)

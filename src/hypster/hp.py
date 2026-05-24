@@ -73,6 +73,7 @@ class HP:
         self.namespace_stack: List[str] = []  # For nested name prefixes
         self.called_params: set[str] = set()  # Track called parameter names
         self.nested_scopes: set[str] = set()  # Track names that have been nested
+        self.nested_scope_paths: set[str] = set()  # Track nest/group paths separately from parameter leaves
 
     def _get_full_param_path(self, name: str) -> str:
         """Get full parameter path including namespace stack."""
@@ -319,7 +320,7 @@ class HP:
             )
             return option_map.get(validated_key, validated_key) if is_mapping else validated_key
         else:
-            if actual_default is None and default is _NO_DEFAULT and not option_keys:
+            if actual_default is None and default is _NO_DEFAULT and not option_keys and not allow_none:
                 raise HPCallError(
                     full_path,
                     "select has no options and no default. "
@@ -541,9 +542,11 @@ class HP:
                 nested_key = key[len(prefix) :]
                 nested_values[nested_key] = value
 
+        explicit_values = normalize_values(values) if values else {}
+
         # Merge with explicit values if provided
-        if values:
-            nested_values.update(normalize_values(values))
+        if explicit_values:
+            nested_values.update(explicit_values)
 
         # Create new HP instance for nested call with namespace
         self._record_nest(path=full_path, name=name, description=description)
@@ -551,10 +554,12 @@ class HP:
         nested_hp = self.__class__(nested_values, parameter_tracker=self.parameter_tracker)
         nested_hp.namespace_stack = self.namespace_stack + [name]
         nested_hp.called_params = self.called_params  # Share called_params tracking
+        nested_hp.nested_scope_paths = self.nested_scope_paths
 
         # Mark that we've nested under this name
         self.nested_scopes.add(name)
         self.called_params.add(full_path)
+        self.nested_scope_paths.add(full_path)
 
         # Prepare arguments
         kwargs = kwargs or {}
@@ -562,14 +567,12 @@ class HP:
         # Call the nested function
         result = child(nested_hp, *args, **kwargs)
 
-        # Track nested parameters in parent's called_params
-        nested_params = list(nested_hp.called_params)  # Create a copy to avoid iteration issues
-        for param in nested_params:
-            if "." in param:
-                self.called_params.add(param)
-            else:
-                full_nested_param = f"{full_path}.{param}"
-                self.called_params.add(full_nested_param)
+        if explicit_values:
+            from .core import _handle_unknown_parameters
+
+            prefixed_explicit_values = {f"{full_path}.{key}": value for key, value in explicit_values.items()}
+            leaf_params = self.called_params - self.nested_scope_paths
+            _handle_unknown_parameters(prefixed_explicit_values, leaf_params, "raise")
 
         return result
 

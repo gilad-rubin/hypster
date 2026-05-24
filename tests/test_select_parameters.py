@@ -142,6 +142,13 @@ def test_select_none_choice_requires_allow_none() -> None:
         instantiate(missing_allow_none)
 
 
+def test_select_with_no_options_can_default_to_none_when_nullable() -> None:
+    def config(hp: HP) -> object:
+        return hp.select([], name="choice", allow_none=True)
+
+    assert instantiate(config) is None
+
+
 def test_select_rejects_complex_list_options_with_dict_guidance() -> None:
     def config(hp: HP) -> object:
         return hp.select([{"layers": 2}, {"layers": 4}], name="model")

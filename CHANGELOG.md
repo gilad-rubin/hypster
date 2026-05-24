@@ -3,6 +3,19 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-05-24
+
+### Fixed
+- Reject boolean values for numeric hyperparameters instead of treating `True`/`False` as integers.
+- Apply non-strict float coercion consistently for top-level and nested parameter paths.
+- Treat nested scope values such as `values={"child": ...}` as unknown unless they target a concrete child parameter.
+- Raise on unknown explicit `hp.nest(..., values=...)` child overrides instead of silently ignoring them.
+- Allow `hp.select([], allow_none=True)` to default to `None`, matching its error guidance.
+- Compute `HpoInt(include_max=False)` ranges correctly when `step` does not evenly divide the interval.
+- Reject unsupported Optuna HPO spec fields instead of silently ignoring them.
+- Validate HPO nested override values before returning them from `suggest_values()`.
+- Return helpful configuration signature errors for keyword-only `hp` parameters and callable objects.
+
 ## [0.5.0] - 2026-05-23
 
 ### Added

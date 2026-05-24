@@ -250,7 +250,8 @@ def explore(
         raise ValueError(str(e)) from e
 
     called_params = tracer.called_params - original_called_params
-    _handle_unknown_parameters(normalized_values, called_params, on_unknown)
+    leaf_params = called_params - tracer.nested_scope_paths
+    _handle_unknown_parameters(normalized_values, leaf_params, on_unknown)
 
     schema = tracer.build_schema(getattr(func, "__name__", func.__class__.__name__))
 

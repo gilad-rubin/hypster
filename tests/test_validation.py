@@ -42,14 +42,14 @@ def test_type_mismatch_with_context() -> None:
     """Test type mismatch errors include full path context."""
 
     def optimizer(hp: HP) -> Dict[str, float]:
-        lr = hp.float(0.1, name="lr")
+        lr = hp.float(0.1, name="lr", strict=True)
         return {"lr": lr}
 
     def config(hp: HP) -> Dict[str, Dict[str, float]]:
         opt = hp.nest(optimizer, name="optimizer")
         return {"optimizer": opt}
 
-    # Integer provided for float in nested context
+    # Integer provided for strict float in nested context
     with pytest.raises(ValueError, match="Parameter 'optimizer.lr': expected float but got int"):
         instantiate(config, values={"optimizer.lr": 1})
 

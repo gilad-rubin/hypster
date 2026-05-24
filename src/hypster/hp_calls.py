@@ -54,6 +54,8 @@ class IntValidator(ParameterValidator):
     """Validates int parameters with optional type conversion."""
 
     def validate_value(self, value: Any, param_path: str, strict: bool = False) -> int:
+        if isinstance(value, bool):
+            raise HPCallError(param_path, f"expected int but got bool ({value})")
         if isinstance(value, float):
             if strict:
                 raise HPCallError(param_path, f"expected int but got float ({value}). Use an integer value.")
@@ -73,8 +75,10 @@ class FloatValidator(ParameterValidator):
     """Validates float parameters with optional type conversion."""
 
     def validate_value(self, value: Any, param_path: str, strict: bool = False) -> float:
+        if isinstance(value, bool):
+            raise HPCallError(param_path, f"expected float but got bool ({value})")
         if isinstance(value, int):
-            if strict or "." in param_path:
+            if strict:
                 raise HPCallError(
                     param_path,
                     f"expected float but got int ({value}). Please provide a float value like {float(value)}",

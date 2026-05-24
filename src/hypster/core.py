@@ -107,7 +107,8 @@ def _run_config(
     try:
         result = func(hp, *args, **kwargs)
         called_params = hp.called_params - original_called_params
-        _handle_unknown_parameters(normalized_values, called_params, on_unknown)
+        leaf_params = called_params - hp.nested_scope_paths
+        _handle_unknown_parameters(normalized_values, leaf_params, on_unknown)
         return result
     except HPCallError as e:
         raise ValueError(str(e)) from e
