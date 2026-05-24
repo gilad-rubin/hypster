@@ -6,6 +6,7 @@ The config is a normal Python function. Keep it cheap and side-effect-free so `e
 
 ## 1. Define A Typed Config
 
+{% code overflow="wrap" %}
 ```python
 from dataclasses import dataclass
 
@@ -26,26 +27,32 @@ def data_config(hp: HP) -> DataLoadSettings:
         shuffle=hp.bool(True, name="shuffle"),
     )
 ```
+{% endcode %}
 
 ## 2. Inspect The Parameters
 
 Print the active tree when you want a quick human check:
 
+{% code overflow="wrap" %}
 ```python
 from hypster import explore
 
 explore(data_config)
 ```
+{% endcode %}
 
 Use structured metadata when another tool needs to render fields:
 
+{% code overflow="wrap" %}
 ```python
 schema = explore(data_config, return_info=True)
 fields = schema.to_dict()["parameters"]
 ```
+{% endcode %}
 
 ## 3. Instantiate With Overrides
 
+{% code overflow="wrap" %}
 ```python
 from hypster import instantiate
 
@@ -57,9 +64,11 @@ assert settings == DataLoadSettings(
     shuffle=True,
 )
 ```
+{% endcode %}
 
 ## 4. Capture Params For Replay
 
+{% code overflow="wrap" %}
 ```python
 from hypster import instantiate_with_params
 
@@ -72,9 +81,11 @@ assert run.params == {
     "shuffle": True,
 }
 ```
+{% endcode %}
 
 ## 5. Store And Replay
 
+{% code overflow="wrap" %}
 ```python
 import json
 
@@ -84,5 +95,6 @@ restored_params = json.loads(payload)
 replayed = instantiate(data_config, values=restored_params)
 assert replayed == run.value
 ```
+{% endcode %}
 
 Because `run.params` includes defaulted values, replay does not silently change if the config's defaults are edited later.

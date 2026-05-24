@@ -2,29 +2,37 @@
 
 Install Optuna support:
 
+{% code overflow="wrap" %}
 ```bash
 uv add 'hypster[optuna]'
 ```
+{% endcode %}
 
 Public imports:
 
+{% code overflow="wrap" %}
 ```python
 from hypster.hpo.optuna import suggest_values
 from hypster.hpo.types import HpoCategorical, HpoFloat, HpoInt
 ```
+{% endcode %}
 
 ## suggest_values
 
+{% code overflow="wrap" %}
 ```python
 suggest_values(trial, *, config, args=(), kwargs=None) -> dict
 ```
+{% endcode %}
 
 Runs `config` with a trial-backed `HP` proxy and returns a `values` dictionary that can be passed to `instantiate()`.
 
+{% code overflow="wrap" %}
 ```python
 values = suggest_values(trial, config=model_config)
 cfg = instantiate(model_config, values=values)
 ```
+{% endcode %}
 
 The adapter is branch-aware. It only suggests parameters reached by the sampled execution path.
 
@@ -32,6 +40,7 @@ For numeric suggestions, `min` and `max` on the `hp.int` or `hp.float` call defi
 
 ## HpoInt
 
+{% code overflow="wrap" %}
 ```python
 HpoInt(
     step=None,
@@ -40,6 +49,7 @@ HpoInt(
     include_max=True,
 )
 ```
+{% endcode %}
 
 | Field | Meaning |
 | --- | --- |
@@ -50,6 +60,7 @@ HpoInt(
 
 ## HpoFloat
 
+{% code overflow="wrap" %}
 ```python
 HpoFloat(
     step=None,
@@ -60,6 +71,7 @@ HpoFloat(
     spread=None,
 )
 ```
+{% endcode %}
 
 | Field | Meaning |
 | --- | --- |
@@ -73,9 +85,11 @@ If `distribution="loguniform"`, the adapter uses Optuna's log sampling even if `
 
 ## HpoCategorical
 
+{% code overflow="wrap" %}
 ```python
 HpoCategorical(ordered=False, weights=None)
 ```
+{% endcode %}
 
 The current Optuna adapter uses `trial.suggest_categorical()` for `hp.select`. `ordered=True` and `weights=...` are rejected because Optuna categorical suggestions cannot express ordered or weighted categorical semantics.
 
@@ -100,6 +114,7 @@ Explicit child-local overrides passed with `hp.nest(child, name="child", values=
 
 `suggest_values()` raises `ValueError` when a backend-agnostic HPO spec asks for semantics that Optuna cannot represent.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP
 from hypster.hpo.optuna import suggest_values
@@ -123,9 +138,12 @@ def weighted_choice_config(hp: HP):
         hpo_spec=HpoCategorical(weights=[0.8, 0.2]),
     )
 ```
+{% endcode %}
 
 Both fail during `suggest_values(trial, config=...)` before a values dictionary is returned. Show the error as configuration feedback:
 
+{% code overflow="wrap" %}
 ```text
 This HPO spec cannot be represented by the Optuna adapter. Use uniform/loguniform float sampling, remove categorical weights or ordering, or implement custom sampling inside the objective.
 ```
+{% endcode %}

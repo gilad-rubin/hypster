@@ -10,6 +10,7 @@ Public validation failures currently raise `ValueError`. When `on_unknown="warn"
 
 `instantiate()`, `instantiate_with_params()`, and `explore()` default to `on_unknown="raise"`.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate
 
@@ -21,11 +22,13 @@ def config(hp: HP):
 
 instantiate(config, values={"mode": "b", "count": 3})
 ```
+{% endcode %}
 
 `count` is unreachable on the `mode="b"` branch, so Hypster raises.
 
 Example message:
 
+{% code overflow="wrap" %}
 ```text
 Unknown or unreachable parameters:
   - 'count': Unknown parameter
@@ -33,6 +36,7 @@ Unknown or unreachable parameters:
 Run explore(config, values=...) to inspect the active branch.
 Nested dict values are interpreted as parameter paths; use dict-backed select keys for objects.
 ```
+{% endcode %}
 
 Unknown and unreachable values share the same public error family because both mean "this key was not consumed by the active run." To diagnose the difference, run `explore(config, values=...)` for the selected branch:
 
@@ -41,10 +45,13 @@ Unknown and unreachable values share the same public error family because both m
 
 A typo can include a nearest-name suggestion:
 
+{% code overflow="wrap" %}
 ```python
 instantiate(config, values={"mode": "a", "coutn": 3})
 ```
+{% endcode %}
 
+{% code overflow="wrap" %}
 ```text
 Unknown or unreachable parameters:
   - 'coutn': Did you mean 'count'? (similarity: 80%)
@@ -52,16 +59,20 @@ Unknown or unreachable parameters:
 Run explore(config, values=...) to inspect the active branch.
 Nested dict values are interpreted as parameter paths; use dict-backed select keys for objects.
 ```
+{% endcode %}
 
 Use softer policies only when intentional:
 
+{% code overflow="wrap" %}
 ```python
 instantiate(config, values={"mode": "b", "count": 3}, on_unknown="warn")
 instantiate(config, values={"mode": "b", "count": 3}, on_unknown="ignore")
 ```
+{% endcode %}
 
 With `on_unknown="warn"`, use Python warning controls if you need to capture the message in a UI or test:
 
+{% code overflow="wrap" %}
 ```python
 import warnings
 
@@ -70,9 +81,11 @@ with warnings.catch_warnings(record=True) as caught:
 
 assert caught
 ```
+{% endcode %}
 
 For user-facing tools, a common strategy is:
 
+{% code overflow="wrap" %}
 ```python
 try:
     value = instantiate(config, values=form_values)
@@ -81,6 +94,7 @@ except ValueError as exc:
 else:
     run_workflow(value)
 ```
+{% endcode %}
 
 Interactive widget handles expose the same validation through a different boundary: direct `instantiate()` and `explore()` failures raise `ValueError`, while reading `InteractiveResult.value` or `InteractiveResult.params` during an invalid applied state raises `RuntimeError` with the underlying validation message. Show either message to the user and keep the last valid submitted params separate from draft UI state.
 
@@ -88,28 +102,34 @@ Interactive widget handles expose the same validation through a different bounda
 
 Parameter and nest names must be Python identifier-style strings.
 
+{% code overflow="wrap" %}
 ```python
 hp.int(32, name="batch_size")  # valid
 hp.int(32, name="batch-size")  # invalid
 ```
+{% endcode %}
 
 Use nesting to create dotted paths:
 
+{% code overflow="wrap" %}
 ```python
 hp.nest(child_config, name="model")
 # child_config's "learning_rate" parameter becomes "model.learning_rate"
 ```
+{% endcode %}
 
 ## Duplicate Value Paths
 
 These two entries spell the same final parameter path:
 
+{% code overflow="wrap" %}
 ```python
 values = {
     "model.learning_rate": 0.01,
     "model": {"learning_rate": 0.01},
 }
 ```
+{% endcode %}
 
 Hypster raises even if both values are identical, because duplicate inputs make logs ambiguous.
 
@@ -128,12 +148,15 @@ Each `hp.*` call validates runtime values:
 
 Do not put dictionaries or lists directly inside list-backed `select` choices:
 
+{% code overflow="wrap" %}
 ```python
 hp.select([{"layers": 2}, {"layers": 4}], name="model")
 ```
+{% endcode %}
 
 Use dictionary-backed select instead:
 
+{% code overflow="wrap" %}
 ```python
 hp.select(
     {
@@ -143,5 +166,6 @@ hp.select(
     name="model",
 )
 ```
+{% endcode %}
 
 The selected key is replayable, and the runtime value can still be complex.

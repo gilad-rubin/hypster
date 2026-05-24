@@ -4,6 +4,7 @@ Data pipelines often mix environment choices, schema decisions, cleaning rules, 
 
 ## Configure The Pipeline
 
+{% code overflow="wrap" %}
 ```python
 from dataclasses import dataclass
 from hypster import HP, explore, instantiate
@@ -65,9 +66,11 @@ def data_pipeline_config(hp: HP):
         "export": hp.nest(export_config, name="export"),
     }
 ```
+{% endcode %}
 
 ## Explore A Production Branch
 
+{% code overflow="wrap" %}
 ```python
 explore(
     data_pipeline_config,
@@ -78,9 +81,11 @@ explore(
     },
 )
 ```
+{% endcode %}
 
 ## Instantiate A Run
 
+{% code overflow="wrap" %}
 ```python
 cfg = instantiate(
     data_pipeline_config,
@@ -100,6 +105,7 @@ assert cfg["mode"] == "full"
 assert cfg["input"].path.startswith("s3://")
 assert cfg["cleaning"].fill_missing_numeric == 0.0
 ```
+{% endcode %}
 
 ## Why This Shape Works
 

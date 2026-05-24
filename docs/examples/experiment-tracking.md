@@ -4,6 +4,7 @@ Use `instantiate_with_params()` when you need both the runtime object and the ex
 
 ## Capture The Value And Params
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate, instantiate_with_params
 
@@ -44,13 +45,16 @@ assert run.params == {
 }
 assert instantiate(model_config, values=run.params) == run.value
 ```
+{% endcode %}
 
 ## Log Params In Your Tracker
 
+{% code overflow="wrap" %}
 ```python
 def log_to_tracker(tracker, run):
     for path, value in run.params.items():
         tracker.log_param(path, value)
 ```
+{% endcode %}
 
 The important detail is that `run.params` contains defaulted values as well as user overrides. That makes it suitable for exact replay.

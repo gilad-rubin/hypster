@@ -22,6 +22,7 @@ Hypster config functions return exactly what you decide to return. There is no f
 
 ## Return A Dict
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate
 
@@ -33,9 +34,11 @@ def config(hp: HP):
 cfg = instantiate(config, values={"model_name": "large"})
 assert cfg == {"model_name": "large", "batch_size": 32}
 ```
+{% endcode %}
 
 ## Return A Dataclass
 
+{% code overflow="wrap" %}
 ```python
 from dataclasses import dataclass
 from hypster import HP, instantiate
@@ -55,11 +58,13 @@ cfg = instantiate(config, values={"batch_size": 64})
 assert cfg.batch_size == 64
 assert cfg == TrainingConfig(batch_size=64, learning_rate=0.001)
 ```
+{% endcode %}
 
 ## Return Initialized Runtime Objects
 
 One common Hypster style is to make the config a typed factory for the object your application will use.
 
+{% code overflow="wrap" %}
 ```python
 from sklearn.ensemble import RandomForestClassifier
 from hypster import HP, instantiate
@@ -78,11 +83,13 @@ def classifier_config(hp: HP) -> RandomForestClassifier:
 
 model = instantiate(classifier_config, values={"n_estimators": 500})
 ```
+{% endcode %}
 
 The return type annotation helps readers, IDEs, and downstream code understand what instantiation produces.
 
 Use dict-backed `select` when a parameter should log a simple key but return a more complex runtime value:
 
+{% code overflow="wrap" %}
 ```python
 architecture = hp.select(
     {
@@ -93,11 +100,13 @@ architecture = hp.select(
     default="small",
 )
 ```
+{% endcode %}
 
 ## Use hp.collect
 
 `hp.collect()` helps gather local variables while excluding `hp`, private names, and anything you explicitly exclude.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP
 
@@ -107,9 +116,11 @@ def config(hp: HP):
     helper = "not returned"
     return hp.collect(locals(), exclude=["helper"])
 ```
+{% endcode %}
 
 Use `include=[...]` when you want to whitelist outputs:
 
+{% code overflow="wrap" %}
 ```python
 def config(hp: HP):
     batch_size = hp.int(32, name="batch_size")
@@ -117,6 +128,7 @@ def config(hp: HP):
     debug_label = "local"
     return hp.collect(locals(), include=["batch_size", "learning_rate"])
 ```
+{% endcode %}
 
 ## Keep Expensive Side Effects Outside Configs
 

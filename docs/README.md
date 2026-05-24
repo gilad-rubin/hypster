@@ -31,6 +31,7 @@ Hypster configs are pure Python functions, not a separate DSL. You can use norma
 
 ## First Example
 
+{% code overflow="wrap" %}
 ```python
 from dataclasses import dataclass
 from hypster import HP, explore, instantiate_with_params
@@ -68,6 +69,7 @@ run = instantiate_with_params(
 print(run.value)
 print(run.params)
 ```
+{% endcode %}
 
 The output value is the typed runtime object you use in your application. The `params` sidecar is the replayable record of every parameter Hypster selected on that run, including defaults.
 
@@ -83,15 +85,19 @@ The output value is the typed runtime object you use in your application. The `p
 
 ## Install
 
+{% code overflow="wrap" %}
 ```bash
 uv add hypster
 ```
+{% endcode %}
 
 For Optuna support:
 
+{% code overflow="wrap" %}
 ```bash
 uv add 'hypster[optuna]'
 ```
+{% endcode %}
 
 ## Where To Go Next
 

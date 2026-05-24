@@ -6,6 +6,7 @@ The public schema hook is `explore(config, return_info=True)`: it returns metada
 
 ## Turn A Config Into Field Metadata
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, explore, instantiate
 
@@ -36,11 +37,13 @@ fields = flatten_parameters(schema.to_dict()["parameters"])
 for field in fields:
     print(field["path"], field["kind"], field["selected_value"])
 ```
+{% endcode %}
 
 ## Feed UI State Back Into Hypster
 
 Your UI state should be a dictionary whose keys are Hypster parameter paths:
 
+{% code overflow="wrap" %}
 ```python
 ui_values = {
     "provider": "remote",
@@ -56,6 +59,7 @@ assert schema.defaults()["provider"] == "local"
 assert cfg["provider"] == "remote"
 assert cfg["timeout"] == 30.0
 ```
+{% endcode %}
 
 ## Control Mapping
 
@@ -73,6 +77,7 @@ assert cfg["timeout"] == 30.0
 
 This is the adapter shape. It assumes you already installed Streamlit and are running inside a Streamlit app.
 
+{% code overflow="wrap" %}
 ```python
 def render_field(st, field):
     path = field["path"]
@@ -93,5 +98,6 @@ def render_field(st, field):
 
     raise ValueError(f"Unsupported field kind: {kind}")
 ```
+{% endcode %}
 
 For conditional UIs, rerun `explore(config, values=current_ui_values, return_info=True)` whenever a branch-selecting value changes. That keeps the rendered fields aligned with the active branch.

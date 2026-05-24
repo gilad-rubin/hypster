@@ -4,6 +4,7 @@ Hypster does not define a custom serialization format. The recommended reproduci
 
 ## JSON Params
 
+{% code overflow="wrap" %}
 ```python
 import json
 from hypster import HP, explore, instantiate, instantiate_with_params
@@ -20,11 +21,13 @@ restored = json.loads(payload)
 
 assert instantiate(config, values=restored) == run.value
 ```
+{% endcode %}
 
 ## Complex Runtime Values
 
 Use dict-backed `select` so the serialized params contain simple keys:
 
+{% code overflow="wrap" %}
 ```python
 def model_config(hp: HP):
     return hp.select(
@@ -36,6 +39,7 @@ def model_config(hp: HP):
         default="small",
     )
 ```
+{% endcode %}
 
 `instantiate_with_params(model_config, values={"model": "large"}).params` records `{"model": "large"}`, not the mapped dictionary.
 
@@ -43,10 +47,12 @@ def model_config(hp: HP):
 
 `explore(config, return_info=True).to_dict()` returns JSON-serializable schema metadata for UIs, catalogs, and validation tools.
 
+{% code overflow="wrap" %}
 ```python
 schema = explore(config, return_info=True).to_dict()
 json.dumps(schema)
 ```
+{% endcode %}
 
 Schema metadata is not a replacement for selected params. Use schema for rendering and params for replay.
 
@@ -54,6 +60,7 @@ Schema metadata is not a replacement for selected params. Use schema for renderi
 
 When params leave the current process, store them with enough identity to understand which code and data produced the original run:
 
+{% code overflow="wrap" %}
 ```python
 import json
 import hypster
@@ -73,6 +80,7 @@ restored = json.loads(payload)
 
 replayed = instantiate(config, values=restored["params"])
 ```
+{% endcode %}
 
 If replay fails after the config evolves, inspect the old payload with `explore(config, values=restored["params"], on_unknown="warn")`, migrate the parameter names deliberately, and save the migrated artifact as a new record.
 
@@ -80,6 +88,7 @@ If replay fails after the config evolves, inspect the old payload with `explore(
 
 The versioned artifact still protects you when defaults change, because replay uses stored params:
 
+{% code overflow="wrap" %}
 ```python
 def training_config(hp: HP):
     return {"batch_size": hp.int(64, name="batch_size")}
@@ -105,3 +114,4 @@ def training_config(hp: HP):
 
 assert instantiate(training_config, values=restored["params"]) == {"batch_size": 64}
 ```
+{% endcode %}

@@ -4,6 +4,7 @@ This example shows the recommended ML shape: each Hypster config returns an init
 
 ## Define Model Factories
 
+{% code overflow="wrap" %}
 ```python
 from sklearn.base import ClassifierMixin
 from sklearn.ensemble import RandomForestClassifier
@@ -34,9 +35,11 @@ def forest_model(hp: HP) -> RandomForestClassifier:
         random_state=random_state,
     )
 ```
+{% endcode %}
 
 ## Choose The Active Model
 
+{% code overflow="wrap" %}
 ```python
 def classifier_config(hp: HP) -> ClassifierMixin:
     model_family = hp.select(["logistic", "forest"], name="model_family", default="forest", options_only=True)
@@ -46,11 +49,13 @@ def classifier_config(hp: HP) -> ClassifierMixin:
 
     return hp.nest(forest_model, name="forest")
 ```
+{% endcode %}
 
 The config returns a ready-to-use classifier, not a dictionary that must be assembled later.
 
 ## Explore And Instantiate
 
+{% code overflow="wrap" %}
 ```python
 explore(classifier_config)
 
@@ -66,9 +71,11 @@ run = instantiate_with_params(
 model = run.value
 params = run.params
 ```
+{% endcode %}
 
 Expected selected params:
 
+{% code overflow="wrap" %}
 ```python
 {
     "model_family": "forest",
@@ -78,6 +85,7 @@ Expected selected params:
     "forest.random_state": 42,
 }
 ```
+{% endcode %}
 
 Use `model.fit(X_train, y_train)` in your training code after instantiation. Keep training itself outside the config function so `explore()`, HPO, and UI generation stay fast.
 
@@ -85,6 +93,7 @@ Use `model.fit(X_train, y_train)` in your training code after instantiation. Kee
 
 For larger experiments, nest preprocessing, training, and model configs under one parent. Each nested config owns one part of the workflow, while the selected params remain a flat replayable dictionary.
 
+{% code overflow="wrap" %}
 ```python
 from dataclasses import dataclass
 
@@ -150,6 +159,7 @@ assert isinstance(run.value.model, RandomForestClassifier)
 assert run.params["preprocessing.scaler"] == "robust"
 assert run.params["model.forest.n_estimators"] == 500
 ```
+{% endcode %}
 
 Use `run.value.preprocessing` to build your feature transformer, `run.value.model` as the initialized estimator, and `run.params` as the exact experiment record.
 
@@ -157,6 +167,7 @@ Use `run.value.preprocessing` to build your feature transformer, `run.value.mode
 
 Add `hpo_spec=` where search semantics matter. Normal instantiation ignores these specs; the Optuna adapter consumes them.
 
+{% code overflow="wrap" %}
 ```python
 from hypster.hpo.types import HpoFloat, HpoInt
 
@@ -193,5 +204,6 @@ def regularized_logistic(hp: HP) -> LogisticRegression:
 
     return LogisticRegression(C=C, max_iter=1000)
 ```
+{% endcode %}
 
 See [Perform Hyperparameter Optimization](../how-to/perform-hyperparameter-optimization.md) for the Optuna objective pattern.

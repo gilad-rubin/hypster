@@ -6,26 +6,37 @@ Selected choices are part of Hypster's reproducibility surface. They are what `i
 
 ## Signatures
 
+{% code overflow="wrap" %}
 ```python
 hp.select(options, *, name, default=NO_DEFAULT, options_only=False, allow_none=False, hpo_spec=None)
 hp.multi_select(options, *, name, default=None, options_only=False, allow_none=False)
 ```
+{% endcode %}
 
 ## List Form
 
 Use list form when the logged choice and returned value are the same simple value:
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate
 
 def config(hp: HP):
-    model = hp.select(["haiku", "sonnet"], name="model", default="haiku")
+    model = hp.select(
+        ["claude-haiku-4-5", "claude-sonnet-4-6"],
+        name="model",
+        default="claude-haiku-4-5",
+    )
     features = hp.multi_select(["cache", "trace"], name="features", default=["cache"])
     return {"model": model, "features": features}
 
-instantiate(config, values={"model": "sonnet", "features": ["cache", "trace"]})
-# => {"model": "sonnet", "features": ["cache", "trace"]}
+instantiate(
+    config,
+    values={"model": "claude-sonnet-4-6", "features": ["cache", "trace"]},
+)
+# => {"model": "claude-sonnet-4-6", "features": ["cache", "trace"]}
 ```
+{% endcode %}
 
 List-form choices must be logging-safe scalar values: `None`, `bool`, `int`, `float`, or `str`. If you need a complex object, use dictionary form.
 
@@ -33,6 +44,7 @@ List-form choices must be logging-safe scalar values: `None`, `bool`, `int`, `fl
 
 Use dictionary form when a simple logged key should return a different value. The key is logged and replayed; the mapped value is returned from the config.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate_with_params
 
@@ -52,9 +64,11 @@ run = instantiate_with_params(config, values={"model": "large"})
 assert run.value == {"model": {"layers": 4, "units": [256, 128]}}
 assert run.params == {"model": "large"}
 ```
+{% endcode %}
 
 Use `options_only=True` with dictionary form when the logged keys are a closed enum:
 
+{% code overflow="wrap" %}
 ```python
 def strict_config(hp: HP):
     model = hp.select(
@@ -73,6 +87,7 @@ run = instantiate_with_params(strict_config, values={"model": "large"})
 assert run.value == {"model": {"layers": 4}}
 assert run.params == {"model": "large"}
 ```
+{% endcode %}
 
 Dictionary form is the recommended way to return:
 
@@ -80,6 +95,7 @@ Dictionary form is the recommended way to return:
 * dictionaries, lists, tuples, or dataclasses
 * long provider/model IDs behind short aliases
 
+{% code overflow="wrap" %}
 ```python
 architecture = hp.select(
     {
@@ -90,6 +106,7 @@ architecture = hp.select(
     default="small",
 )
 ```
+{% endcode %}
 
 For nullable choices, you can use `None` directly in list-form options with `allow_none=True`.
 
@@ -97,6 +114,7 @@ For nullable choices, you can use `None` directly in list-form options with `all
 
 If `None` itself is a selectable choice or override, mark the parameter as nullable with `allow_none=True`:
 
+{% code overflow="wrap" %}
 ```python
 def config(hp: HP):
     thinking_level = hp.select(
@@ -113,6 +131,7 @@ def config(hp: HP):
     )
     return {"thinking_level": thinking_level, "features": features}
 ```
+{% endcode %}
 
 Without `allow_none=True`, `None` defaults, choices, and overrides raise with guidance.
 
@@ -120,12 +139,14 @@ Without `allow_none=True`, `None` defaults, choices, and overrides raise with gu
 
 An empty option list can default to `None` when the parameter is explicitly nullable:
 
+{% code overflow="wrap" %}
 ```python
 def config(hp: HP):
     return hp.select([], name="choice", allow_none=True)
 
 assert instantiate(config) is None
 ```
+{% endcode %}
 
 Without `allow_none=True`, an empty option list with no explicit default raises because Hypster has no safe value to select.
 
@@ -133,22 +154,30 @@ Without `allow_none=True`, an empty option list with no explicit default raises 
 
 By default, `options_only=False`, so callers may provide a custom choice outside the declared options:
 
+{% code overflow="wrap" %}
 ```python
 def config(hp: HP):
-    return hp.select(["haiku", "sonnet"], name="model")
+    return hp.select(["claude-haiku-4-5", "claude-sonnet-4-6"], name="model")
 
-assert instantiate(config, values={"model": "opus"}) == "opus"
+assert instantiate(config, values={"model": "claude-opus-4-7"}) == "claude-opus-4-7"
 ```
+{% endcode %}
 
 Custom choices must still be logging-safe scalar values. Use `options_only=True` to reject anything outside the declared options:
 
+{% code overflow="wrap" %}
 ```python
 def config(hp: HP):
-    return hp.select(["haiku", "sonnet"], name="model", options_only=True)
+    return hp.select(
+        ["claude-haiku-4-5", "claude-sonnet-4-6"],
+        name="model",
+        options_only=True,
+    )
 
-instantiate(config, values={"model": "opus"})
-# ValueError: 'opus' not in allowed options
+instantiate(config, values={"model": "claude-opus-4-7"})
+# ValueError: 'claude-opus-4-7' not in allowed options
 ```
+{% endcode %}
 
 ## Names
 

@@ -110,15 +110,32 @@ from hypster.hpo.types import HpoFloat, HpoInt
 
 
 def model_cfg(hp: HP):
-    family = hp.select(["linear", "forest"], name="family", default="forest", options_only=True)
+    family = hp.select(
+        ["linear", "forest"],
+        name="family",
+        default="forest",
+        options_only=True,
+    )
     if family == "linear":
         return {
             "family": family,
-            "alpha": hp.float(0.1, name="alpha", min=1e-4, max=10.0, hpo_spec=HpoFloat(scale="log")),
+            "alpha": hp.float(
+                0.1,
+                name="alpha",
+                min=1e-4,
+                max=10.0,
+                hpo_spec=HpoFloat(scale="log"),
+            ),
         }
     return {
         "family": family,
-        "n_estimators": hp.int(200, name="n_estimators", min=50, max=1000, hpo_spec=HpoInt(step=50)),
+        "n_estimators": hp.int(
+            200,
+            name="n_estimators",
+            min=50,
+            max=1000,
+            hpo_spec=HpoInt(step=50),
+        ),
     }
 
 

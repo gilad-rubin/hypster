@@ -4,6 +4,7 @@ Use `instantiate_with_params()` when a run needs a durable parameter record.
 
 ## Capture Params
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate, instantiate_with_params
 
@@ -30,16 +31,20 @@ assert run.params == {
     "max_pages": 6,
 }
 ```
+{% endcode %}
 
 ## Replay Later
 
+{% code overflow="wrap" %}
 ```python
 replayed = instantiate(report_config, values=run.params)
 assert replayed == run.value
 ```
+{% endcode %}
 
 Captured params include defaults, so replay does not silently pick up later default changes:
 
+{% code overflow="wrap" %}
 ```python
 def old_config(hp: HP):
     return {"batch_size": hp.int(64, name="batch_size")}
@@ -55,11 +60,13 @@ def new_config(hp: HP):
 
 assert instantiate(new_config, values=old_run.params) == {"batch_size": 64}
 ```
+{% endcode %}
 
 ## Store Params As JSON
 
 `run.params` only contains values selected by `hp.*` calls. It is intended to be JSON-friendly when your parameter values are JSON-friendly.
 
+{% code overflow="wrap" %}
 ```python
 import json
 
@@ -68,11 +75,13 @@ restored_params = json.loads(payload)
 
 assert instantiate(report_config, values=restored_params) == run.value
 ```
+{% endcode %}
 
 ## Complex Runtime Objects
 
 Use dict-backed `select` when a runtime choice is a complex object. The params record the simple key, not the complex mapped value.
 
+{% code overflow="wrap" %}
 ```python
 def model_config(hp: HP):
     return hp.select(
@@ -89,3 +98,4 @@ run = instantiate_with_params(model_config, values={"model": "large"})
 assert run.value == {"layers": 4, "units": [256, 128]}
 assert run.params == {"model": "large"}
 ```
+{% endcode %}

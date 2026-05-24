@@ -4,18 +4,23 @@ Optuna is the first supported HPO backend for Hypster. The integration lives in 
 
 ## Install
 
+{% code overflow="wrap" %}
 ```bash
 uv add 'hypster[optuna]'
 ```
+{% endcode %}
 
 or:
 
+{% code overflow="wrap" %}
 ```bash
 pip install 'hypster[optuna]'
 ```
+{% endcode %}
 
 ## Basic Pattern
 
+{% code overflow="wrap" %}
 ```python
 import optuna
 from hypster import HP, instantiate
@@ -52,6 +57,7 @@ def objective(trial: optuna.Trial) -> float:
 study = optuna.create_study(direction="maximize")
 study.optimize(objective, n_trials=30)
 ```
+{% endcode %}
 
 ## What Is Supported
 
