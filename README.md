@@ -38,12 +38,10 @@
 
 ## Key Features
 
-- 🐍 **Pure Python, Not a DSL**: Use normal functions, `if` statements, loops, lists, helper functions, imports, and runtime objects
+- 🐍 **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
 - 🪆 **Hierarchical, Conditional Configurations**: Support for nested and swappable configurations
 - 📐 **Type Safety**: Built-in type hints and validation
 - 🧪 **Hyperparameter Optimization Built-In**: Native, first-class optuna support
-
-Hypster configs are ordinary Python functions rather than a separate configuration language. That keeps them flexible and readable, but it also means Hypster discovers the available parameters by executing the function. A config usually returns the initialized object your application needs. Keep config functions fast and side-effect-free: avoid paid API calls, network calls, file writes, training, database access, and costly initialization in code paths used by `explore()`, HPO, or interactive UIs.
 
 ## Installation
 
