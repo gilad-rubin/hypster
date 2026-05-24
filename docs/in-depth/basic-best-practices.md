@@ -12,6 +12,7 @@ The implication is that Hypster discovers the available parameters by running yo
 
 A strong Hypster pattern is to make each config function a typed factory for the object the caller needs:
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP
 from sklearn.ensemble import RandomForestClassifier
@@ -26,6 +27,7 @@ def classifier_config(hp: HP) -> RandomForestClassifier:
         random_state=42,
     )
 ```
+{% endcode %}
 
 Use a return type annotation for config functions whenever the output is a meaningful object. It makes the config easier to read, test, and compose with `hp.nest()`.
 
@@ -52,9 +54,11 @@ Use this boundary when deciding what a config should return:
 
 Every `hp.*` call needs a stable `name=`. Names become the keys in `values=`, `explore()` output, and `instantiate_with_params().params`.
 
+{% code overflow="wrap" %}
 ```python
 hp.float(0.001, name="learning_rate")
 ```
+{% endcode %}
 
 Use Python identifier-style names:
 
@@ -67,6 +71,7 @@ Let `hp.nest()` create dotted paths.
 
 Branch when downstream structure changes:
 
+{% code overflow="wrap" %}
 ```python
 def model_config(hp: HP):
     family = hp.select(["linear", "forest"], name="family", default="forest", options_only=True)
@@ -76,6 +81,7 @@ def model_config(hp: HP):
 
     return {"n_estimators": hp.int(200, name="n_estimators", min=10)}
 ```
+{% endcode %}
 
 Avoid carrying irrelevant parameters for inactive branches. Branch-aware configs make experiment logs cleaner and HPO search spaces smaller.
 
@@ -83,6 +89,7 @@ Avoid carrying irrelevant parameters for inactive branches. Branch-aware configs
 
 Select keys should be simple and replayable. Map those keys to complex runtime values:
 
+{% code overflow="wrap" %}
 ```python
 tokenizer = hp.select(
     {
@@ -93,6 +100,7 @@ tokenizer = hp.select(
     default="wordpiece",
 )
 ```
+{% endcode %}
 
 This keeps `params={"tokenizer": "wordpiece"}` while your app receives the mapped dictionary when that branch is selected.
 
@@ -100,28 +108,35 @@ This keeps `params={"tokenizer": "wordpiece"}` while your app receives the mappe
 
 By default, `select` allows custom scalar values outside the listed options. Use `options_only=True` when the option list is closed:
 
+{% code overflow="wrap" %}
 ```python
 provider = hp.select(["openai", "gemini"], name="provider", default="openai", options_only=True)
 ```
+{% endcode %}
 
 ## Use `allow_none=True` Deliberately
 
 `None` is a real value, not an unspecified value. Mark it explicitly:
 
+{% code overflow="wrap" %}
 ```python
 max_depth = hp.int(None, name="max_depth", allow_none=True)
 ```
+{% endcode %}
 
 For nullable choices, you can put `None` directly in the options:
 
+{% code overflow="wrap" %}
 ```python
 tokenizer = hp.select([None, "basic"], name="tokenizer", default=None, allow_none=True)
 ```
+{% endcode %}
 
 ## Use Numeric Coercion Deliberately
 
 Hypster safely coerces common numeric inputs by default. Integral floats can be used for integer parameters, and integers can be used for float parameters:
 
+{% code overflow="wrap" %}
 ```python
 def config(hp: HP):
     return {
@@ -132,9 +147,11 @@ def config(hp: HP):
 instantiate(config, values={"epochs": 20.0, "lr": 1})
 # => {"epochs": 20, "lr": 1.0}
 ```
+{% endcode %}
 
 Use `strict=True` when the input type itself matters:
 
+{% code overflow="wrap" %}
 ```python
 def strict_config(hp: HP):
     return {
@@ -142,6 +159,7 @@ def strict_config(hp: HP):
         "lr": hp.float(0.1, name="lr", strict=True),
     }
 ```
+{% endcode %}
 
 `True` and `False` are rejected by numeric parameters. Use `hp.bool()` for boolean choices.
 
@@ -149,10 +167,12 @@ def strict_config(hp: HP):
 
 Use `instantiate_with_params()` for experiments, UI submissions, scheduled jobs, and production runs:
 
+{% code overflow="wrap" %}
 ```python
 run = instantiate_with_params(config, values={"learning_rate": 0.01})
 # tracker.log_params(run.params)
 ```
+{% endcode %}
 
 The params include defaults as well as explicit overrides, so later replay does not depend on changing defaults.
 
@@ -160,9 +180,11 @@ The params include defaults as well as explicit overrides, so later replay does 
 
 When overriding a branch, inspect it first:
 
+{% code overflow="wrap" %}
 ```python
 explore(config, values={"provider": "gemini"})
 ```
+{% endcode %}
 
 This prevents stale values from inactive branches from leaking into logs.
 
@@ -170,11 +192,13 @@ This prevents stale values from inactive branches from leaking into logs.
 
 Return what the caller needs. A small return surface makes configs easier to test and less likely to couple unrelated workflow stages.
 
+{% code overflow="wrap" %}
 ```python
 return {
     "model": model,
     "optimizer": optimizer,
 }
 ```
+{% endcode %}
 
 Use `hp.collect(locals(), include=[...])` when that makes the return explicit and concise.

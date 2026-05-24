@@ -4,6 +4,7 @@ Hypster is useful when an AI workflow needs to switch providers, retrieval modes
 
 ## Provider Configs
 
+{% code overflow="wrap" %}
 ```python
 from dataclasses import dataclass
 from hypster import HP, explore, instantiate_with_params
@@ -18,7 +19,12 @@ class ProviderConfig:
 def openai_config(hp: HP) -> ProviderConfig:
     return ProviderConfig(
         provider="openai",
-        model=hp.select(["gpt-4o-mini", "gpt-4.1"], name="model", default="gpt-4o-mini", options_only=True),
+        model=hp.select(
+            ["gpt-5.4-mini", "gpt-5.5"],
+            name="model",
+            default="gpt-5.4-mini",
+            options_only=True,
+        ),
         temperature=hp.float(0.2, name="temperature", min=0.0, max=2.0),
         max_tokens=hp.int(1024, name="max_tokens", min=1, max=16_384),
     )
@@ -26,16 +32,23 @@ def openai_config(hp: HP) -> ProviderConfig:
 def gemini_config(hp: HP) -> ProviderConfig:
     return ProviderConfig(
         provider="gemini",
-        model=hp.select(["flash-lite", "pro"], name="model", default="flash-lite", options_only=True),
+        model=hp.select(
+            ["gemini-3.5-flash", "gemini-3.1-pro-preview"],
+            name="model",
+            default="gemini-3.5-flash",
+            options_only=True,
+        ),
         temperature=hp.float(0.3, name="temperature", min=0.0, max=2.0),
         max_tokens=hp.int(2048, name="max_tokens", min=1, max=16_384),
     )
 ```
+{% endcode %}
 
 ## RAG And Output Settings
 
 Use dict-backed `select` when the runtime value is complex. The parameter records the simple key, while your app receives the mapped object.
 
+{% code overflow="wrap" %}
 ```python
 def retrieval_config(hp: HP):
     retriever = hp.select(
@@ -61,9 +74,11 @@ def output_config(hp: HP):
         "system_prompt": hp.text("Answer with concise, sourced reasoning.", name="system_prompt"),
     }
 ```
+{% endcode %}
 
 ## Compose The Workflow
 
+{% code overflow="wrap" %}
 ```python
 def qa_workflow_config(hp: HP):
     provider = hp.select(["openai", "gemini"], name="provider", default="openai", options_only=True)
@@ -80,9 +95,11 @@ def qa_workflow_config(hp: HP):
         "output": hp.nest(output_config, name="output"),
     }
 ```
+{% endcode %}
 
 ## Explore And Replay
 
+{% code overflow="wrap" %}
 ```python
 explore(
     qa_workflow_config,
@@ -93,7 +110,7 @@ run = instantiate_with_params(
     qa_workflow_config,
     values={
         "provider": "gemini",
-        "gemini.model": "pro",
+        "gemini.model": "gemini-3.1-pro-preview",
         "gemini.temperature": 0.1,
         "retrieval.retriever": "vector",
         "output.format": "markdown",
@@ -101,15 +118,17 @@ run = instantiate_with_params(
 )
 
 assert run.params["provider"] == "gemini"
-assert run.params["gemini.model"] == "pro"
+assert run.params["gemini.model"] == "gemini-3.1-pro-preview"
 assert run.params["retrieval.retriever"] == "vector"
 assert run.value["retrieval"]["retriever"]["kind"] == "dense"
 ```
+{% endcode %}
 
 ## Branch Safety
 
 This raises by default because `openai.temperature` is unreachable when the `gemini` branch is selected:
 
+{% code overflow="wrap" %}
 ```python
 from hypster import instantiate
 
@@ -118,5 +137,6 @@ instantiate(
     values={"provider": "gemini", "openai.temperature": 0.7},
 )
 ```
+{% endcode %}
 
 Run `explore(qa_workflow_config, values={"provider": "gemini"})` before instantiation to inspect the reachable parameter paths for that branch.

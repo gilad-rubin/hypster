@@ -4,18 +4,23 @@ Use this guide when you want Optuna to sample values for the active branch of a 
 
 ## Install Optuna Support
 
+{% code overflow="wrap" %}
 ```bash
 uv add 'hypster[optuna]'
 ```
+{% endcode %}
 
 or:
 
+{% code overflow="wrap" %}
 ```bash
 pip install 'hypster[optuna]'
 ```
+{% endcode %}
 
 ## Define A Searchable Config
 
+{% code overflow="wrap" %}
 ```python
 from dataclasses import dataclass
 from hypster import HP, instantiate_with_params
@@ -49,9 +54,11 @@ def model_config(hp: HP) -> ModelConfig:
     max_depth = hp.int(12, name="max_depth", min=2, max=64, hpo_spec=HpoInt(scale="log"))
     return ModelConfig(family=family, params={"n_estimators": n_estimators, "max_depth": max_depth})
 ```
+{% endcode %}
 
 ## Use It In An Objective
 
+{% code overflow="wrap" %}
 ```python
 import optuna
 from hypster.hpo.optuna import suggest_values
@@ -71,11 +78,13 @@ def objective(trial: optuna.Trial) -> float:
 study = optuna.create_study(direction="maximize")
 study.optimize(objective, n_trials=30)
 ```
+{% endcode %}
 
 ## Fix Part Of The Search
 
 Wrap the config when you want a fixed branch. This keeps Optuna from sampling parameters that will later become unreachable.
 
+{% code overflow="wrap" %}
 ```python
 def forest_only_config(hp: HP) -> ModelConfig:
     n_estimators = hp.int(
@@ -93,6 +102,7 @@ def objective(trial: optuna.Trial) -> float:
     run = instantiate_with_params(forest_only_config, values=values)
     return train_and_score(run.value)
 ```
+{% endcode %}
 
 Prefer encoding fixed branches in the config itself when possible. It keeps the search space smaller and the replay payload cleaner.
 
@@ -114,6 +124,7 @@ The Optuna adapter does not expand `multi_*` calls into a search space. Keep `mu
 
 Use categorical booleans for per-feature include/exclude decisions:
 
+{% code overflow="wrap" %}
 ```python
 def feature_config(hp: HP) -> list[str]:
     features = []
@@ -125,20 +136,24 @@ def feature_config(hp: HP) -> list[str]:
         features.append("days_active")
     return features
 ```
+{% endcode %}
 
 Use `hp.select([False, True], ...)` here rather than `hp.bool(...)` because the Optuna adapter samples categorical `select` calls, not boolean HP calls.
 
 Use fixed slots when position matters:
 
+{% code overflow="wrap" %}
 ```python
 def top_features_config(hp: HP) -> list[str]:
     first = hp.select(["age", "income", "days_active"], name="feature_1", options_only=True)
     second = hp.select(["age", "income", "days_active"], name="feature_2", options_only=True)
     return [first, second]
 ```
+{% endcode %}
 
 Use dict-backed categorical presets for finite feature subsets:
 
+{% code overflow="wrap" %}
 ```python
 def preset_features_config(hp: HP) -> list[str]:
     return hp.select(
@@ -152,3 +167,4 @@ def preset_features_config(hp: HP) -> list[str]:
         options_only=True,
     )
 ```
+{% endcode %}

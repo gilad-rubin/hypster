@@ -4,6 +4,7 @@ Use `hp.nest()` to split a large workflow into smaller config functions. Nested 
 
 ## A Deeply Nested Training Workflow
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, explore, instantiate
 
@@ -35,9 +36,11 @@ def experiment_config(hp: HP):
     trainer = hp.nest(trainer_config, name="trainer", kwargs={"epochs_default": 20})
     return {"dataset": dataset, "trainer": trainer}
 ```
+{% endcode %}
 
 ## Override Nested Values
 
+{% code overflow="wrap" %}
 ```python
 cfg = instantiate(
     experiment_config,
@@ -52,9 +55,11 @@ cfg = instantiate(
 assert cfg["trainer"]["optimizer"]["algorithm"] == "sgd"
 assert cfg["trainer"]["optimizer"]["momentum"] == 0.95
 ```
+{% endcode %}
 
 The same values can be expressed as nested dictionaries:
 
+{% code overflow="wrap" %}
 ```python
 cfg = instantiate(
     experiment_config,
@@ -70,16 +75,19 @@ cfg = instantiate(
     },
 )
 ```
+{% endcode %}
 
 Do not provide both spellings for the same final parameter path. Hypster raises duplicate-path errors so logs and replays stay unambiguous.
 
 ## Explore A Nested Branch
 
+{% code overflow="wrap" %}
 ```python
 explore(
     experiment_config,
     values={"trainer.optimizer.algorithm": "sgd"},
 )
 ```
+{% endcode %}
 
 The printed tree includes only the active optimizer branch, so you can see that `momentum` is reachable and `beta1` is not.

@@ -18,6 +18,7 @@ Because the config is executed normally, conditionals work naturally. If Optuna 
 
 Use `hpo_spec=` to document search semantics where the parameter is defined:
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP
 from hypster.hpo.types import HpoFloat, HpoInt
@@ -40,6 +41,7 @@ def config(hp: HP):
         ),
     }
 ```
+{% endcode %}
 
 Normal `instantiate()` ignores `hpo_spec`; the Optuna adapter consumes it.
 
@@ -69,6 +71,7 @@ Nested HPO paths behave like normal nested values. Explicit child-local override
 
 Nullable numeric HPO parameters are not supported directly. Model the nullable choice as a categorical branch:
 
+{% code overflow="wrap" %}
 ```python
 def tree_config(hp: HP):
     depth_mode = hp.select(["unlimited", "bounded"], name="depth_mode", default="bounded", options_only=True)
@@ -78,6 +81,7 @@ def tree_config(hp: HP):
 
     return {"max_depth": hp.int(12, name="max_depth", min=1, max=64)}
 ```
+{% endcode %}
 
 ## Exact API
 

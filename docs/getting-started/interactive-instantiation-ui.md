@@ -6,20 +6,25 @@ Use `interact()` in a notebook when you want to instantiate a configuration thro
 
 Install the notebook renderer with the visualization extra:
 
+{% code overflow="wrap" %}
 ```bash
 uv add "hypster[viz]"
 ```
+{% endcode %}
 
 or:
 
+{% code overflow="wrap" %}
 ```bash
 pip install "hypster[viz]"
 ```
+{% endcode %}
 
 The `viz` extra installs the widget runtime needed by Jupyter Notebook, JupyterLab, and VS Code notebooks. In VS Code, the Jupyter extension may ask to enable downloads for `anywidget` support files the first time a widget is displayed. Accept that prompt, then rerun the cell.
 
 ## Start An Interaction
 
+{% code overflow="wrap" %}
 ```python
 from dataclasses import dataclass
 
@@ -42,9 +47,19 @@ def model_config(hp: HP) -> ModelSettings:
         description="Chooses which provider branch is active.",
     )
     if provider == "anthropic":
-        model = hp.select(["claude-haiku", "claude-sonnet"], name="model")
+        model = hp.select(
+            ["claude-sonnet-4-6", "claude-opus-4-7"],
+            name="model",
+            default="claude-sonnet-4-6",
+            options_only=True,
+        )
     else:
-        model = hp.select(["gpt-4o-mini", "gpt-4.1"], name="model")
+        model = hp.select(
+            ["gpt-5.4-mini", "gpt-5.5"],
+            name="model",
+            default="gpt-5.4-mini",
+            options_only=True,
+        )
 
     return ModelSettings(
         provider=provider,
@@ -56,13 +71,16 @@ def model_config(hp: HP) -> ModelSettings:
 
 result = interact(model_config)
 ```
+{% endcode %}
 
 `interact()` returns an interactive result handle, not the raw configured object. After changing the widget, read the current applied object and replayable selected params from Python:
 
+{% code overflow="wrap" %}
 ```python
 settings = result.value
 params = result.params
 ```
+{% endcode %}
 
 `result.value` has the same type as the config function return value. In this example it is a `ModelSettings` instance.
 
@@ -74,9 +92,11 @@ By default, widget changes apply immediately. Valid changes update `result.value
 
 Use manual apply mode when you want to stage widget edits before updating the applied result:
 
+{% code overflow="wrap" %}
 ```python
 result = interact(model_config, auto_apply=False)
 ```
+{% endcode %}
 
 In manual mode, the UI continues to explore draft values so dependent controls stay current, but `result.value` and `result.params` keep returning the last applied state until Apply succeeds.
 
@@ -95,14 +115,18 @@ If a widget selection is invalid, the UI shows the current error. In auto-apply 
 
 Call `result.interact()` to render another live view of the same interaction:
 
+{% code overflow="wrap" %}
 ```python
 result.interact()
 ```
+{% endcode %}
 
 To start a fresh session from a previous selection, pass selected params explicitly:
 
+{% code overflow="wrap" %}
 ```python
 result2 = interact(model_config, values=result.params)
 ```
+{% endcode %}
 
 For framework-specific UIs outside notebooks, use the schema returned by `explore(..., return_info=True)`. See [Build an Interactive UI](../how-to/build-an-interactive-ui.md).

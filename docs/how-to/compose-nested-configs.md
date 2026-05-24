@@ -4,6 +4,7 @@ Use this guide when one workflow should be assembled from reusable smaller confi
 
 ## Start With Child Configs
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, explore, instantiate
 
@@ -18,9 +19,11 @@ def encoder_config(hp: HP):
     hidden_size = 384 if size == "small" else 768
     return {"size": size, "hidden_size": hidden_size}
 ```
+{% endcode %}
 
 ## Nest Them In A Parent
 
+{% code overflow="wrap" %}
 ```python
 def embedding_pipeline(hp: HP):
     return {
@@ -29,9 +32,11 @@ def embedding_pipeline(hp: HP):
         "normalize": hp.bool(True, name="normalize"),
     }
 ```
+{% endcode %}
 
 ## Override Nested Values
 
+{% code overflow="wrap" %}
 ```python
 cfg = instantiate(
     embedding_pipeline,
@@ -44,9 +49,11 @@ cfg = instantiate(
 
 assert cfg["encoder"]["hidden_size"] == 768
 ```
+{% endcode %}
 
 Nested dictionaries are equivalent:
 
+{% code overflow="wrap" %}
 ```python
 cfg = instantiate(
     embedding_pipeline,
@@ -57,6 +64,7 @@ cfg = instantiate(
     },
 )
 ```
+{% endcode %}
 
 The nested scope name is a prefix, not a leaf value. `values={"tokenizer": "wordpiece"}` raises as unknown because it does not target `tokenizer.kind`.
 
@@ -64,6 +72,7 @@ When you pass child-local values through `hp.nest(child, name="child", values=..
 
 ## Pass Args And Kwargs To Children
 
+{% code overflow="wrap" %}
 ```python
 def sampler_config(hp: HP, default_batch_size: int):
     return {
@@ -77,11 +86,14 @@ def training_config(hp: HP):
         "eval": hp.nest(sampler_config, name="eval", kwargs={"default_batch_size": 256}),
     }
 ```
+{% endcode %}
 
 ## Inspect Branches Before Running
 
+{% code overflow="wrap" %}
 ```python
 explore(embedding_pipeline, values={"encoder.size": "base"})
 ```
+{% endcode %}
 
 If an override points at a parameter that is not reached on the active branch, Hypster raises by default. That keeps `values=` safe to log and replay.

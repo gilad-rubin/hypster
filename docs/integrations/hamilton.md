@@ -8,6 +8,7 @@ Hamilton and Hypster can be used together by keeping graph construction and para
 
 ## Shape
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate_with_params
 
@@ -26,11 +27,13 @@ run = instantiate_with_params(
 # driver.execute(..., inputs=run.value)
 # tracker.log_params(run.params)
 ```
+{% endcode %}
 
 ## Execution Boundary
 
 Use `run.value` at the Hamilton execution boundary, and log `run.params` beside Hamilton metadata:
 
+{% code overflow="wrap" %}
 ```python
 # from hamilton import driver
 # import my_hamilton_nodes
@@ -48,6 +51,7 @@ run = instantiate_with_params(
 # tracker.log_params(run.params)
 # tracker.log_metrics(result["validation_metrics"])
 ```
+{% endcode %}
 
 Use Hamilton `inputs=` for runtime choices such as dataset, feature set, and model family. Use Hamilton `config=` only for static graph-construction choices in your Hamilton project. Hypster stays outside Hamilton's graph; it selects and records the values that you pass into the graph.
 

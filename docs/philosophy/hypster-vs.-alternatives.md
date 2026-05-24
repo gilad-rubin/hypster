@@ -16,12 +16,14 @@ Use Hypster when:
 
 YAML, TOML, and JSON are excellent for static settings. Hypster is better when the configuration space itself contains logic:
 
+{% code overflow="wrap" %}
 ```python
 if provider == "openai":
     llm = hp.nest(openai_config, name="openai")
 else:
     llm = hp.nest(gemini_config, name="gemini")
 ```
+{% endcode %}
 
 The active branch determines which parameters exist for a run.
 

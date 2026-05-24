@@ -2,6 +2,7 @@
 
 `values=` is the dictionary you pass to `instantiate()`, `instantiate_with_params()`, or `explore()` to select concrete parameter values.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate
 
@@ -14,9 +15,11 @@ def child(hp: HP):
 def parent(hp: HP):
     return {"child": hp.nest(child, name="child")}
 ```
+{% endcode %}
 
 ## Top-Level Values
 
+{% code overflow="wrap" %}
 ```python
 def config(hp: HP):
     return {"batch_size": hp.int(32, name="batch_size")}
@@ -24,24 +27,29 @@ def config(hp: HP):
 instantiate(config, values={"batch_size": 64})
 # => {"batch_size": 64}
 ```
+{% endcode %}
 
 ## Dotted Keys
 
 Use dotted keys for nested parameters:
 
+{% code overflow="wrap" %}
 ```python
 instantiate(parent, values={"child.x": 15})
 # => {"child": {"x": 15, "y": 20}}
 ```
+{% endcode %}
 
 ## Nested Dictionaries
 
 Nested dictionaries are normalized to the same dotted paths:
 
+{% code overflow="wrap" %}
 ```python
 instantiate(parent, values={"child": {"x": 25}})
 # => {"child": {"x": 25, "y": 20}}
 ```
+{% endcode %}
 
 You can mix dotted keys and nested dictionaries as long as each final parameter path appears once.
 
@@ -49,22 +57,27 @@ You can mix dotted keys and nested dictionaries as long as each final parameter 
 
 A nested scope name is a prefix for child parameters, not a parameter leaf by itself. These forms are valid because they target `child.x`:
 
+{% code overflow="wrap" %}
 ```python
 instantiate(parent, values={"child.x": 15})
 instantiate(parent, values={"child": {"x": 15}})
 ```
+{% endcode %}
 
 This raises because `child` is a scope, not a selectable parameter:
 
+{% code overflow="wrap" %}
 ```python
 instantiate(parent, values={"child": 123})
 # ValueError: Unknown or unreachable parameters
 ```
+{% endcode %}
 
 ## Duplicate Paths
 
 This raises because both entries target `child.x`:
 
+{% code overflow="wrap" %}
 ```python
 instantiate(
     parent,
@@ -75,6 +88,7 @@ instantiate(
 )
 # ValueError: Duplicate value for 'child.x'
 ```
+{% endcode %}
 
 Hypster raises even when the duplicate values are identical. A single canonical path keeps experiment logs and replay payloads unambiguous.
 
@@ -82,6 +96,7 @@ Hypster raises even when the duplicate values are identical. A single canonical 
 
 Only parameters touched by the active branch may appear in `values=`.
 
+{% code overflow="wrap" %}
 ```python
 def model_config(hp: HP):
     family = hp.select(["linear", "forest"], name="family", default="linear", options_only=True)
@@ -94,6 +109,7 @@ def model_config(hp: HP):
 instantiate(model_config, values={"family": "linear", "n_estimators": 500})
 # ValueError: Unknown or unreachable parameters
 ```
+{% endcode %}
 
 Use `explore(model_config, values={"family": "forest"})` to inspect the branch before instantiating it.
 
@@ -113,6 +129,7 @@ Prefer the default for experiments and production replay. Softer policies are us
 
 Nested dictionaries inside `values=` are interpreted as nested parameter paths. If you need a select option whose runtime value is a dictionary, use dict-backed `select`:
 
+{% code overflow="wrap" %}
 ```python
 def config(hp: HP):
     return hp.select(
@@ -127,5 +144,6 @@ def config(hp: HP):
 instantiate(config, values={"model": "large"})
 # => {"layers": 4}
 ```
+{% endcode %}
 
 Do not pass `values={"model": {"layers": 4}}`; Hypster will treat that as a nested parameter path.

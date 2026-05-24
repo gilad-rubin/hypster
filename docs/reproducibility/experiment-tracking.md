@@ -2,6 +2,7 @@
 
 Use `instantiate_with_params()` to log the exact parameters selected by a run.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate_with_params
 
@@ -23,14 +24,17 @@ assert run.params == {
     "batch_size": 128,
 }
 ```
+{% endcode %}
 
 ## Log To A Tracker
 
+{% code overflow="wrap" %}
 ```python
 def log_hypster_run(tracker, run):
     for path, value in run.params.items():
         tracker.log_param(path, value)
 ```
+{% endcode %}
 
 The params include defaults as well as explicit overrides. That matters because defaults may change between versions.
 
@@ -38,6 +42,7 @@ The params include defaults as well as explicit overrides. That matters because 
 
 Use `run.params` for replay, then store adjacent metadata that explains the code, data, and outputs that produced the run:
 
+{% code overflow="wrap" %}
 ```python
 import hypster
 
@@ -52,6 +57,7 @@ record = {
     "dataset_id": "warehouse/churn/2026-05-01",
 }
 ```
+{% endcode %}
 
 For trackers with separate concepts, log `params` as parameters, versions and dataset IDs as tags, metrics as metrics, and large files as artifacts.
 
@@ -65,6 +71,7 @@ At minimum, log:
 * `run.params`
 * the metric values produced by the run
 
+{% code overflow="wrap" %}
 ```python
 import hypster
 
@@ -73,14 +80,17 @@ metadata = {
     "params": run.params,
 }
 ```
+{% endcode %}
 
 ## Replay
 
+{% code overflow="wrap" %}
 ```python
 from hypster import instantiate
 
 replayed = instantiate(training_config, values=run.params)
 assert replayed == run.value
 ```
+{% endcode %}
 
 If replay fails because a parameter is now unknown, inspect the old payload with `explore(training_config, values=old_params, on_unknown="warn")` and migrate it deliberately.

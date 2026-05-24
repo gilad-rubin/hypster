@@ -4,6 +4,7 @@ When a past run stores Hypster params, you can inspect what those params mean ag
 
 ## Inspect The Active Branch
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, explore
 
@@ -19,6 +20,7 @@ past_params = {"model": "forest", "n_estimators": 500}
 
 explore(config, values=past_params)
 ```
+{% endcode %}
 
 The tree shows the reachable parameters for that recorded branch.
 
@@ -26,17 +28,21 @@ The tree shows the reachable parameters for that recorded branch.
 
 Use `on_unknown="warn"` when reviewing old payloads that may include stale fields:
 
+{% code overflow="wrap" %}
 ```python
 explore(config, values={"model": "linear", "n_estimators": 500}, on_unknown="warn")
 ```
+{% endcode %}
 
 Do not replay with `on_unknown="ignore"` until you have decided which old values should be dropped or migrated.
 
 ## Compare Defaults
 
+{% code overflow="wrap" %}
 ```python
 schema = explore(config, values=past_params, return_info=True)
 current_branch_defaults = schema.defaults()
 ```
+{% endcode %}
 
 This is useful when you want to know which values were explicit in a past run and which current defaults would apply if they were omitted.

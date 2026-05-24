@@ -12,6 +12,7 @@ Hypster is in preview, so production use should be deliberate. When you do deplo
 
 ## Example Smoke Test
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate_with_params
 
@@ -29,6 +30,7 @@ def test_production_config():
     )
     assert run.params["replicas"] == 4
 ```
+{% endcode %}
 
 ## Avoid Stale Overrides
 

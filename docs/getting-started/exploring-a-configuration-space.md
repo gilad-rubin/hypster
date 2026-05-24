@@ -6,6 +6,7 @@ That execution should be cheap and safe. Keep side effects, paid API calls, data
 
 ## Print The Parameter Tree
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, explore
 
@@ -33,9 +34,11 @@ def app_config(hp: HP):
 
 explore(app_config)
 ```
+{% endcode %}
 
 Expected output:
 
+{% code overflow="wrap" %}
 ```text
 app_config
 ├── backend: select = "local"  (options: ["local", "remote"])
@@ -43,20 +46,24 @@ app_config
     ├── threads: int = 4  (1-64)
     └── cache: bool = True
 ```
+{% endcode %}
 
 ## Explore A Different Conditional Branch
 
 Pass `values=` to choose a branch before tracing it:
 
+{% code overflow="wrap" %}
 ```python
 explore(
     app_config,
     values={"backend": "remote", "remote.timeout": 30.0},
 )
 ```
+{% endcode %}
 
 Expected output:
 
+{% code overflow="wrap" %}
 ```text
 app_config
 ├── backend: select = "remote"  (options: ["local", "remote"])
@@ -64,22 +71,26 @@ app_config
     ├── endpoint: text = "https://api.example.com"
     └── timeout: float = 30.0  (0.1-120.0)
 ```
+{% endcode %}
 
 ## Get Structured Metadata
 
 Use `return_info=True` when you want to inspect the schema in code:
 
+{% code overflow="wrap" %}
 ```python
 info = explore(app_config, return_info=True)
 
 print(info.defaults())
 print(info.to_dict())
 ```
+{% endcode %}
 
 For programmatic inspection before instantiation, use `schema = explore(config, return_info=True)` and read `schema.to_dict()["parameters"]`. Use plain `explore(config)` when a printed tree is enough.
 
 `defaults()` returns a flat dictionary of the active branch's default parameter values:
 
+{% code overflow="wrap" %}
 ```python
 {
     "backend": "local",
@@ -87,6 +98,7 @@ For programmatic inspection before instantiation, use `schema = explore(config, 
     "local.cache": True,
 }
 ```
+{% endcode %}
 
 ## When To Use `explore()` vs `instantiate()`
 

@@ -8,6 +8,7 @@ Use `explore(config, return_info=True)` to discover fields, render controls in y
 
 ## 1. Get A Schema
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, explore
 
@@ -53,9 +54,11 @@ def search_config(hp: HP):
 schema = explore(search_config, return_info=True)
 metadata = schema.to_dict()
 ```
+{% endcode %}
 
 ## 2. Flatten Field Metadata
 
+{% code overflow="wrap" %}
 ```python
 def flatten_fields(parameters):
     for parameter in parameters:
@@ -66,11 +69,13 @@ def flatten_fields(parameters):
 
 fields = list(flatten_fields(metadata["parameters"]))
 ```
+{% endcode %}
 
 Each field has `path`, `kind`, `default_value`, `selected_value`, optional `options`, optional `minimum`, and optional `maximum`.
 
 Schema metadata is JSON-serializable. After exploring the vector branch with values such as `{"backend": "vector", "features": ["cache", None], "retrieval.index": "embeddings-v3", "retrieval.top_k": 12, "retrieval.score_threshold": 0.35}`, the payload looks like this shape:
 
+{% code overflow="wrap" %}
 ```python
 {
     "name": "search_config",
@@ -158,6 +163,7 @@ Schema metadata is JSON-serializable. After exploring the vector branch with val
     ],
 }
 ```
+{% endcode %}
 
 For dict-backed selects, `options` contains the replayable keys, not the mapped runtime objects.
 
@@ -165,6 +171,7 @@ For dict-backed selects, `options` contains the replayable keys, not the mapped 
 
 Map field kinds to controls in your UI framework:
 
+{% code overflow="wrap" %}
 ```python
 def control_spec(field):
     if field["kind"] == "select":
@@ -186,11 +193,13 @@ def control_spec(field):
 
 controls = {field["path"]: control_spec(field) for field in fields}
 ```
+{% endcode %}
 
 ## 4. Recompute Conditional Branches
 
 When a branch-selecting field changes, call `explore()` again with current UI values:
 
+{% code overflow="wrap" %}
 ```python
 ui_values = {"backend": "vector"}
 schema = explore(search_config, values=ui_values, return_info=True)
@@ -204,9 +213,11 @@ assert [field["path"] for field in fields] == [
     "features",
 ]
 ```
+{% endcode %}
 
 Custom UIs should submit only paths present in the latest schema. A robust branch-change loop is:
 
+{% code overflow="wrap" %}
 ```python
 def reachable_paths(schema):
     return {field["path"] for field in flatten_fields(schema.to_dict()["parameters"])}
@@ -218,6 +229,7 @@ def refresh_schema(config, current_values):
     schema = explore(config, values=pruned_values, return_info=True)
     return schema, pruned_values
 ```
+{% endcode %}
 
 If your UI remembers draft values per branch, keep that memory outside the submitted `values=` dictionary. Before calling `instantiate()`, remove stale paths from inactive branches.
 
@@ -225,6 +237,7 @@ Use `on_unknown="ignore"` only for this schema-refresh pruning pass. For the fin
 
 ## 5. Instantiate From UI State
 
+{% code overflow="wrap" %}
 ```python
 from hypster import instantiate
 
@@ -240,9 +253,11 @@ cfg = instantiate(search_config, values=ui_values)
 assert cfg["backend"] == "vector"
 assert cfg["retrieval"]["top_k"] == 12
 ```
+{% endcode %}
 
 ## 6. Submit And Show Errors
 
+{% code overflow="wrap" %}
 ```python
 from hypster import instantiate
 
@@ -253,6 +268,7 @@ except ValueError as exc:
 else:
     run_search(cfg)
 ```
+{% endcode %}
 
 If you intentionally allow old UI payloads while users are editing, use `on_unknown="warn"` and capture warnings near the form. Keep final run submissions strict unless you have a migration path for ignored fields.
 

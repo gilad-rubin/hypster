@@ -2,12 +2,14 @@
 
 A Hypster configuration space is an ordinary Python function whose first argument is named `hp`. It is not a DSL or a separate config file format: use normal Python control flow, lists, helper functions, imports, dataclasses, and object construction.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP
 
 def config(hp: HP):
     ...
 ```
+{% endcode %}
 
 `hp` must be the first positional parameter; keyword-only `hp` is rejected before the config executes. The `hp: HP` annotation is recommended, but unannotated config functions are still valid.
 
@@ -19,6 +21,7 @@ Because Hypster discovers available parameters by running this function, keep co
 
 Use `hp.*` calls for values that should be visible, overrideable, replayable, searchable, or rendered in a UI.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP
 
@@ -33,6 +36,7 @@ def llm_config(hp: HP):
         "max_tokens": max_tokens,
     }
 ```
+{% endcode %}
 
 Every public parameter needs an explicit `name=...`. Names must be valid Python identifiers, so use `batch_size`, not `batch-size` or `model.learning_rate`.
 
@@ -40,6 +44,7 @@ Every public parameter needs an explicit `name=...`. Names must be valid Python 
 
 Hypster is define-by-run. Only parameters touched by the active branch are selected for that run.
 
+{% code overflow="wrap" %}
 ```python
 def model_config(hp: HP):
     family = hp.select(["linear", "forest"], name="family", default="forest", options_only=True)
@@ -56,6 +61,7 @@ def model_config(hp: HP):
         "max_depth": hp.int(None, name="max_depth", min=1, max=100, allow_none=True),
     }
 ```
+{% endcode %}
 
 If `family="linear"`, `n_estimators` and `max_depth` are unreachable. Hypster raises if you pass values for inactive branches.
 
@@ -65,6 +71,7 @@ This define-by-run model is what makes normal Python branches work: Hypster runs
 
 Split large configs into smaller functions and compose them with `hp.nest()`.
 
+{% code overflow="wrap" %}
 ```python
 def optimizer_config(hp: HP):
     return {
@@ -78,17 +85,21 @@ def training_config(hp: HP):
         "optimizer": hp.nest(optimizer_config, name="optimizer"),
     }
 ```
+{% endcode %}
 
 Nested parameters use dotted paths in `values=`:
 
+{% code overflow="wrap" %}
 ```python
 {"optimizer.learning_rate": 0.01}
 ```
+{% endcode %}
 
 ## Use Dict-Backed Selects For Complex Values
 
 Select choices must be logging-safe scalars. If the runtime value is complex, map a simple key to it:
 
+{% code overflow="wrap" %}
 ```python
 def architecture_config(hp: HP):
     return hp.select(
@@ -101,6 +112,7 @@ def architecture_config(hp: HP):
         options_only=True,
     )
 ```
+{% endcode %}
 
 Your config receives the mapped dictionary, while `instantiate_with_params()` records the key. Add `options_only=True` when values outside the mapping should be rejected.
 
@@ -108,6 +120,7 @@ Your config receives the mapped dictionary, while `instantiate_with_params()` re
 
 It is often best to let a config return the initialized object your application will use:
 
+{% code overflow="wrap" %}
 ```python
 from sklearn.ensemble import RandomForestClassifier
 from hypster import HP
@@ -122,6 +135,7 @@ def classifier_config(hp: HP) -> RandomForestClassifier:
         random_state=42,
     )
 ```
+{% endcode %}
 
 {% hint style="info" %}
 Initialized in-memory objects are a good fit when construction is cheap. For SDK clients, remote retrievers, loaded indexes, database handles, training jobs, or writes, return lightweight settings and build the side-effectful object after `instantiate()`. See [Best Practices](../in-depth/basic-best-practices.md).

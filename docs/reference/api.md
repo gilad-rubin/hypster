@@ -2,9 +2,11 @@
 
 This page lists the public API exposed by `hypster`.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, InteractiveResult, explore, instantiate, instantiate_with_params, interact
 ```
+{% endcode %}
 
 ## Config Function Contract
 
@@ -12,12 +14,14 @@ A config function must be callable and its first positional parameter must be na
 
 Config functions are pure Python, not a DSL. `instantiate()`, `explore()`, `interact()`, and the HPO adapter all execute the function to discover or select values, so public API calls inherit any side effects or expensive work in the function body.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP
 
 def config(hp: HP):
     return {"batch_size": hp.int(32, name="batch_size")}
 ```
+{% endcode %}
 
 The `hp: HP` annotation is recommended but not mandatory. If the first parameter has a type annotation, it must include `HP`. Callable objects are supported when `inspect.signature()` can read their `__call__` signature; signature validation errors use the class name.
 
@@ -25,6 +29,7 @@ Config functions may accept extra positional or keyword arguments. Pass those th
 
 ## instantiate
 
+{% code overflow="wrap" %}
 ```python
 instantiate(
     func,
@@ -35,6 +40,7 @@ instantiate(
     on_unknown="raise",
 )
 ```
+{% endcode %}
 
 Executes a config function and returns whatever the function returns.
 
@@ -50,6 +56,7 @@ Executes a config function and returns whatever the function returns.
 
 ## instantiate_with_params
 
+{% code overflow="wrap" %}
 ```python
 instantiate_with_params(
     func,
@@ -60,9 +67,11 @@ instantiate_with_params(
     on_unknown="raise",
 )
 ```
+{% endcode %}
 
 Executes a config function and returns an `InstantiationOutput`.
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate_with_params
 
@@ -74,14 +83,17 @@ run = instantiate_with_params(config, values={"model": "large"})
 assert run.value == {"model": "large"}
 assert run.params == {"model": "large"}
 ```
+{% endcode %}
 
 `run.params` includes every reachable `hp.*` parameter selected during the run, including defaults.
 
 ## InstantiationOutput
 
+{% code overflow="wrap" %}
 ```python
 InstantiationOutput(value, params)
 ```
+{% endcode %}
 
 | Attribute | Meaning |
 | --- | --- |
@@ -90,6 +102,7 @@ InstantiationOutput(value, params)
 
 ## explore
 
+{% code overflow="wrap" %}
 ```python
 explore(
     func,
@@ -101,17 +114,20 @@ explore(
     return_info=False,
 )
 ```
+{% endcode %}
 
 Traces a config function with a schema-recording `HP`. This executes the function to discover the active branch.
 
 * With `return_info=False`, prints a tree and returns `None`.
 * With `return_info=True`, returns a `ConfigSchema`.
 
+{% code overflow="wrap" %}
 ```python
 schema = explore(config, return_info=True)
 print(schema.defaults())
 print(schema.to_dict())
 ```
+{% endcode %}
 
 ## ConfigSchema
 
@@ -125,6 +141,7 @@ Returned by `explore(..., return_info=True)`.
 
 ## interact
 
+{% code overflow="wrap" %}
 ```python
 interact(
     func,
@@ -136,20 +153,25 @@ interact(
     auto_apply=True,
 ) -> InteractiveResult
 ```
+{% endcode %}
 
 Creates a notebook widget session for a config function and returns an `InteractiveResult` handle. Install the visualization extra before using it:
 
+{% code overflow="wrap" %}
 ```bash
 uv add "hypster[viz]"
 ```
+{% endcode %}
 
 `interact()` explores the config to render reachable controls, then instantiates the config from the current widget state. Widget changes can trigger repeated config execution to keep dependent controls current. The returned handle is not the configured object itself:
 
+{% code overflow="wrap" %}
 ```python
 result = interact(config)
 current_value = result.value
 current_params = result.params
 ```
+{% endcode %}
 
 | Parameter | Meaning |
 | --- | --- |
@@ -161,12 +183,14 @@ current_params = result.params
 
 ## InteractiveResult
 
+{% code overflow="wrap" %}
 ```python
 result.value
 result.params
 result.snapshot
 result.interact()
 ```
+{% endcode %}
 
 | Attribute or method | Meaning |
 | --- | --- |
@@ -177,10 +201,12 @@ result.interact()
 
 Replay an interactive selection the same way you replay any Hypster run:
 
+{% code overflow="wrap" %}
 ```python
 result = interact(config)
 replayed = instantiate(config, values=result.params)
 ```
+{% endcode %}
 
 ## ParameterInfo
 
@@ -207,12 +233,14 @@ UI builders should use schema metadata to render controls, then round-trip user 
 
 All parameter names must be valid Python identifier-style strings: use letters, numbers, and underscores, and do not include dots, spaces, hyphens, or Python keywords. Hypster composes dotted paths from nesting.
 
+{% code overflow="wrap" %}
 ```python
 hp.int(default, *, name, min=None, max=None, strict=False, allow_none=False, hpo_spec=None, description=None)
 hp.float(default, *, name, min=None, max=None, strict=False, allow_none=False, hpo_spec=None, description=None)
 hp.text(default, *, name, allow_none=False, description=None)
 hp.bool(default, *, name, allow_none=False, description=None)
 ```
+{% endcode %}
 
 | Method | Selected value |
 | --- | --- |
@@ -226,21 +254,26 @@ Numeric coercion is consistent for top-level parameters and nested paths.
 
 ## HP Select Methods
 
+{% code overflow="wrap" %}
 ```python
 hp.select(options, *, name, default=NO_DEFAULT, options_only=False, allow_none=False, hpo_spec=None, description=None)
 hp.multi_select(options, *, name, default=None, options_only=False, allow_none=False, description=None)
 ```
+{% endcode %}
 
 `options` may be a list of logging-safe scalar choices or a dictionary from logging-safe scalar keys to any runtime values.
 
 Use `allow_none=True` when `None` is one of the list-form choices:
 
+{% code overflow="wrap" %}
 ```python
 hp.select([None, "basic"], name="tokenizer", default=None, allow_none=True)
 ```
+{% endcode %}
 
 `hp.select([], name="choice", allow_none=True)` is valid and defaults to `None`. Without `allow_none=True`, an empty option list with no explicit default raises.
 
+{% code overflow="wrap" %}
 ```python
 model = hp.select(
     {
@@ -251,6 +284,7 @@ model = hp.select(
     default="small",
 )
 ```
+{% endcode %}
 
 The selected params record `"small"` or `"large"`, while the config function receives the mapped dictionary value.
 
@@ -258,17 +292,20 @@ By default, `options_only=False`, so custom scalar values outside the listed opt
 
 ## HP Multi-Value Methods
 
+{% code overflow="wrap" %}
 ```python
 hp.multi_int(default, *, name, min=None, max=None, strict=False, allow_none=False, description=None)
 hp.multi_float(default, *, name, min=None, max=None, strict=False, allow_none=False, description=None)
 hp.multi_text(default, *, name, allow_none=False, description=None)
 hp.multi_bool(default, *, name, allow_none=False, description=None)
 ```
+{% endcode %}
 
 These methods select lists whose elements are validated like the corresponding scalar type. `multi_int` accepts integral floats by default, and `multi_float` accepts integers by default. Both reject bool values. Nullable elements are not supported for `multi_int`, `multi_float`, `multi_text`, or `multi_bool`. Use `multi_select(..., allow_none=True)` for nullable categorical lists.
 
 ## HP.nest
 
+{% code overflow="wrap" %}
 ```python
 hp.nest(
     child,
@@ -280,9 +317,11 @@ hp.nest(
     description=None,
 )
 ```
+{% endcode %}
 
 Executes another config function under a named path.
 
+{% code overflow="wrap" %}
 ```python
 def child(hp: HP):
     return {"x": hp.int(1, name="x")}
@@ -290,12 +329,15 @@ def child(hp: HP):
 def parent(hp: HP):
     return hp.nest(child, name="child")
 ```
+{% endcode %}
 
 Override nested values with dotted paths:
 
+{% code overflow="wrap" %}
 ```python
 instantiate(parent, values={"child.x": 2})
 ```
+{% endcode %}
 
 Nested dictionaries are normalized to the same dotted paths, so `values={"child": {"x": 2}}` is also valid. The scope name itself is not a parameter leaf: `values={"child": 2}` raises as unknown or unreachable.
 
@@ -303,12 +345,15 @@ Explicit child-local `values=` passed to `hp.nest(child, name="child", values=..
 
 ## HP.collect
 
+{% code overflow="wrap" %}
 ```python
 hp.collect(locals_dict, include=None, exclude=None)
 ```
+{% endcode %}
 
 Collects local variables into a dictionary while excluding `hp`, `self`, dunder names, and private names.
 
+{% code overflow="wrap" %}
 ```python
 def config(hp: HP):
     batch_size = hp.int(32, name="batch_size")
@@ -316,3 +361,4 @@ def config(hp: HP):
     helper = "not returned"
     return hp.collect(locals(), exclude=["helper"])
 ```
+{% endcode %}

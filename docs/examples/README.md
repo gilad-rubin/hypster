@@ -4,6 +4,7 @@ Use these examples as copyable shapes for real projects. Each page focuses on on
 
 Hypster config functions are plain Python functions:
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP
 
@@ -11,6 +12,7 @@ def config(hp: HP):
     mode = hp.select(["fast", "accurate"], name="mode", default="fast")
     return {"mode": mode}
 ```
+{% endcode %}
 
 The same function can serve several jobs:
 
@@ -33,6 +35,7 @@ The same function can serve several jobs:
 
 ## A Small End-to-End Pattern
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, explore, instantiate_with_params
 
@@ -56,6 +59,7 @@ run = instantiate_with_params(
 assert run.value == {"stage": "full", "sample_rows": 250_000}
 assert run.params == {"stage": "full", "sample_rows": 250_000}
 ```
+{% endcode %}
 
 {% hint style="info" %}
 Hypster raises when `values=` includes unknown parameters or parameters from a branch that was not reached. That default protects replayability. Use `explore(config, values=...)` to inspect the branch you are about to run.

@@ -4,6 +4,7 @@ Haystack pipelines often have swappable retrievers, rankers, prompts, and genera
 
 ## Shape
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate_with_params
 
@@ -35,11 +36,13 @@ run = instantiate_with_params(
 # pipeline = build_haystack_pipeline(run.value)
 # tracker.log_params(run.params)
 ```
+{% endcode %}
 
 ## Build The Pipeline After Instantiation
 
 Keep Hypster configs focused on replayable settings. Build Haystack components after `instantiate_with_params()` so exploration and UI generation do not open indexes, clients, or network connections.
 
+{% code overflow="wrap" %}
 ```python
 def build_haystack_pipeline(settings):
     retrieval = settings["retrieval"]
@@ -70,6 +73,7 @@ run = instantiate_with_params(
 pipeline = build_haystack_pipeline(run.value)
 tracker.log_params(run.params)
 ```
+{% endcode %}
 
 If your components are cheap pure-Python objects, a config can return factories or initialized components. For retrievers, indexes, remote LLM clients, and pipelines that allocate resources, prefer returning lightweight settings and building the Haystack pipeline outside the config function.
 

@@ -11,6 +11,7 @@ Hypster treats `values` as a reproducibility surface, so unknown or unreachable 
 
 ## Example
 
+{% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate
 
@@ -23,5 +24,6 @@ def config(hp: HP):
 instantiate(config, values={"branch": "b", "x": 10})
 # ValueError: Unknown or unreachable parameters
 ```
+{% endcode %}
 
 `x` is a real parameter, but it is not reachable on the selected branch. Raising by default prevents a run from looking as though it used `x=10` when that value had no effect.
