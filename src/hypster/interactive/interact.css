@@ -1,12 +1,13 @@
 .hypster-widget {
+  --hypster-background: Canvas;
   --hypster-border: color-mix(in srgb, currentColor 14%, transparent);
   --hypster-error: color-mix(in srgb, #d93025 76%, CanvasText 24%);
   --hypster-error-border: color-mix(in srgb, #d93025 30%, transparent);
-  --hypster-error-surface: color-mix(in srgb, #d93025 12%, Canvas 88%);
+  --hypster-error-surface: color-mix(in srgb, #d93025 12%, var(--hypster-background) 88%);
   --hypster-muted: color-mix(in srgb, currentColor 58%, transparent);
   --hypster-menu-shadow: 0 8px 18px rgb(0 0 0 / 18%);
-  --hypster-surface: color-mix(in srgb, Canvas 96%, currentColor 4%);
-  --hypster-surface-strong: color-mix(in srgb, Canvas 90%, currentColor 10%);
+  --hypster-surface: color-mix(in srgb, var(--hypster-background) 96%, currentColor 4%);
+  --hypster-surface-strong: color-mix(in srgb, var(--hypster-background) 90%, currentColor 10%);
   border: 1px solid var(--hypster-border);
   border-radius: 8px;
   display: grid;
@@ -14,7 +15,7 @@
   max-width: 640px;
   padding: 16px;
   color: CanvasText;
-  background: Canvas;
+  background: var(--hypster-background);
   font: 14px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -96,7 +97,7 @@
   min-height: 32px;
   padding: 5px 8px;
   color: inherit;
-  background: Canvas;
+  background: var(--hypster-background);
 }
 
 .hypster-choice {
@@ -105,7 +106,7 @@
 
 .hypster-choice-trigger {
   align-items: center;
-  background: Canvas;
+  background: var(--hypster-background);
   border: 1px solid var(--hypster-border);
   border-radius: 6px;
   box-sizing: border-box;
@@ -149,7 +150,7 @@
 }
 
 .hypster-choice-menu {
-  background: Canvas;
+  background: var(--hypster-background);
   border: 1px solid var(--hypster-border);
   border-radius: 6px;
   box-shadow: var(--hypster-menu-shadow);

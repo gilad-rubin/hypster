@@ -98,11 +98,11 @@ function themeFromColor(value) {
 
   const rgb = raw.match(/rgba?\(([^)]+)\)/i);
   if (rgb) {
-    const parts = rgb[1].split(/,\s*|\s+/).filter(Boolean).map(Number);
+    const parts = (rgb[1].match(/[\d.]+/g) || []).map(Number);
     if (parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)) {
-      if (parts.length >= 4 && parts[3] === 0) return null;
+      if (parts.length >= 4 && parts[3] < 0.1) return null;
       const luminance = 0.299 * parts[0] + 0.587 * parts[1] + 0.114 * parts[2];
-      return luminance > 150 ? "light" : "dark";
+      return { background: raw, luminance, theme: luminance > 150 ? "light" : "dark" };
     }
   }
 
@@ -116,10 +116,32 @@ function themeFromColor(value) {
     const green = Number.parseInt(digits.slice(2, 4), 16);
     const blue = Number.parseInt(digits.slice(4, 6), 16);
     const luminance = 0.299 * red + 0.587 * green + 0.114 * blue;
-    return luminance > 150 ? "light" : "dark";
+    return { background: raw, luminance, theme: luminance > 150 ? "light" : "dark" };
   }
 
   return null;
+}
+
+function fallbackBackground(theme) {
+  return theme === "light" ? "#ffffff" : "#111111";
+}
+
+function themeState(theme, parsedColor = null) {
+  const safeTheme = theme === "light" ? "light" : "dark";
+  let background = parsedColor?.background || fallbackBackground(safeTheme);
+
+  if (typeof parsedColor?.luminance === "number") {
+    const backgroundLooksLight = parsedColor.luminance > 150;
+    if ((safeTheme === "dark" && backgroundLooksLight) || (safeTheme === "light" && !backgroundLooksLight)) {
+      background = fallbackBackground(safeTheme);
+    }
+  }
+
+  return {
+    background,
+    luminance: parsedColor?.luminance ?? null,
+    theme: safeTheme,
+  };
 }
 
 function themeFromDocument(doc) {
@@ -127,30 +149,9 @@ function themeFromDocument(doc) {
   const html = doc.documentElement;
   if (!body || !html) return null;
 
-  const vscodeThemeKind = body.getAttribute("data-vscode-theme-kind") || html.getAttribute("data-vscode-theme-kind");
-  if (vscodeThemeKind) return vscodeThemeKind.includes("light") ? "light" : "dark";
-
-  const classNames = `${body.className || ""} ${html.className || ""}`.toLowerCase();
-  if (classNames.includes("vscode-high-contrast-light") || classNames.includes("vscode-light")) return "light";
-  if (classNames.includes("vscode-high-contrast") || classNames.includes("vscode-dark")) return "dark";
-
-  const jupyterThemeLight = body.dataset.jpThemeLight ?? html.dataset.jpThemeLight;
-  if (jupyterThemeLight === "true") return "light";
-  if (jupyterThemeLight === "false") return "dark";
-  if (classNames.includes("jp-mod-light")) return "light";
-  if (classNames.includes("jp-mod-dark")) return "dark";
-
-  const dataTheme = body.dataset.theme || html.dataset.theme || body.dataset.mode || html.dataset.mode;
-  if (dataTheme === "light" || dataTheme === "dark") return dataTheme;
-
   const view = doc.defaultView || globalThis;
   const rootStyle = view.getComputedStyle?.(html);
   const bodyStyle = view.getComputedStyle?.(body);
-  const colorScheme = rootStyle?.getPropertyValue("color-scheme").trim();
-  const colorSchemes = colorScheme?.split(/\s+/) || [];
-  if (colorSchemes.includes("dark") && !colorSchemes.includes("light")) return "dark";
-  if (colorSchemes.includes("light") && !colorSchemes.includes("dark")) return "light";
-
   const backgroundCandidates = [
     rootStyle?.getPropertyValue("--vscode-editor-background"),
     rootStyle?.getPropertyValue("--jp-layout-color0"),
@@ -158,32 +159,113 @@ function themeFromDocument(doc) {
     bodyStyle?.backgroundColor,
     rootStyle?.backgroundColor,
   ];
-  for (const candidate of backgroundCandidates) {
-    const theme = themeFromColor(candidate);
-    if (theme) return theme;
+  const parsedBackground = backgroundCandidates.map(themeFromColor).find(Boolean);
+
+  const vscodeThemeKind = body.getAttribute("data-vscode-theme-kind") || html.getAttribute("data-vscode-theme-kind");
+  if (vscodeThemeKind) return themeState(vscodeThemeKind.includes("light") ? "light" : "dark", parsedBackground);
+
+  const classNames = `${body.className || ""} ${html.className || ""}`.toLowerCase();
+  if (classNames.includes("vscode-high-contrast-light") || classNames.includes("vscode-light")) {
+    return themeState("light", parsedBackground);
   }
+  if (classNames.includes("vscode-high-contrast") || classNames.includes("vscode-dark")) {
+    return themeState("dark", parsedBackground);
+  }
+
+  const jupyterThemeLight = body.dataset.jpThemeLight ?? html.dataset.jpThemeLight;
+  if (jupyterThemeLight === "true") return themeState("light", parsedBackground);
+  if (jupyterThemeLight === "false") return themeState("dark", parsedBackground);
+  if (classNames.includes("jp-mod-light")) return themeState("light", parsedBackground);
+  if (classNames.includes("jp-mod-dark")) return themeState("dark", parsedBackground);
+
+  const dataTheme = body.dataset.theme || html.dataset.theme || body.dataset.mode || html.dataset.mode;
+  if (dataTheme === "light" || dataTheme === "dark") return themeState(dataTheme, parsedBackground);
+
+  const colorScheme = rootStyle?.getPropertyValue("color-scheme").trim();
+  const colorSchemes = colorScheme?.split(/\s+/) || [];
+  if (colorSchemes.includes("dark") && !colorSchemes.includes("light")) return themeState("dark", parsedBackground);
+  if (colorSchemes.includes("light") && !colorSchemes.includes("dark")) return themeState("light", parsedBackground);
+
+  if (parsedBackground) return themeState(parsedBackground.theme, parsedBackground);
 
   return null;
 }
 
 function detectHostTheme(baseDocument) {
   for (const doc of themeDocuments(baseDocument)) {
-    const theme = themeFromDocument(doc);
-    if (theme) return theme;
+    const state = themeFromDocument(doc);
+    if (state) return state;
   }
 
-  if (globalThis.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
-  return "dark";
+  const preferredTheme = globalThis.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return themeState(preferredTheme);
 }
 
 function applyHostTheme(el) {
+  const state = detectHostTheme(el.ownerDocument || document);
   const root = el.querySelector(".hypster-widget");
-  if (!root) return;
+  if (root) {
+    root.classList.toggle("hypster-theme-light", state.theme === "light");
+    root.classList.toggle("hypster-theme-dark", state.theme === "dark");
+    root.dataset.hypsterTheme = state.theme;
+    root.style.setProperty("--hypster-background", state.background);
+  }
+  paintOutputSurface(el, state);
+}
 
-  const theme = detectHostTheme(el.ownerDocument || document);
-  root.classList.toggle("hypster-theme-light", theme === "light");
-  root.classList.toggle("hypster-theme-dark", theme === "dark");
-  root.dataset.hypsterTheme = theme;
+function outputSurfaceElements(el) {
+  const elements = [el];
+  let current = el.parentElement;
+
+  for (let depth = 0; current && current !== document.body && current !== document.documentElement && depth < 6; depth += 1) {
+    elements.push(current);
+    const className = String(current.className || "");
+    if (/cell-output|outputarea|output-area|jp-outputarea|widget-subarea|widget-area|vscode-cell-output/i.test(className)) {
+      break;
+    }
+    current = current.parentElement;
+  }
+
+  return elements;
+}
+
+function rememberStyle(el, element, property) {
+  if (!el.__hypsterStyleRecords) el.__hypsterStyleRecords = new Map();
+  let record = el.__hypsterStyleRecords.get(element);
+  if (!record) {
+    record = new Map();
+    el.__hypsterStyleRecords.set(element, record);
+  }
+  if (!record.has(property)) {
+    record.set(property, {
+      priority: element.style.getPropertyPriority(property),
+      value: element.style.getPropertyValue(property),
+    });
+  }
+}
+
+function setTrackedStyle(el, element, property, value, priority = "") {
+  rememberStyle(el, element, property);
+  element.style.setProperty(property, value, priority);
+}
+
+function paintOutputSurface(el, state) {
+  for (const element of outputSurfaceElements(el)) {
+    setTrackedStyle(el, element, "background-color", state.background, "important");
+    setTrackedStyle(el, element, "color-scheme", state.theme);
+  }
+
+  setTrackedStyle(el, el, "display", "block");
+  setTrackedStyle(el, el, "width", "100%");
+}
+
+function restoreOutputSurface(el) {
+  for (const [element, record] of el.__hypsterStyleRecords || new Map()) {
+    for (const [property, previous] of record) {
+      element.style.setProperty(property, previous.value, previous.priority);
+    }
+  }
+  delete el.__hypsterStyleRecords;
 }
 
 function watchHostTheme(el) {
@@ -372,8 +454,9 @@ function render(model, el) {
 
   const root = document.createElement("div");
   const theme = detectHostTheme(el.ownerDocument || document);
-  root.className = `hypster-widget hypster-theme-${theme}`;
-  root.dataset.hypsterTheme = theme;
+  root.className = `hypster-widget hypster-theme-${theme.theme}`;
+  root.dataset.hypsterTheme = theme.theme;
+  root.style.setProperty("--hypster-background", theme.background);
 
   const header = document.createElement("div");
   header.className = "hypster-header";
@@ -409,6 +492,7 @@ function render(model, el) {
 
   root.append(actions);
   el.append(root);
+  paintOutputSurface(el, theme);
 }
 
 export default {
@@ -465,6 +549,7 @@ export default {
 
     return () => {
       cleanupTheme();
+      restoreOutputSurface(el);
       model.off?.("change:snapshot", rerender);
     };
   },
