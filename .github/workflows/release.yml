@@ -162,7 +162,7 @@ jobs:
           echo "✅ Package verification completed"
 
       - name: Upload distribution artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist-${{ steps.version_update.outputs.version }}
           path: dist/*
@@ -205,7 +205,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ steps.version_update.outputs.version }}
           name: "Hypster v${{ steps.version_update.outputs.version }}"
@@ -271,7 +271,7 @@ jobs:
           python-version: "3.12"
 
       - name: Download distribution artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: dist-${{ needs.release.outputs.version }}
           path: dist
