@@ -68,11 +68,13 @@ jobs:
         run: |
           echo "🔄 Updating version to $VERSION"
 
-          # Backup original file
+          # Backup original files
           cp pyproject.toml pyproject.toml.backup
+          cp src/hypster/_version.py src/hypster/_version.py.backup
 
           # Update version in pyproject.toml
           sed -i -E "0,/^version = \".*\"/s//version = \"$VERSION\"/" pyproject.toml
+          sed -i -E "s/^__version__ = \".*\"/__version__ = \"$VERSION\"/" src/hypster/_version.py
 
           # Verify the change was made
           if ! grep -q "version = \"$VERSION\"" pyproject.toml; then
@@ -82,19 +84,27 @@ jobs:
             exit 1
           fi
 
+          if ! grep -q "__version__ = \"$VERSION\"" src/hypster/_version.py; then
+            echo "❌ Failed to update version in src/hypster/_version.py"
+            echo "Current content around version line:"
+            grep -n -A2 -B2 "__version__ = " src/hypster/_version.py || echo "No version line found"
+            exit 1
+          fi
+
           echo "✅ Version updated successfully"
           echo "Updated version line:"
           grep "version = " pyproject.toml
+          grep "__version__ = " src/hypster/_version.py
 
           # Configure git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Check if there are changes to commit
-          if git diff --quiet pyproject.toml; then
+          if git diff --quiet pyproject.toml src/hypster/_version.py; then
             echo "⚠️ No version changes detected"
           else
-            git add pyproject.toml
+            git add pyproject.toml src/hypster/_version.py
             git commit -m "chore: bump version to v$VERSION"
 
             # Push changes
@@ -208,7 +218,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version_update.outputs.version }}
-          name: "Hypster v${{ steps.version_update.outputs.version }}"
+          name: "hypster v${{ steps.version_update.outputs.version }}"
           body: |
             ${{ steps.changelog.outputs.content }}
 
@@ -224,6 +234,11 @@ jobs:
             **With HPO support:**
             ```bash
             pip install 'hypster[optuna]==${{ steps.version_update.outputs.version }}'
+            ```
+
+            **With notebook visualization UI:**
+            ```bash
+            pip install 'hypster[viz]==${{ steps.version_update.outputs.version }}'
             ```
 
             ## 📚 Documentation
@@ -249,6 +264,8 @@ jobs:
           echo "### 📦 Installation Commands" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "pip install hypster==${{ steps.version_update.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "pip install 'hypster[optuna]==${{ steps.version_update.outputs.version }}'" >> $GITHUB_STEP_SUMMARY
+          echo "pip install 'hypster[viz]==${{ steps.version_update.outputs.version }}'" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
   publish-pypi:
