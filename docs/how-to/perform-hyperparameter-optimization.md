@@ -100,8 +100,8 @@ Prefer encoding fixed branches in the config itself when possible. It keeps the 
 
 | Surface | Supported | Unsupported | Workaround |
 | --- | --- | --- | --- |
-| `hp.int(...)` | `HpoInt(step=..., scale="linear"|"log", include_max=...)` | custom `base=...`, nullable numeric suggestions | Use default `base=10.0`; model nullable choices as categorical branches. |
-| `hp.float(...)` | `HpoFloat(step=..., scale=...)`, `distribution="uniform"|"loguniform"` | custom `base=...`, `distribution="normal"|"lognormal"`, `center=...`, `spread=...`, nullable numeric suggestions | Use Optuna-compatible float ranges or write a custom objective branch. |
+| `hp.int(...)` | `HpoInt(step=..., scale="linear"\|"log", include_max=...)` | custom `base=...`, nullable numeric suggestions | Use default `base=10.0`; model nullable choices as categorical branches. |
+| `hp.float(...)` | `HpoFloat(step=..., scale=...)`, `distribution="uniform"\|"loguniform"` | custom `base=...`, `distribution="normal"\|"lognormal"`, `center=...`, `spread=...`, nullable numeric suggestions | Use Optuna-compatible float ranges or write a custom objective branch. |
 | `hp.select(...)` | `HpoCategorical(ordered=False, weights=None)` | `ordered=True`, `weights=...` | Encode ordering/weights in your objective or sampler setup. |
 | `hp.nest(...)` | Nested paths are prefixed and branch-aware. | Unknown child-local overrides | Keep child-local `values=` reachable for the selected branch. |
 | `multi_*` calls | Not expanded by the adapter. | `multi_int`, `multi_float`, `multi_text`, `multi_bool`, `multi_select` search spaces | Model each optimized choice as scalar or categorical parameters. |

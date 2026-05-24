@@ -61,7 +61,7 @@ import hypster
 artifact = {
     "kind": "hypster-run-params",
     "hypster_version": hypster.__version__,
-    "config_name": "training_config",
+    "config_name": "config",
     "app_version": "2026.05.24",
     "git_commit": "abc1234",
     "dataset_id": "warehouse/churn/2026-05-01",
@@ -81,11 +81,11 @@ If replay fails after the config evolves, inspect the old payload with `explore(
 The versioned artifact still protects you when defaults change, because replay uses stored params:
 
 ```python
-def old_training_config(hp: HP):
+def training_config(hp: HP):
     return {"batch_size": hp.int(64, name="batch_size")}
 
 
-old_run = instantiate_with_params(old_training_config)
+old_run = instantiate_with_params(training_config)
 artifact = {
     "kind": "hypster-run-params",
     "hypster_version": hypster.__version__,
@@ -99,9 +99,9 @@ payload = json.dumps(artifact, sort_keys=True)
 restored = json.loads(payload)
 
 
-def new_training_config(hp: HP):
+def training_config(hp: HP):
     return {"batch_size": hp.int(128, name="batch_size")}
 
 
-assert instantiate(new_training_config, values=restored["params"]) == {"batch_size": 64}
+assert instantiate(training_config, values=restored["params"]) == {"batch_size": 64}
 ```

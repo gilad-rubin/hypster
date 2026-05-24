@@ -83,4 +83,4 @@ replayed = instantiate(training_config, values=run.params)
 assert replayed == run.value
 ```
 
-If replay fails because a parameter is now unknown, inspect the old payload with `explore(config, values=old_params, on_unknown="warn")` and migrate it deliberately.
+If replay fails because a parameter is now unknown, inspect the old payload with `explore(training_config, values=old_params, on_unknown="warn")` and migrate it deliberately.
