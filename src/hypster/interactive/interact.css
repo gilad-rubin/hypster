@@ -190,16 +190,26 @@
 }
 
 .hypster-actions button {
-  border: 1px solid var(--hypster-border);
-  border-radius: 6px;
-  padding: 5px 10px;
-  color: inherit;
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 4px 10px;
+  color: color-mix(in srgb, currentColor 72%, transparent);
   background: var(--hypster-surface);
   cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
 }
 
 .hypster-actions button:hover:not(:disabled) {
+  border-color: var(--hypster-border);
   background: var(--hypster-surface-strong);
+}
+
+.hypster-actions button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .hypster-actions button:disabled {
