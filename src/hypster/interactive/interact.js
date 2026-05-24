@@ -215,16 +215,33 @@ function applyHostTheme(el) {
 
 function outputSurfaceElements(el) {
   const elements = [el];
+  const ownerDocument = el.ownerDocument || document;
   let current = el.parentElement;
 
-  for (let depth = 0; current && current !== document.body && current !== document.documentElement && depth < 6; depth += 1) {
+  for (
+    let depth = 0;
+    current && current !== ownerDocument.body && current !== ownerDocument.documentElement && depth < 12;
+    depth += 1
+  ) {
     elements.push(current);
-    const className = String(current.className || "");
-    if (/cell-output|outputarea|output-area|jp-outputarea|widget-subarea|widget-area|vscode-cell-output/i.test(className)) {
-      break;
-    }
     current = current.parentElement;
   }
+
+  const rootNode = el.getRootNode?.();
+  if (rootNode?.host instanceof HTMLElement) {
+    let host = rootNode.host;
+    for (
+      let depth = 0;
+      host && host !== ownerDocument.body && host !== ownerDocument.documentElement && depth < 8;
+      depth += 1
+    ) {
+      elements.push(host);
+      host = host.parentElement;
+    }
+  }
+
+  if (ownerDocument.body) elements.push(ownerDocument.body);
+  if (ownerDocument.documentElement) elements.push(ownerDocument.documentElement);
 
   return elements;
 }
@@ -251,6 +268,7 @@ function setTrackedStyle(el, element, property, value, priority = "") {
 
 function paintOutputSurface(el, state) {
   for (const element of outputSurfaceElements(el)) {
+    if (!element?.style) continue;
     setTrackedStyle(el, element, "background-color", state.background, "important");
     setTrackedStyle(el, element, "color-scheme", state.theme);
   }
