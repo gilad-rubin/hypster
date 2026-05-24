@@ -1,112 +1,137 @@
 # Nested Configurations
 
-Use `hp.nest()` to compose a configuration function from smaller configuration functions while keeping parameter paths stable and replayable.
+`hp.nest()` lets one config function call another config function under a named scope. This keeps large workflows readable and gives nested parameters stable dotted paths.
+
+## Basic Nesting
 
 ```python
 from hypster import HP, instantiate
 
+def optimizer_config(hp: HP):
+    return {
+        "learning_rate": hp.float(0.001, name="learning_rate", min=1e-6, max=1.0),
+        "weight_decay": hp.float(0.0, name="weight_decay", min=0.0, max=1.0),
+    }
 
-def llm_config(hp: HP):
-    provider = hp.select(["openai", "gemini"], name="provider", default="openai")
-    temperature = hp.float(0.2, name="temperature", min=0.0, max=2.0)
-    return {"provider": provider, "temperature": temperature}
+def training_config(hp: HP):
+    return {
+        "epochs": hp.int(10, name="epochs", min=1),
+        "optimizer": hp.nest(optimizer_config, name="optimizer"),
+    }
 
-
-def pipeline_config(hp: HP):
-    llm = hp.nest(llm_config, name="llm")
-    max_tokens = hp.int(4096, name="max_tokens", min=1)
-    return {"llm": llm, "max_tokens": max_tokens}
-
-
-run = instantiate(
-    pipeline_config,
-    values={"llm.provider": "gemini", "max_tokens": 8192},
-)
+cfg = instantiate(training_config, values={"optimizer.learning_rate": 0.01})
+assert cfg["optimizer"]["learning_rate"] == 0.01
 ```
 
 ## Signature
 
 ```python
-def nest(
-    child: Callable,
+hp.nest(
+    child,
     *,
-    name: str,
-    values: dict[str, Any] | None = None,
-    args: tuple = (),
-    kwargs: dict[str, Any] | None = None,
-) -> Any
-```
-
-`name` is required. It must be a valid Python identifier, and it cannot contain dots, spaces, hyphens, or Python keywords. Hypster owns dotted path construction from nested names.
-
-## Values
-
-Nested overrides can be provided with dotted keys:
-
-```python
-instantiate(pipeline_config, values={"llm.temperature": 0.7})
-```
-
-Or with nested dictionaries:
-
-```python
-instantiate(pipeline_config, values={"llm": {"temperature": 0.7}})
-```
-
-These are two spellings of the same parameter path. Do not provide both forms for the same leaf:
-
-```python
-instantiate(
-    pipeline_config,
-    values={
-        "llm.temperature": 0.7,
-        "llm": {"temperature": 0.7},
-    },
+    name,
+    values=None,
+    args=(),
+    kwargs=None,
 )
-# ValueError: Duplicate value for 'llm.temperature'
 ```
 
-Nested dictionary keys are individual name segments, so they must be valid Python identifiers. Use dotted keys at the top level when you want to spell a full path.
+| Argument | Meaning |
+| --- | --- |
+| `child` | Config function whose first parameter is `hp`. |
+| `name` | Scope name. Must be a valid Python identifier. |
+| `values` | Child-local values merged into the nested call. |
+| `args` | Positional arguments passed to the child. |
+| `kwargs` | Keyword arguments passed to the child. |
 
-## Passing Values To Children
+## Child-Local Values
 
-Use the `values=` argument on `hp.nest()` when the parent config needs to derive child values:
+`values=` inside `hp.nest()` is local to the child and is merged after parent-provided values for that child. Use it when the parent intentionally fixes or supplies child defaults.
 
 ```python
-def retriever_config(hp: HP):
-    return {"top_k": hp.int(5, name="top_k")}
-
-
-def rag_config(hp: HP):
-    documents = hp.int(100, name="documents")
-    retriever = hp.nest(
-        retriever_config,
-        name="retriever",
-        values={"top_k": max(1, documents // 20)},
+def parent(hp: HP):
+    return hp.nest(
+        optimizer_config,
+        name="optimizer",
+        values={"learning_rate": 0.005},
     )
-    return {"documents": documents, "retriever": retriever}
+
+assert instantiate(parent)["learning_rate"] == 0.005
+assert instantiate(parent, values={"optimizer.learning_rate": 0.02})["learning_rate"] == 0.005
 ```
 
-Explicit child `values=` are normalized with the same dotted/nested rules as top-level `values=`.
+Think of this as a parent-fixed child value: the parent is choosing what the child sees. If you want callers to override the child value, leave `values=` off the `hp.nest()` call and put the default in the child parameter:
+
+```python
+def overridable_parent(hp: HP):
+    return hp.nest(optimizer_config, name="optimizer")
+
+cfg = instantiate(overridable_parent, values={"optimizer.learning_rate": 0.02})
+assert cfg["learning_rate"] == 0.02
+```
+
+Explicit child values are validated after the child config runs. Unknown or unreachable child keys raise instead of being ignored:
+
+```python
+def parent_with_typo(hp: HP):
+    return hp.nest(optimizer_config, name="optimizer", values={"learnig_rate": 0.005})
+
+instantiate(parent_with_typo)
+# ValueError: Unknown or unreachable parameters
+```
+
+Use child-local `values=` for parent-owned policy, test fixtures, or internal composition defaults that should win over caller-provided nested values.
+
+## Args And Kwargs
+
+```python
+def sampler_config(hp: HP, default_batch_size: int):
+    return {
+        "batch_size": hp.int(default_batch_size, name="batch_size", min=1),
+        "shuffle": hp.bool(True, name="shuffle"),
+    }
+
+def data_config(hp: HP):
+    return {
+        "train": hp.nest(sampler_config, name="train", args=(128,)),
+        "eval": hp.nest(sampler_config, name="eval", kwargs={"default_batch_size": 256}),
+    }
+```
 
 ## Conditional Nesting
 
-Nested configs can be selected conditionally. Unknown or unreachable values raise by default, so branch-specific overrides must match the active branch.
+You can choose which child config to run:
 
 ```python
-def openai_config(hp: HP):
-    return {"model": hp.select(["gpt-4o-mini", "gpt-4.1"], name="model")}
+def local_config(hp: HP):
+    return {"threads": hp.int(4, name="threads", min=1)}
 
+def remote_config(hp: HP):
+    return {"endpoint": hp.text("https://api.example.com", name="endpoint")}
 
-def gemini_config(hp: HP):
-    return {"model": hp.select(["flash-lite", "pro"], name="model")}
+def app_config(hp: HP):
+    backend = hp.select(["local", "remote"], name="backend", default="local", options_only=True)
 
+    if backend == "local":
+        settings = hp.nest(local_config, name="local")
+    else:
+        settings = hp.nest(remote_config, name="remote")
 
-def model_config(hp: HP):
-    provider = hp.select(["openai", "gemini"], name="provider", default="openai")
-    if provider == "openai":
-        return hp.nest(openai_config, name="openai")
-    return hp.nest(gemini_config, name="gemini")
+    return {"backend": backend, "settings": settings}
 ```
 
-To inspect a branch before passing values to it, run `explore(model_config, values={"provider": "gemini"})`.
+This value is valid:
+
+```python
+instantiate(app_config, values={"backend": "remote", "remote.endpoint": "https://staging.example.com"})
+```
+
+This value raises by default because `local.threads` is unreachable on the `remote` branch:
+
+```python
+instantiate(app_config, values={"backend": "remote", "local.threads": 8})
+```
+
+## Name Collisions
+
+Nested scopes share one parameter namespace. Hypster raises if the same full path is defined twice or if a parent parameter reserves a prefix needed by a nested child. Use unique scope names such as `encoder`, `decoder`, `train_loader`, and `eval_loader`.

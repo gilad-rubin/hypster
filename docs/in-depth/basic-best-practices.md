@@ -1,173 +1,180 @@
-# 🧠 Best Practices
+# Best Practices
 
-## "Shift Left" - Move Complexity to your Configs
+These practices keep Hypster configs easy to explore, optimize, log, and replay.
 
-Hypster encourages moving complexity into the configuration phase ("shifting left") rather than the execution phase:
+## Embrace Pure Python
+
+Hypster configs are ordinary Python functions rather than a DSL. Use `if` statements, loops, local variables, lists, helpers, dataclasses, imports, and typed return values when they make the config clearer.
+
+The implication is that Hypster discovers the available parameters by running your function. Design config functions so they can be run repeatedly by `explore()`, HPO, and interactive UIs without causing side effects or surprising costs.
+
+## Return Typed Runtime Objects
+
+A strong Hypster pattern is to make each config function a typed factory for the object the caller needs:
 
 ```python
-from hypster import HP, instantiate
+from hypster import HP
+from sklearn.ensemble import RandomForestClassifier
 
+def classifier_config(hp: HP) -> RandomForestClassifier:
+    n_estimators = hp.int(200, name="n_estimators", min=10, max=1000)
+    max_depth = hp.int(None, name="max_depth", allow_none=True)
+
+    return RandomForestClassifier(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        random_state=42,
+    )
+```
+
+Use a return type annotation for config functions whenever the output is a meaningful object. It makes the config easier to read, test, and compose with `hp.nest()`.
+
+## Keep Config Functions Side-Effect-Light
+
+`explore()`, HPO, and UI builders execute your config function to discover parameters. Interactive UIs may rerun it on every value change. Initializing cheap in-memory runtime objects is a good fit for config functions; effects and expensive work should stay outside the config body:
+
+* train the model after `instantiate()`
+* make paid API or network calls after `instantiate()`
+* write files or database rows after `instantiate()`
+* load indexes, large datasets, or heavyweight clients after `instantiate()`
+* defer costly resource construction when exploratory safety matters
+
+Use this boundary when deciding what a config should return:
+
+| Return from the config | Usually safe during `explore()`? | Notes |
+| --- | --- | --- |
+| Dataclasses, dictionaries, enums, small Python objects | Yes | Good for UI generation, experiment tracking, and replay. |
+| In-memory model estimators or pipeline objects | Usually | Good when construction is cheap and does not open files, sockets, or remote handles. |
+| SDK clients, database handles, loaded indexes, network retrievers | Usually no | Return lightweight settings or factories, then build these after `instantiate()`. |
+| Training jobs, writes, API calls, migrations | No | Run these outside the config function. |
+
+## Name Everything Explicitly
+
+Every `hp.*` call needs a stable `name=`. Names become the keys in `values=`, `explore()` output, and `instantiate_with_params().params`.
+
+```python
+hp.float(0.001, name="learning_rate")
+```
+
+Use Python identifier-style names:
+
+* Good: `learning_rate`, `max_depth`, `retriever_kind`
+* Avoid: `learning-rate`, `model.lr`, `max depth`
+
+Let `hp.nest()` create dotted paths.
+
+## Use Branches For Real Runtime Decisions
+
+Branch when downstream structure changes:
+
+```python
 def model_config(hp: HP):
-    # Complex logic in configuration
-    model_type = hp.select(["lstm", "transformer"], name="model_type", default="lstm")
+    family = hp.select(["linear", "forest"], name="family", default="forest", options_only=True)
 
-    if model_type == "lstm":
-        hidden_size = hp.int(128, name="hidden_size", min=64, max=512)
-        num_layers = hp.int(2, name="num_layers", min=1, max=4)
-        bidirectional = hp.bool(True, name="bidirectional")
+    if family == "linear":
+        return {"alpha": hp.float(0.1, name="alpha", min=0.0, max=10.0)}
 
-        model = LSTMModel(
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            bidirectional=bidirectional
-        )
-    else:  # transformer
-        num_heads = hp.int(8, name="num_heads", min=4, max=16)
-        num_layers = hp.int(6, name="num_layers", min=2, max=12)
-        dropout = hp.float(0.1, name="dropout", min=0, max=0.5)
-
-        model = TransformerModel(
-            num_heads=num_heads,
-            num_layers=num_layers,
-            dropout=dropout
-        )
-
-    # Common training parameters
-    optimizer = hp.select(["adam", "sgd"], name="optimizer", default="adam")
-    learning_rate = hp.float(0.001, name="learning_rate", min=1e-5, max=0.1)
-
-    return {
-        "model": model,
-        "optimizer": optimizer,
-        "learning_rate": learning_rate
-    }
-
-
-# Simple execution code (outside config)
-config = instantiate(model_config, values={"model_type": "transformer"})
-model = config["model"]
-model.fit(X_train, y_train)  # All complexity handled in config
+    return {"n_estimators": hp.int(200, name="n_estimators", min=10)}
 ```
 
-## Performance Guidelines
+Avoid carrying irrelevant parameters for inactive branches. Branch-aware configs make experiment logs cleaner and HPO search spaces smaller.
 
-* Keep configuration execution under 1ms
-* Never make API calls or database requests during configuration
-* Avoid any operations that incur costs
-* Defer resource initialization to execution phase
+## Use Dict-Backed Selects For Complex Runtime Values
 
-## Pythonic Configuration
-
-### Use Native Python Features
+Select keys should be simple and replayable. Map those keys to complex runtime values:
 
 ```python
-def model_config(hp: HP):
-    # Conditional logic
-    model_type = hp.select(["cnn", "rnn", "transformer"], name="model_type")
+tokenizer = hp.select(
+    {
+        "simple": "basic_tokenizer",
+        "wordpiece": {"kind": "wordpiece", "vocab": "vocab.txt"},
+    },
+    name="tokenizer",
+    default="wordpiece",
+)
+```
 
-    # Match-case statement
-    match model_type:
-        case "cnn":
-            layers = hp.int(3, name="layers", min=1, max=10)
-            kernel = hp.select([3, 5, 7], name="kernel")
-        case "rnn":
-            cell = hp.select(["lstm", "gru"], name="cell")
-            hidden = hp.int(128, name="hidden")
-        case _:
-            heads = hp.int(8, name="heads")
+This keeps `params={"tokenizer": "wordpiece"}` while your app receives the mapped dictionary when that branch is selected.
 
-    # List comprehension
-    layer_sizes = [hp.int(64, name=f"layer_{i}") for i in range(layers)]
+## Turn On `options_only=True` For Enums
 
-    # For loop
-    activations = {}
-    for layer in range(layers):
-        activations[f"layer_{layer}"] = hp.select(["relu", "tanh"], name=f"activation_{layer}")
+By default, `select` allows custom scalar values outside the listed options. Use `options_only=True` when the option list is closed:
 
-    # One-liner conditional
-    dropout = hp.float(0.5, name="dropout") if model_type == "transformer" else hp.float(0.3, name="dropout_alt")
+```python
+provider = hp.select(["openai", "gemini"], name="provider", default="openai", options_only=True)
+```
 
+## Use `allow_none=True` Deliberately
+
+`None` is a real value, not an unspecified value. Mark it explicitly:
+
+```python
+max_depth = hp.int(None, name="max_depth", allow_none=True)
+```
+
+For nullable choices, you can put `None` directly in the options:
+
+```python
+tokenizer = hp.select([None, "basic"], name="tokenizer", default=None, allow_none=True)
+```
+
+## Use Numeric Coercion Deliberately
+
+Hypster safely coerces common numeric inputs by default. Integral floats can be used for integer parameters, and integers can be used for float parameters:
+
+```python
+def config(hp: HP):
     return {
-        "model_type": model_type,
-        "layer_sizes": layer_sizes,
-        "activations": activations,
-        "dropout": dropout
+        "epochs": hp.int(10, name="epochs"),
+        "lr": hp.float(0.1, name="lr"),
+    }
+
+instantiate(config, values={"epochs": 20.0, "lr": 1})
+# => {"epochs": 20, "lr": 1.0}
+```
+
+Use `strict=True` when the input type itself matters:
+
+```python
+def strict_config(hp: HP):
+    return {
+        "epochs": hp.int(10, name="epochs", strict=True),
+        "lr": hp.float(0.1, name="lr", strict=True),
     }
 ```
 
-## Utilize Hypster's built-in Type Safety
+`True` and `False` are rejected by numeric parameters. Use `hp.bool()` for boolean choices.
 
-### Use Built-in Type Checking
+## Capture Params For Anything You May Replay
 
-```python
-def typed_config(hp: HP):
-    # Automatic type validation
-    batch_size = hp.int(32, name="batch_size")          # Only accepts integers
-    learning_rate = hp.float(0.001, name="learning_rate")  # Accepts floats
-    model_name = hp.text("gpt-4", name="model_name")    # Accepts strings
-
-    return {
-        "batch_size": batch_size,
-        "learning_rate": learning_rate,
-        "model_name": model_name
-    }
-```
-
-### Value Validation
+Use `instantiate_with_params()` for experiments, UI submissions, scheduled jobs, and production runs:
 
 ```python
-def validated_config(hp: HP):
-    # Numeric bounds
-    epochs = hp.int(100, name="epochs", min=1, max=1000)
-
-    # Categorical options
-    model = hp.select(["a", "b"], name="model", options_only=True)  # Only allows listed values
-
-    return {
-        "epochs": epochs,
-        "model": model
-    }
+run = instantiate_with_params(config, values={"learning_rate": 0.01})
+# tracker.log_params(run.params)
 ```
 
-## Required Naming Convention
+The params include defaults as well as explicit overrides, so later replay does not depend on changing defaults.
 
-{% hint style="warning" %}
-All `hp.*` calls that you want to be overrideable must include an explicit `name="..."` argument. An `hp.*` call without a name will raise an error upon execution.
-{% endhint %}
+## Explore Before Instantiating Conditional Values
+
+When overriding a branch, inspect it first:
 
 ```python
-def proper_naming(hp: HP):
-    # Correct - explicit names
-    model_type = hp.select(["a", "b"], name="model_type")
-    learning_rate = hp.float(0.01, name="learning_rate")
-
-    # Incorrect - missing names (will raise error)
-    # model_type = hp.select(["a", "b"])  # Error!
-    # learning_rate = hp.float(0.01)     # Error!
-
-    return {"model_type": model_type, "learning_rate": learning_rate}
+explore(config, values={"provider": "gemini"})
 ```
 
-## Configuration Function Structure
+This prevents stale values from inactive branches from leaking into logs.
+
+## Keep Return Values Narrow
+
+Return what the caller needs. A small return surface makes configs easier to test and less likely to couple unrelated workflow stages.
 
 ```python
-def well_structured_config(hp: HP):
-    # 1. Define parameters with explicit names
-    model_type = hp.select(["a", "b"], name="model_type")
-    learning_rate = hp.float(0.01, name="learning_rate")
-
-    # 2. Apply conditional logic
-    if model_type == "a":
-        param_a = hp.int(100, name="param_a")
-    else:
-        param_b = hp.float(0.5, name="param_b")
-
-    # 3. Build objects/models
-    model = SomeModel(type=model_type, lr=learning_rate)
-
-    # 4. Return explicitly what downstream code needs
-    return {
-        "model": model,
-        "learning_rate": learning_rate
-    }
+return {
+    "model": model,
+    "optimizer": optimizer,
+}
 ```
+
+Use `hp.collect(locals(), include=[...])` when that makes the return explicit and concise.

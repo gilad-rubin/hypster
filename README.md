@@ -7,7 +7,7 @@
     <a href="https://gilad-rubin.gitbook.io/hypster"><strong>Docs</strong></a> ·
     <a href="https://github.com/gilad-rubin/hypster/issues/new?template=bug_report.md"><strong>Report Bug</strong></a> ·
     <a href="https://github.com/gilad-rubin/hypster/issues/new?template=feature_request.md"><strong>Feature Request</strong></a> ·
-    <a href="https://github.com/gilad-rubin/hypster/blob/hypster-v2/CHANGELOG.md"><strong>Changelog</strong></a>
+    <a href="https://github.com/gilad-rubin/hypster/blob/master/CHANGELOG.md"><strong>Changelog</strong></a>
   </div>
 </div>
 
@@ -41,10 +41,12 @@
 
 ## Key Features
 
-- 🐍 **Pythonic API**: Intuitive & minimal syntax that feels natural to Python developers
+- 🐍 **Pure Python, Not a DSL**: Use normal functions, `if` statements, loops, lists, helper functions, imports, dataclasses, and runtime objects
 - 🪆 **Hierarchical, Conditional Configurations**: Support for nested and swappable configurations
 - 📐 **Type Safety**: Built-in type hints and validation
 - 🧪 **Hyperparameter Optimization Built-In**: Native, first-class optuna support
+
+Hypster configs are ordinary Python functions rather than a separate configuration language. That keeps them flexible and readable, but it also means Hypster discovers the available parameters by executing the function. Keep config functions fast and side-effect-free: avoid paid API calls, network calls, file writes, training, database access, and costly initialization in code paths used by `explore()`, HPO, or interactive UIs.
 
 ## Installation
 
@@ -69,24 +71,31 @@ pip install hypster
 Define a configuration function and instantiate it with overrides:
 
 ```python
-from hypster import HP, explore, instantiate
-from llm import LLM
+from dataclasses import dataclass
+from hypster import HP, explore, instantiate_with_params
 
-def llm_config(hp: HP):
-    model_name = hp.select(["gpt-4o-mini", "gpt-4o"], name="model_name")
+@dataclass
+class LLMSettings:
+    provider: str
+    temperature: float
+    max_tokens: int
+
+def llm_config(hp: HP) -> LLMSettings:
+    provider = hp.select(["openai", "gemini"], name="provider", default="openai", options_only=True)
     temperature = hp.float(0.7, name="temperature", min=0.0, max=1.0)
     max_tokens = hp.int(256, name="max_tokens", min=1, max=4096)
-    llm = LLM(model_name=model_name, temperature=temperature, max_tokens=max_tokens)
-    return llm
+    return LLMSettings(provider=provider, temperature=temperature, max_tokens=max_tokens)
 
 explore(llm_config)
 # llm_config
-# ├── model_name: select = "gpt-4o-mini"  (options: ["gpt-4o-mini", "gpt-4o"])
+# ├── provider: select = "openai"  (options: ["openai", "gemini"])
 # ├── temperature: float = 0.7  (0.0-1.0)
 # └── max_tokens: int = 256  (1-4096)
 
-llm = instantiate(llm_config, values={"model_name": "gpt-4o-mini", "temperature": 0.3})
-llm.invoke("How's your day going?")
+run = instantiate_with_params(llm_config, values={"provider": "gemini", "temperature": 0.3})
+
+assert run.value == LLMSettings(provider="gemini", temperature=0.3, max_tokens=256)
+assert run.params == {"provider": "gemini", "temperature": 0.3, "max_tokens": 256}
 ```
 
 Use `explore(..., values=...)` to inspect a specific conditional branch before you instantiate it, or `explore(..., return_info=True)` to get a JSON-serializable schema object.
@@ -95,17 +104,28 @@ Use `explore(..., values=...)` to inspect a specific conditional branch before y
 
 ```python
 import optuna
-from hypster.hpo.types import HpoInt, HpoFloat, HpoCategorical
+from hypster import HP, instantiate
 from hypster.hpo.optuna import suggest_values
+from hypster.hpo.types import HpoFloat, HpoInt
+
+
+def model_cfg(hp: HP):
+    family = hp.select(["linear", "forest"], name="family", default="forest", options_only=True)
+    if family == "linear":
+        return {
+            "family": family,
+            "alpha": hp.float(0.1, name="alpha", min=1e-4, max=10.0, hpo_spec=HpoFloat(scale="log")),
+        }
+    return {
+        "family": family,
+        "n_estimators": hp.int(200, name="n_estimators", min=50, max=1000, hpo_spec=HpoInt(step=50)),
+    }
 
 
 def objective(trial: optuna.Trial) -> float:
     values = suggest_values(trial, config=model_cfg)
-    model = instantiate(model_cfg, values=values)
-    X, y = make_classification(
-        n_samples=400, n_features=20, n_informative=10, random_state=42
-    )
-    return cross_val_score(model, X, y, cv=3, n_jobs=-1).mean()
+    cfg = instantiate(model_cfg, values=values)
+    return train_and_score(cfg)
 
 study = optuna.create_study(direction="maximize")
 study.optimize(objective, n_trials=30)

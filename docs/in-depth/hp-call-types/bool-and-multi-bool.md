@@ -1,102 +1,50 @@
 # Boolean Types
 
-Hypster provides boolean parameter configuration through `bool` and `multi_bool` methods. These methods handle boolean values without additional validation.
+Use `hp.bool()` for one boolean and `hp.multi_bool()` for a list of booleans.
 
-## Function Signatures
-
-```python
-def bool(
-    default: Optional[bool],
-    *,
-    name: str,
-    allow_none: bool = False
-) -> Optional[bool]
-
-def multi_bool(
-    default: List[bool] = [],
-    *,
-    name: str
-) -> List[bool]
-```
-
-## Nullable boolean values
-
-Use `allow_none=True` when `None` is an intentional tri-state value:
+## Signatures
 
 ```python
-def stream_config(hp: HP):
-    stream = hp.bool(None, name="stream", allow_none=True)
-    return {"stream": stream}
+hp.bool(default, *, name, allow_none=False)
+hp.multi_bool(default, *, name, allow_none=False)
 ```
 
-Nullable elements are not supported for `multi_bool`; use `multi_select(..., allow_none=True)` for nullable categorical lists.
-
-## Usage Examples
-
-### Single Boolean Values
+## Single Boolean
 
 ```python
 from hypster import HP, instantiate
 
-def stream_config(hp: HP):
-    # Single boolean parameters with defaults
-    stream = hp.bool(True, name="stream")
-    use_cache = hp.bool(False, name="use_cache")
-    verbose = hp.bool(True, name="verbose")
-
+def config(hp: HP):
     return {
-        "stream": stream,
-        "use_cache": use_cache,
-        "verbose": verbose
+        "stream": hp.bool(True, name="stream"),
+        "use_cache": hp.bool(True, name="use_cache"),
     }
 
-# Usage with overrides
-cfg = instantiate(stream_config, values={"stream": False, "use_cache": True})
-# cfg -> {"stream": False, "use_cache": True, "verbose": True}
+cfg = instantiate(config, values={"stream": False})
+assert cfg == {"stream": False, "use_cache": True}
 ```
 
-### Multiple Boolean Values
+`hp.bool` requires actual booleans. Strings such as `"true"` are rejected.
+
+## Nullable Boolean
+
+Use `allow_none=True` for tri-state values:
 
 ```python
-from hypster import HP, instantiate
+def config(hp: HP):
+    return hp.bool(None, name="stream", allow_none=True)
 
-def training_config(hp: HP):
-    # Multiple boolean parameters for layer configurations
-    layer_trainable = hp.multi_bool([True, True, False], name="layer_trainable")
-    feature_flags = hp.multi_bool([False, False], name="feature_flags")
-
-    return {
-        "layer_trainable": layer_trainable,
-        "feature_flags": feature_flags
-    }
-
-# Usage with overrides
-cfg = instantiate(training_config, values={
-    "layer_trainable": [False, True, True],
-    "feature_flags": [True, False, True]
-})
+assert instantiate(config) is None
+assert instantiate(config, values={"stream": True}) is True
 ```
 
-### Invalid Values
+## Multiple Booleans
 
 ```python
-# These will raise errors during instantiation
-instantiate(stream_config, values={"stream": "true"})  # String instead of boolean
-instantiate(training_config, values={"layer_trainable": [1, 0]})  # Numbers instead of booleans
+def config(hp: HP):
+    return hp.multi_bool([True, False, True], name="feature_flags")
+
+assert instantiate(config, values={"feature_flags": [False, False, True]}) == [False, False, True]
 ```
 
-## Required Name Parameter
-
-{% hint style="warning" %}
-All `hp.*` calls that you want to be overrideable must include an explicit `name="..."` argument.
-{% endhint %}
-
-```python
-# Correct usage - explicit names
-stream = hp.bool(True, name="stream")
-use_cache = hp.bool(False, name="use_cache")
-
-# Incorrect usage - missing names (will raise error)
-stream = hp.bool(True)        # Error: missing name
-use_cache = hp.bool(False)    # Error: missing name
-```
+Nullable elements are not supported for `multi_bool`. Use `multi_select(..., allow_none=True)` for nullable categorical lists.
