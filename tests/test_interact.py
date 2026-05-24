@@ -349,3 +349,24 @@ def test_interact_multiple_widget_views_share_session_updates() -> None:
     assert first.snapshot["selected_params"] == {"count": 4}
     assert second.snapshot["selected_params"] == {"count": 4}
     assert result.value == {"count": 4}
+
+
+def test_interact_widget_display_includes_vscode_background_shim(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[Any, Dict[str, Any]]] = []
+
+    def fake_display(obj: Any = None, **kwargs: Any) -> None:
+        calls.append((obj, kwargs))
+
+    def config(hp: HP) -> Dict[str, int]:
+        return {"count": hp.int(1, name="count", min=1, max=5)}
+
+    monkeypatch.setattr("IPython.display.display", fake_display)
+
+    widget = interact(config).interact()
+    widget._ipython_display_()
+
+    assert len(calls) == 2
+    assert "cell-output-ipywidget-background" in calls[0][0].data
+    assert "vscode-cell-output" in calls[0][0].data
+    assert calls[1][1]["raw"] is True
+    assert "application/vnd.jupyter.widget-view+json" in calls[1][0]

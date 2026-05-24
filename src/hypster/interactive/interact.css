@@ -16,6 +16,7 @@
   max-width: 640px;
   padding: 16px;
   position: relative;
+  z-index: 0;
   color: CanvasText;
   background: var(--hypster-background);
   font: 14px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -25,9 +26,14 @@
   content: "";
   position: absolute;
   inset: -32px -100vw -32px -32px;
-  z-index: -1;
+  z-index: 0;
   background: var(--hypster-background);
   pointer-events: none;
+}
+
+.hypster-widget > * {
+  position: relative;
+  z-index: 1;
 }
 
 .hypster-theme-light {
