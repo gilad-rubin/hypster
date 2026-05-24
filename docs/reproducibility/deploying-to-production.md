@@ -1,6 +1,6 @@
 # Deploying To Production
 
-Hypster is in preview, so production use should be deliberate. When you do deploy it, treat selected params as part of the release artifact.
+When you deploy Hypster, treat selected params as part of the release artifact.
 
 ## Recommended Pattern
 

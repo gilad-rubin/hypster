@@ -3,6 +3,18 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-05-24
+
+### Changed
+- Updated release guidance to include the `viz` extra in generated GitHub releases, workflow summaries, README installation examples, and GitBook installation docs.
+- Corrected README and GitBook examples to emphasize the preferred runtime-object return pattern and dict-backed nested component selection.
+
+### Fixed
+- Updated lockfile-only vulnerable dependencies for Mako, pytest, and Pygments.
+
+### Removed
+- Removed production-readiness warning blocks from the README and docs.
+
 ## [0.5.2] - 2026-05-24
 
 ### Changed
