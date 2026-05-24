@@ -9,7 +9,7 @@ The first Jupyter renderer should use the smallest implementation that still fee
 - Use one anywidget custom widget with file-backed JavaScript and CSS, such as `_esm = Path(...)` and `_css = Path(...)`.
 - Use vanilla JavaScript with simple themed controls; do not introduce React, a bundler, generated HTML blobs, a default value preview, or a default params panel.
 - Sync only compact `snapshot` and `action` traits between Python and the frontend.
-- Keep the raw **Instantiation Value**, full branch history, and **Branch Choice Memory** Python-side in the **Interactive Result** controller.
+- Keep the raw **Instantiation Value**, full branch history, and **Branch Choice Memory** Python-side in the **Interactive Result** controller. Branch memory is keyed by reachable branch context and parameter metadata, not dotted path alone, because different branches may reuse the same parameter path for different parameter meanings.
 - Scope CSS under a Hypster-specific root class because anywidget CSS is loaded globally.
 - Treat saved Jupyter widget state as normal notebook behavior; keep synced state tiny so notebooks remain lightweight even when widget state is saved.
 

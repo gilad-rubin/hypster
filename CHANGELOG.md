@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-select and empty multi-value widget edits now round-trip through the notebook transport correctly.
 - Interactive errors no longer expose stale selected params in snapshots while `result.params` is raising.
 - Branch choice memory skips incompatible remembered multi-value inputs instead of replaying invalid hidden state.
+- Branch choice memory distinguishes reused parameter paths by reachable branch context and parameter metadata, so same-name branch parameters do not leak values into each other.
 - Reset now reports exploration or instantiation errors in the snapshot instead of leaking stale values or raising out of the widget action.
 
 ## [0.4.0] - 2026-05-22

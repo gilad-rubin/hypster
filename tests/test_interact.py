@@ -85,6 +85,62 @@ def test_interact_remembers_latest_compatible_branch_choice() -> None:
     assert result.params == {"provider": "gemini", "model": "pro"}
 
 
+def test_interact_separates_same_path_values_by_branch_context() -> None:
+    def config(hp: HP) -> Dict[str, Any]:
+        mode = hp.select(["a", "b"], name="mode", default="a")
+        if mode == "a":
+            n = hp.int(0, name="n", min=0, max=10)
+        else:
+            n = hp.int(0, name="n", min=0, max=10)
+        return {"mode": mode, "n": n}
+
+    result = interact(config)
+
+    result.dispatch({"type": "set_value", "path": "n", "value": 7})
+    result.dispatch({"type": "set_value", "path": "mode", "value": "b"})
+
+    assert result.params == {"mode": "b", "n": 0}
+
+    result.dispatch({"type": "set_value", "path": "n", "value": 3})
+    result.dispatch({"type": "set_value", "path": "mode", "value": "a"})
+
+    assert result.params == {"mode": "a", "n": 7}
+
+    result.dispatch({"type": "set_value", "path": "mode", "value": "b"})
+
+    assert result.params == {"mode": "b", "n": 3}
+
+
+def test_interact_updates_same_path_numeric_bounds_by_branch_context() -> None:
+    def config(hp: HP) -> Dict[str, int]:
+        a = hp.select([2, 3], name="a", default=3)
+        if a == 2:
+            n = hp.int(0, name="n", min=0, max=3)
+        else:
+            n = hp.int(0, name="n", min=0, max=10)
+        return {"a": a, "n": n}
+
+    result = interact(config)
+
+    result.dispatch({"type": "set_value", "path": "n", "value": 8})
+    snapshot = result.dispatch({"type": "set_value", "path": "a", "value": 2})
+    n_parameter = snapshot["schema"]["parameters"][1]
+
+    assert snapshot["status"] == "applied"
+    assert n_parameter["minimum"] == 0
+    assert n_parameter["maximum"] == 3
+    assert result.params == {"a": 2, "n": 0}
+
+    result.dispatch({"type": "set_value", "path": "n", "value": 2})
+    result.dispatch({"type": "set_value", "path": "a", "value": 3})
+
+    assert result.params == {"a": 3, "n": 8}
+
+    result.dispatch({"type": "set_value", "path": "a", "value": 2})
+
+    assert result.params == {"a": 2, "n": 2}
+
+
 def test_interact_reset_restores_baseline_and_clears_later_branch_memory() -> None:
     def config(hp: HP) -> Dict[str, str]:
         provider = hp.select(["openai", "gemini"], name="provider", default="openai")

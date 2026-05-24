@@ -29,6 +29,16 @@ def _flatten_parameter(parameter: ParameterInfo) -> list[ParameterInfo]:
     return parameters
 
 
+def _context_for(parameters: list[ParameterInfo], values: Mapping[str, Any], path: str) -> Dict[str, Any]:
+    context: Dict[str, Any] = {}
+    for parameter in parameters:
+        if parameter.path == path:
+            return context
+        if parameter.path in values:
+            context[parameter.path] = values[parameter.path]
+    return context
+
+
 @dataclass
 class InteractiveError:
     kind: str
@@ -113,7 +123,7 @@ class InteractiveSession(Generic[T]):
     def _initialize(self, values: Dict[str, Any]) -> None:
         schema, selected_values = self._build_values(values)
         self._baseline_values = dict(selected_values)
-        self._memory.remember_many(selected_values)
+        self._memory.remember_many(_parameters(schema), selected_values)
         self._apply(schema, selected_values)
 
     def _set_value(self, path: str, value: Any) -> None:
@@ -125,8 +135,7 @@ class InteractiveSession(Generic[T]):
         if path not in current_paths:
             raise ValueError(f"Cannot set unreachable parameter: {path}")
 
-        self._memory.remember_many(self._draft_values)
-        self._memory.remember(path, value)
+        self._memory.remember_many(current_parameters, self._draft_values)
 
         prefix_values: Dict[str, Any] = {}
         for parameter in current_parameters:
@@ -135,6 +144,9 @@ class InteractiveSession(Generic[T]):
                 break
             if parameter.path in self._draft_values:
                 prefix_values[parameter.path] = self._draft_values[parameter.path]
+
+        current_parameter = next(parameter for parameter in current_parameters if parameter.path == path)
+        self._memory.remember(current_parameter, value, _context_for(current_parameters, prefix_values, path))
 
         try:
             schema, selected_values = self._build_values(prefix_values)
@@ -145,7 +157,7 @@ class InteractiveSession(Generic[T]):
                 self._applied_error = self._draft_error
             return
 
-        self._memory.remember_many(selected_values)
+        self._memory.remember_many(_parameters(schema), selected_values)
         self._draft_error = None
         if self.auto_apply:
             try:
@@ -172,7 +184,7 @@ class InteractiveSession(Generic[T]):
             self._applied_error = self._draft_error
             return
 
-        self._memory.remember_many(selected_values)
+        self._memory.remember_many(_parameters(schema), selected_values)
         self._draft_error = None
         self._applied_error = None
         try:
@@ -197,11 +209,12 @@ class InteractiveSession(Generic[T]):
         values = dict(seed_values)
         while True:
             schema = self._explore(values)
-            missing = next((parameter for parameter in _parameters(schema) if parameter.path not in values), None)
+            parameters = _parameters(schema)
+            missing = next((parameter for parameter in parameters if parameter.path not in values), None)
             if missing is None:
                 return schema, values
 
-            found, value = self._memory.latest_compatible(missing)
+            found, value = self._memory.latest_compatible(missing, _context_for(parameters, values, missing.path))
             values[missing.path] = value if found else missing.selected_value
 
     def _explore(self, values: Dict[str, Any]) -> ConfigSchema:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable
+import json
+from typing import Any, Dict, Iterable, Mapping
 
 from hypster.explore import ParameterInfo
 
@@ -11,20 +12,47 @@ class BranchChoiceMemory:
     def __init__(self) -> None:
         self._history: Dict[str, list[Any]] = {}
 
-    def remember(self, path: str, value: Any) -> None:
-        history = self._history.setdefault(path, [])
+    def remember(self, parameter: ParameterInfo, value: Any, context: Mapping[str, Any]) -> None:
+        history = self._history.setdefault(_memory_key(parameter, context), [])
         history[:] = [item for item in history if item != value]
         history.append(value)
 
-    def remember_many(self, values: Dict[str, Any]) -> None:
-        for path, value in values.items():
-            self.remember(path, value)
+    def remember_many(self, parameters: list[ParameterInfo], values: Dict[str, Any]) -> None:
+        for index, parameter in enumerate(parameters):
+            if parameter.path not in values:
+                continue
+            self.remember(parameter, values[parameter.path], _context_for(parameters, values, index))
 
-    def latest_compatible(self, parameter: ParameterInfo) -> tuple[bool, Any]:
-        for value in reversed(self._history.get(parameter.path, [])):
+    def latest_compatible(self, parameter: ParameterInfo, context: Mapping[str, Any]) -> tuple[bool, Any]:
+        for value in reversed(self._history.get(_memory_key(parameter, context), [])):
             if _is_compatible(parameter, value):
                 return True, value
         return False, None
+
+
+def _memory_key(parameter: ParameterInfo, context: Mapping[str, Any]) -> str:
+    signature = {
+        "path": parameter.path,
+        "name": parameter.name,
+        "kind": parameter.kind,
+        "default": parameter.default_value,
+        "options": parameter.options,
+        "minimum": parameter.minimum,
+        "maximum": parameter.maximum,
+    }
+    return _stable_json({"parameter": signature, "context": dict(context)})
+
+
+def _context_for(parameters: list[ParameterInfo], values: Mapping[str, Any], index: int) -> Dict[str, Any]:
+    context: Dict[str, Any] = {}
+    for previous in parameters[:index]:
+        if previous.path in values:
+            context[previous.path] = values[previous.path]
+    return context
+
+
+def _stable_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, default=repr, separators=(",", ":"))
 
 
 def _is_compatible(parameter: ParameterInfo, value: Any) -> bool:

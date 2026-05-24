@@ -137,7 +137,7 @@ _Avoid_: exploration error, validation error
 - An **Interactive Snapshot** includes the current **Explore Schema**, **Draft Values**, **Applied Values**, current **Selected Params**, and any current exploration or instantiation error.
 - When an immediate interactive state cannot instantiate, an **Interactive Snapshot** uses `selected_params=None` so renderers do not confuse stale params with the current invalid state.
 - An **Interactive Snapshot** may include notebook-friendly display metadata for an **Instantiation Value**, but the raw **Instantiation Value** remains available through the returned proxy.
-- Remembered branch choices in an interactive session are UI input memory; they are not **Selected Params** until their parameter paths are reachable in the current **Interactive Snapshot**.
+- Remembered branch choices in an interactive session are UI input memory; they are keyed by reachable branch context and parameter metadata rather than by dotted path alone, and they are not **Selected Params** until their parameter paths are reachable in the current **Interactive Snapshot**.
 - Notebook, Streamlit, and React renderers should consume the same **Interactive Snapshot** contract instead of each inventing a parameter metadata model.
 - A renderer sends **Interactive Actions** to an interactive controller; the controller applies Hypster semantics and returns a new **Interactive Snapshot**.
 - **Interactive Actions** must not implement branch reachability, parameter validation, or selected-param collection in the renderer.
