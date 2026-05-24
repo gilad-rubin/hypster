@@ -91,6 +91,10 @@ The versioned artifact still protects you when defaults change, because replay u
 
 {% code overflow="wrap" %}
 ```python
+import json
+import hypster
+from hypster import HP, instantiate, instantiate_with_params
+
 def training_config(hp: HP) -> int:
     return hp.int(64, name="batch_size")
 
