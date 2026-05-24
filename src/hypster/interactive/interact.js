@@ -80,6 +80,140 @@ function closeChoiceMenus(root) {
   }
 }
 
+function themeDocuments(baseDocument) {
+  const documents = [];
+  try {
+    const parentDocument = globalThis.parent?.document;
+    if (parentDocument) documents.push(parentDocument);
+  } catch {
+    // Cross-origin notebook hosts can block parent access.
+  }
+  if (baseDocument && !documents.includes(baseDocument)) documents.push(baseDocument);
+  return documents;
+}
+
+function themeFromColor(value) {
+  const raw = String(value || "").trim();
+  if (!raw || raw === "transparent" || raw === "rgba(0, 0, 0, 0)") return null;
+
+  const rgb = raw.match(/rgba?\(([^)]+)\)/i);
+  if (rgb) {
+    const parts = rgb[1].split(/,\s*|\s+/).filter(Boolean).map(Number);
+    if (parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)) {
+      if (parts.length >= 4 && parts[3] === 0) return null;
+      const luminance = 0.299 * parts[0] + 0.587 * parts[1] + 0.114 * parts[2];
+      return luminance > 150 ? "light" : "dark";
+    }
+  }
+
+  const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hex) {
+    const digits =
+      hex[1].length === 3
+        ? hex[1].split("").map((digit) => digit + digit).join("")
+        : hex[1];
+    const red = Number.parseInt(digits.slice(0, 2), 16);
+    const green = Number.parseInt(digits.slice(2, 4), 16);
+    const blue = Number.parseInt(digits.slice(4, 6), 16);
+    const luminance = 0.299 * red + 0.587 * green + 0.114 * blue;
+    return luminance > 150 ? "light" : "dark";
+  }
+
+  return null;
+}
+
+function themeFromDocument(doc) {
+  const body = doc.body;
+  const html = doc.documentElement;
+  if (!body || !html) return null;
+
+  const vscodeThemeKind = body.getAttribute("data-vscode-theme-kind") || html.getAttribute("data-vscode-theme-kind");
+  if (vscodeThemeKind) return vscodeThemeKind.includes("light") ? "light" : "dark";
+
+  const classNames = `${body.className || ""} ${html.className || ""}`.toLowerCase();
+  if (classNames.includes("vscode-high-contrast-light") || classNames.includes("vscode-light")) return "light";
+  if (classNames.includes("vscode-high-contrast") || classNames.includes("vscode-dark")) return "dark";
+
+  const jupyterThemeLight = body.dataset.jpThemeLight ?? html.dataset.jpThemeLight;
+  if (jupyterThemeLight === "true") return "light";
+  if (jupyterThemeLight === "false") return "dark";
+  if (classNames.includes("jp-mod-light")) return "light";
+  if (classNames.includes("jp-mod-dark")) return "dark";
+
+  const dataTheme = body.dataset.theme || html.dataset.theme || body.dataset.mode || html.dataset.mode;
+  if (dataTheme === "light" || dataTheme === "dark") return dataTheme;
+
+  const view = doc.defaultView || globalThis;
+  const rootStyle = view.getComputedStyle?.(html);
+  const bodyStyle = view.getComputedStyle?.(body);
+  const colorScheme = rootStyle?.getPropertyValue("color-scheme").trim();
+  const colorSchemes = colorScheme?.split(/\s+/) || [];
+  if (colorSchemes.includes("dark") && !colorSchemes.includes("light")) return "dark";
+  if (colorSchemes.includes("light") && !colorSchemes.includes("dark")) return "light";
+
+  const backgroundCandidates = [
+    rootStyle?.getPropertyValue("--vscode-editor-background"),
+    rootStyle?.getPropertyValue("--jp-layout-color0"),
+    rootStyle?.getPropertyValue("--jp-layout-color1"),
+    bodyStyle?.backgroundColor,
+    rootStyle?.backgroundColor,
+  ];
+  for (const candidate of backgroundCandidates) {
+    const theme = themeFromColor(candidate);
+    if (theme) return theme;
+  }
+
+  return null;
+}
+
+function detectHostTheme(baseDocument) {
+  for (const doc of themeDocuments(baseDocument)) {
+    const theme = themeFromDocument(doc);
+    if (theme) return theme;
+  }
+
+  if (globalThis.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
+  return "dark";
+}
+
+function applyHostTheme(el) {
+  const root = el.querySelector(".hypster-widget");
+  if (!root) return;
+
+  const theme = detectHostTheme(el.ownerDocument || document);
+  root.classList.toggle("hypster-theme-light", theme === "light");
+  root.classList.toggle("hypster-theme-dark", theme === "dark");
+  root.dataset.hypsterTheme = theme;
+}
+
+function watchHostTheme(el) {
+  const apply = () => applyHostTheme(el);
+  const observers = [];
+  const watchedAttributes = ["class", "data-vscode-theme-kind", "data-jp-theme-light", "data-theme", "data-mode", "style"];
+
+  for (const doc of themeDocuments(el.ownerDocument || document)) {
+    try {
+      const Observer = doc.defaultView?.MutationObserver || globalThis.MutationObserver;
+      if (!Observer) continue;
+      const observer = new Observer(apply);
+      observer.observe(doc.body, { attributes: true, attributeFilter: watchedAttributes });
+      observer.observe(doc.documentElement, { attributes: true, attributeFilter: watchedAttributes });
+      observers.push(observer);
+    } catch {
+      // Some hosts expose a partial or inaccessible parent document.
+    }
+  }
+
+  const mediaQuery = globalThis.matchMedia?.("(prefers-color-scheme: dark)");
+  mediaQuery?.addEventListener?.("change", apply);
+  apply();
+
+  return () => {
+    for (const observer of observers) observer.disconnect();
+    mediaQuery?.removeEventListener?.("change", apply);
+  };
+}
+
 function renderParameter(model, snapshot, parameter) {
   if (parameter.kind === "group") {
     const group = document.createElement("fieldset");
@@ -237,7 +371,9 @@ function render(model, el) {
   el.replaceChildren();
 
   const root = document.createElement("div");
-  root.className = "hypster-widget";
+  const theme = detectHostTheme(el.ownerDocument || document);
+  root.className = `hypster-widget hypster-theme-${theme}`;
+  root.dataset.hypsterTheme = theme;
 
   const header = document.createElement("div");
   header.className = "hypster-header";
@@ -322,7 +458,14 @@ export default {
       });
     });
 
-    model.on("change:snapshot", () => render(model, el));
+    const rerender = () => render(model, el);
+    model.on("change:snapshot", rerender);
     render(model, el);
+    const cleanupTheme = watchHostTheme(el);
+
+    return () => {
+      cleanupTheme();
+      model.off?.("change:snapshot", rerender);
+    };
   },
 };

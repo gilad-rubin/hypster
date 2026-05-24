@@ -18,6 +18,14 @@
   font: 14px/1.35 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+.hypster-theme-light {
+  color-scheme: light;
+}
+
+.hypster-theme-dark {
+  color-scheme: dark;
+}
+
 .hypster-header {
   align-items: start;
   display: flex;
@@ -190,17 +198,25 @@
 }
 
 .hypster-actions button {
+  -webkit-appearance: none;
   appearance: none;
   border: 1px solid transparent;
   border-radius: 5px;
+  box-sizing: border-box;
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 25px;
+  min-width: 52px;
   padding: 4px 10px;
   color: color-mix(in srgb, currentColor 72%, transparent);
   background: var(--hypster-surface);
   cursor: pointer;
-  font: inherit;
+  font-family: inherit;
   font-size: 12px;
   font-weight: 500;
   line-height: 1.35;
+  text-transform: none;
 }
 
 .hypster-actions button:hover:not(:disabled) {
