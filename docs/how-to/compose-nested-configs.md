@@ -7,30 +7,36 @@ Use this guide when one workflow should be assembled from reusable smaller confi
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, explore, instantiate
+from my_app.embeddings import BpeTokenizer, EmbeddingPipeline, Encoder, Tokenizer, WordPieceTokenizer
 
-def tokenizer_config(hp: HP):
-    return {
-        "kind": hp.select(["wordpiece", "bpe"], name="kind", default="bpe", options_only=True),
-        "lowercase": hp.bool(True, name="lowercase"),
-    }
+tokenizer_options = {
+    "wordpiece": WordPieceTokenizer,
+    "bpe": BpeTokenizer,
+}
 
-def encoder_config(hp: HP):
+def tokenizer_config(hp: HP) -> Tokenizer:
+    tokenizer_cls = hp.select(tokenizer_options, name="kind", default="bpe", options_only=True)
+    lowercase = hp.bool(True, name="lowercase")
+    return tokenizer_cls(lowercase=lowercase)
+
+def encoder_config(hp: HP) -> Encoder:
     size = hp.select(["small", "base"], name="size", default="small", options_only=True)
     hidden_size = 384 if size == "small" else 768
-    return {"size": size, "hidden_size": hidden_size}
+    return Encoder(size=size, hidden_size=hidden_size)
 ```
 {% endcode %}
+
+Use this named-options shape when a parent config chooses between swappable children. The dictionary provides the stable keys Hypster logs, while the values can be classes, callables, or full child config functions.
 
 ## Nest Them In A Parent
 
 {% code overflow="wrap" %}
 ```python
-def embedding_pipeline(hp: HP):
-    return {
-        "tokenizer": hp.nest(tokenizer_config, name="tokenizer"),
-        "encoder": hp.nest(encoder_config, name="encoder"),
-        "normalize": hp.bool(True, name="normalize"),
-    }
+def embedding_pipeline(hp: HP) -> EmbeddingPipeline:
+    tokenizer = hp.nest(tokenizer_config, name="tokenizer")
+    encoder = hp.nest(encoder_config, name="encoder")
+    normalize = hp.bool(True, name="normalize")
+    return EmbeddingPipeline(tokenizer=tokenizer, encoder=encoder, normalize=normalize)
 ```
 {% endcode %}
 
@@ -47,7 +53,7 @@ cfg = instantiate(
     },
 )
 
-assert cfg["encoder"]["hidden_size"] == 768
+assert cfg.encoder.hidden_size == 768
 ```
 {% endcode %}
 
@@ -74,17 +80,17 @@ When you pass child-local values through `hp.nest(child, name="child", values=..
 
 {% code overflow="wrap" %}
 ```python
-def sampler_config(hp: HP, default_batch_size: int):
-    return {
-        "batch_size": hp.int(default_batch_size, name="batch_size", min=1),
-        "shuffle": hp.bool(True, name="shuffle"),
-    }
+from my_app.training import BatchSampler, TrainingInputs
 
-def training_config(hp: HP):
-    return {
-        "train": hp.nest(sampler_config, name="train", args=(128,)),
-        "eval": hp.nest(sampler_config, name="eval", kwargs={"default_batch_size": 256}),
-    }
+def sampler_config(hp: HP, default_batch_size: int) -> BatchSampler:
+    batch_size = hp.int(default_batch_size, name="batch_size", min=1)
+    shuffle = hp.bool(True, name="shuffle")
+    return BatchSampler(batch_size=batch_size, shuffle=shuffle)
+
+def training_config(hp: HP) -> TrainingInputs:
+    train = hp.nest(sampler_config, name="train", args=(128,))
+    eval = hp.nest(sampler_config, name="eval", kwargs={"default_batch_size": 256})
+    return TrainingInputs(train=train, eval=eval)
 ```
 {% endcode %}
 

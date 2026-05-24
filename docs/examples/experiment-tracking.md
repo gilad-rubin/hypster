@@ -7,43 +7,55 @@ Use `instantiate_with_params()` when you need both the runtime object and the ex
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate, instantiate_with_params
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from my_app.experiments import TrainingJob
+from my_app.features import FeatureSelector
 
-def feature_config(hp: HP):
-    return {
-        "numeric": hp.multi_text(["age", "income"], name="numeric"),
-        "categorical": hp.multi_text(["country"], name="categorical"),
-        "scale": hp.bool(True, name="scale"),
-    }
+def feature_config(hp: HP) -> FeatureSelector:
+    numeric = hp.multi_text(["age", "income"], name="numeric")
+    categorical = hp.multi_text(["country"], name="categorical")
+    scale = hp.bool(True, name="scale")
+    return FeatureSelector(numeric=numeric, categorical=categorical, scale=scale)
 
-def model_config(hp: HP):
-    model = hp.select(["linear", "tree"], name="model", default="linear", options_only=True)
+def linear_model(hp: HP) -> LogisticRegression:
+    C = hp.float(1.0, name="C", min=1e-4, max=100.0)
+    return LogisticRegression(C=C, max_iter=1000)
+
+def tree_model(hp: HP) -> RandomForestClassifier:
+    max_depth = hp.int(6, name="max_depth", min=1, max=64)
+    return RandomForestClassifier(max_depth=max_depth, random_state=42)
+
+model_options = {
+    "linear": linear_model,
+    "tree": tree_model,
+}
+
+def training_job_config(hp: HP) -> TrainingJob:
+    selected_model = hp.select(model_options, name="model_family", default="linear", options_only=True)
     features = hp.nest(feature_config, name="features")
-
-    if model == "tree":
-        depth = hp.int(6, name="depth", min=1, max=64)
-        return {"model": model, "features": features, "depth": depth}
-
-    alpha = hp.float(0.1, name="alpha", min=0.0, max=10.0)
-    return {"model": model, "features": features, "alpha": alpha}
+    model = hp.nest(selected_model, name="model")
+    return TrainingJob(features=features, model=model)
 
 run = instantiate_with_params(
-    model_config,
+    training_job_config,
     values={
-        "model": "tree",
-        "depth": 12,
+        "model_family": "tree",
+        "model.max_depth": 12,
         "features.numeric": ["age", "income", "days_active"],
     },
 )
 
-assert run.value["depth"] == 12
+assert run.value.model.max_depth == 12
 assert run.params == {
-    "model": "tree",
+    "model_family": "tree",
     "features.numeric": ["age", "income", "days_active"],
     "features.categorical": ["country"],
     "features.scale": True,
-    "depth": 12,
+    "model.max_depth": 12,
 }
-assert instantiate(model_config, values=run.params) == run.value
+replayed = instantiate(training_job_config, values=run.params)
+assert replayed.model.max_depth == run.value.model.max_depth
 ```
 {% endcode %}
 

@@ -23,23 +23,25 @@ pip install 'hypster[optuna]'
 {% code overflow="wrap" %}
 ```python
 import optuna
+from sklearn.base import ClassifierMixin
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+
 from hypster import HP, instantiate
 from hypster.hpo.optuna import suggest_values
 from hypster.hpo.types import HpoFloat, HpoInt
 
-def model_config(hp: HP):
-    family = hp.select(["linear", "forest"], name="family", default="forest", options_only=True)
+def linear_model(hp: HP) -> LogisticRegression:
+    C = hp.float(
+        1.0,
+        name="C",
+        min=1e-4,
+        max=10.0,
+        hpo_spec=HpoFloat(scale="log"),
+    )
+    return LogisticRegression(C=C, max_iter=1000)
 
-    if family == "linear":
-        alpha = hp.float(
-            0.1,
-            name="alpha",
-            min=1e-4,
-            max=10.0,
-            hpo_spec=HpoFloat(scale="log"),
-        )
-        return {"family": family, "alpha": alpha}
-
+def forest_model(hp: HP) -> RandomForestClassifier:
     n_estimators = hp.int(
         200,
         name="n_estimators",
@@ -47,12 +49,21 @@ def model_config(hp: HP):
         max=1000,
         hpo_spec=HpoInt(step=50),
     )
-    return {"family": family, "n_estimators": n_estimators}
+    return RandomForestClassifier(n_estimators=n_estimators, random_state=42)
+
+model_options = {
+    "linear": linear_model,
+    "forest": forest_model,
+}
+
+def model_config(hp: HP) -> ClassifierMixin:
+    selected_config = hp.select(model_options, name="model_family", default="forest", options_only=True)
+    return hp.nest(selected_config, name="model")
 
 def objective(trial: optuna.Trial) -> float:
     values = suggest_values(trial, config=model_config)
-    cfg = instantiate(model_config, values=values)
-    return train_and_score(cfg)
+    model = instantiate(model_config, values=values)
+    return train_and_score(model)
 
 study = optuna.create_study(direction="maximize")
 study.optimize(objective, n_trials=30)

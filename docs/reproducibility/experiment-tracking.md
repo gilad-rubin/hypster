@@ -5,21 +5,21 @@ Use `instantiate_with_params()` to log the exact parameters selected by a run.
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate_with_params
+from my_app.training import TrainingJob
 
-def training_config(hp: HP):
-    return {
-        "model": hp.select(["linear", "forest"], name="model", default="forest", options_only=True),
-        "seed": hp.int(42, name="seed", min=0),
-        "batch_size": hp.int(64, name="batch_size", min=1),
-    }
+def training_config(hp: HP) -> TrainingJob:
+    model_family = hp.select(["linear", "forest"], name="model_family", default="forest", options_only=True)
+    seed = hp.int(42, name="seed", min=0)
+    batch_size = hp.int(64, name="batch_size", min=1)
+    return TrainingJob(model_family=model_family, seed=seed, batch_size=batch_size)
 
 run = instantiate_with_params(
     training_config,
-    values={"model": "linear", "batch_size": 128},
+    values={"model_family": "linear", "batch_size": 128},
 )
 
 assert run.params == {
-    "model": "linear",
+    "model_family": "linear",
     "seed": 42,
     "batch_size": 128,
 }
@@ -89,7 +89,8 @@ metadata = {
 from hypster import instantiate
 
 replayed = instantiate(training_config, values=run.params)
-assert replayed == run.value
+assert replayed.model_family == run.value.model_family
+assert replayed.batch_size == run.value.batch_size
 ```
 {% endcode %}
 

@@ -9,18 +9,21 @@ The public schema hook is `explore(config, return_info=True)`: it returns metada
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, explore, instantiate
+from my_app.backends import AppRuntime, LocalBackend, RemoteBackend
 
-def app_config(hp: HP):
+def app_config(hp: HP) -> AppRuntime:
     provider = hp.select(["local", "remote"], name="provider", default="local", options_only=True)
     batch_size = hp.int(32, name="batch_size", min=1, max=512)
 
     if provider == "remote":
         endpoint = hp.text("https://api.example.com", name="endpoint")
         timeout = hp.float(10.0, name="timeout", min=0.1, max=120.0)
-        return {"provider": provider, "batch_size": batch_size, "endpoint": endpoint, "timeout": timeout}
+        backend = RemoteBackend(endpoint=endpoint, timeout=timeout)
+        return AppRuntime(provider=provider, batch_size=batch_size, backend=backend)
 
     threads = hp.int(4, name="threads", min=1, max=64)
-    return {"provider": provider, "batch_size": batch_size, "threads": threads}
+    backend = LocalBackend(threads=threads)
+    return AppRuntime(provider=provider, batch_size=batch_size, backend=backend)
 
 def flatten_parameters(parameters):
     fields = []
@@ -56,8 +59,8 @@ schema = explore(app_config, values=ui_values, return_info=True)
 cfg = instantiate(app_config, values=ui_values)
 
 assert schema.defaults()["provider"] == "local"
-assert cfg["provider"] == "remote"
-assert cfg["timeout"] == 30.0
+assert cfg.provider == "remote"
+assert cfg.backend.timeout == 30.0
 ```
 {% endcode %}
 

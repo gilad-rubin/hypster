@@ -98,15 +98,25 @@ Only parameters touched by the active branch may appear in `values=`.
 
 {% code overflow="wrap" %}
 ```python
-def model_config(hp: HP):
-    family = hp.select(["linear", "forest"], name="family", default="linear", options_only=True)
+from sklearn.base import ClassifierMixin
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 
-    if family == "linear":
-        return {"alpha": hp.float(0.1, name="alpha", min=0.0, max=10.0)}
+def linear_model(hp: HP) -> LogisticRegression:
+    C = hp.float(1.0, name="C", min=1e-4, max=100.0)
+    return LogisticRegression(C=C, max_iter=1000)
 
-    return {"n_estimators": hp.int(200, name="n_estimators", min=10)}
+def forest_model(hp: HP) -> RandomForestClassifier:
+    n_estimators = hp.int(200, name="n_estimators", min=10)
+    return RandomForestClassifier(n_estimators=n_estimators, random_state=42)
 
-instantiate(model_config, values={"family": "linear", "n_estimators": 500})
+model_options = {"linear": linear_model, "forest": forest_model}
+
+def model_config(hp: HP) -> ClassifierMixin:
+    selected_config = hp.select(model_options, name="family", default="linear", options_only=True)
+    return hp.nest(selected_config, name="model")
+
+instantiate(model_config, values={"family": "linear", "model.n_estimators": 500})
 # ValueError: Unknown or unreachable parameters
 ```
 {% endcode %}

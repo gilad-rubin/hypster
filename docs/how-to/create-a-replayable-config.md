@@ -8,24 +8,15 @@ The config is a normal Python function. Keep it cheap and side-effect-free so `e
 
 {% code overflow="wrap" %}
 ```python
-from dataclasses import dataclass
-
 from hypster import HP
+from my_app.data import CsvDataset
 
 
-@dataclass(frozen=True)
-class DataLoadSettings:
-    path: str
-    batch_size: int
-    shuffle: bool
-
-
-def data_config(hp: HP) -> DataLoadSettings:
-    return DataLoadSettings(
-        path=hp.text("data/train.csv", name="path"),
-        batch_size=hp.int(64, name="batch_size", min=1),
-        shuffle=hp.bool(True, name="shuffle"),
-    )
+def data_config(hp: HP) -> CsvDataset:
+    path = hp.text("data/train.csv", name="path")
+    batch_size = hp.int(64, name="batch_size", min=1)
+    shuffle = hp.bool(True, name="shuffle")
+    return CsvDataset(path=path, batch_size=batch_size, shuffle=shuffle)
 ```
 {% endcode %}
 
@@ -56,13 +47,11 @@ fields = schema.to_dict()["parameters"]
 ```python
 from hypster import instantiate
 
-settings = instantiate(data_config, values={"batch_size": 128})
+dataset = instantiate(data_config, values={"batch_size": 128})
 
-assert settings == DataLoadSettings(
-    path="data/train.csv",
-    batch_size=128,
-    shuffle=True,
-)
+assert dataset.path == "data/train.csv"
+assert dataset.batch_size == 128
+assert dataset.shuffle is True
 ```
 {% endcode %}
 
@@ -74,7 +63,7 @@ from hypster import instantiate_with_params
 
 run = instantiate_with_params(data_config, values={"batch_size": 128})
 
-assert run.value == settings
+assert run.value.batch_size == dataset.batch_size
 assert run.params == {
     "path": "data/train.csv",
     "batch_size": 128,
@@ -93,7 +82,7 @@ payload = json.dumps(run.params, sort_keys=True)
 restored_params = json.loads(payload)
 
 replayed = instantiate(data_config, values=restored_params)
-assert replayed == run.value
+assert replayed.batch_size == run.value.batch_size
 ```
 {% endcode %}
 

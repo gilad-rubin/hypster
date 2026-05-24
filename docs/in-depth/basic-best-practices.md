@@ -4,7 +4,7 @@ These practices keep Hypster configs easy to explore, optimize, log, and replay.
 
 ## Embrace Pure Python
 
-Hypster configs are ordinary Python functions rather than a DSL. Use `if` statements, loops, local variables, lists, helpers, dataclasses, imports, and typed return values when they make the config clearer.
+Hypster configs are ordinary Python functions rather than a DSL. Use `if` statements, loops, local variables, lists, helpers, imports, and typed return values when they make the config clearer.
 
 The implication is that Hypster discovers the available parameters by running your function. Design config functions so they can be run repeatedly by `explore()`, HPO, and interactive UIs without causing side effects or surprising costs.
 
@@ -45,7 +45,7 @@ Use this boundary when deciding what a config should return:
 
 | Return from the config | Usually safe during `explore()`? | Notes |
 | --- | --- | --- |
-| Dataclasses, dictionaries, enums, small Python objects | Yes | Good for UI generation, experiment tracking, and replay. |
+| Enums, paths, mappings your runtime actually consumes, small Python objects | Yes | Good for UI generation, experiment tracking, and replay. |
 | In-memory model estimators or pipeline objects | Usually | Good when construction is cheap and does not open files, sockets, or remote handles. |
 | SDK clients, database handles, loaded indexes, network retrievers | Usually no | Return lightweight settings or factories, then build these after `instantiate()`. |
 | Training jobs, writes, API calls, migrations | No | Run these outside the config function. |
@@ -73,36 +73,60 @@ Branch when downstream structure changes:
 
 {% code overflow="wrap" %}
 ```python
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+
+from hypster import HP
+
 def model_config(hp: HP):
     family = hp.select(["linear", "forest"], name="family", default="forest", options_only=True)
 
     if family == "linear":
-        return {"alpha": hp.float(0.1, name="alpha", min=0.0, max=10.0)}
+        C = hp.float(1.0, name="C", min=1e-4, max=100.0)
+        return LogisticRegression(C=C, max_iter=1000)
 
-    return {"n_estimators": hp.int(200, name="n_estimators", min=10)}
+    n_estimators = hp.int(200, name="n_estimators", min=10, max=1000)
+    max_depth = hp.int(None, name="max_depth", min=1, max=100, allow_none=True)
+    return RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth)
 ```
 {% endcode %}
 
 Avoid carrying irrelevant parameters for inactive branches. Branch-aware configs make experiment logs cleaner and HPO search spaces smaller.
 
-## Use Dict-Backed Selects For Complex Runtime Values
+Use inline branches for small, local differences. When the branch chooses between reusable components, prefer composition with `hp.nest()` and a dict-backed `select` over a long `if`/`elif` chain. The key stays replayable, each component keeps its parameters local, and interactive UIs can render the selected child config as a contained group.
 
-Select keys should be simple and replayable. Map those keys to complex runtime values:
+## Prefer Dict-Backed Selects For Swappable Components
+
+Select keys should be simple and replayable. For swappable runtime components, map those keys to config functions and then nest the selected function:
 
 {% code overflow="wrap" %}
 ```python
-tokenizer = hp.select(
-    {
-        "simple": "basic_tokenizer",
-        "wordpiece": {"kind": "wordpiece", "vocab": "vocab.txt"},
-    },
-    name="tokenizer",
-    default="wordpiece",
-)
+from my_app.tokenizers import SimpleTokenizer, Tokenizer, WordPieceTokenizer
+
+def simple_tokenizer_config(hp: HP) -> SimpleTokenizer:
+    lowercase = hp.bool(True, name="lowercase")
+    return SimpleTokenizer(lowercase=lowercase)
+
+def wordpiece_tokenizer_config(hp: HP) -> WordPieceTokenizer:
+    vocab_path = hp.text("vocab.txt", name="vocab_path")
+    return WordPieceTokenizer(vocab_path=vocab_path)
+
+tokenizer_options = {
+    "simple": simple_tokenizer_config,
+    "wordpiece": wordpiece_tokenizer_config,
+}
+
+def tokenizer_config(hp: HP) -> Tokenizer:
+    selected_config = hp.select(tokenizer_options, name="tokenizer", default="wordpiece", options_only=True)
+    return hp.nest(selected_config, name="settings")
 ```
 {% endcode %}
 
-This keeps `params={"tokenizer": "wordpiece"}` while your app receives the mapped dictionary when that branch is selected.
+This keeps `params={"tokenizer": "wordpiece", "settings.vocab_path": "vocab.txt"}` while your app receives the selected tokenizer object.
+
+Keep the options mapping in a named variable such as `tokenizer_options`, `model_options`, or `retriever_options`. That keeps the parent config readable, especially when the mapping is long, and makes it easy to reuse the same option set in HPO, interactive UIs, tests, and nested configs.
+
+For a tiny branch with one or two scalar differences, an `if` statement is fine. Once each branch has its own parameters or returns a different runtime type, split the branches into child config functions and choose between them with a dict-backed select.
 
 ## Turn On `options_only=True` For Enums
 
@@ -120,7 +144,7 @@ provider = hp.select(["openai", "gemini"], name="provider", default="openai", op
 
 {% code overflow="wrap" %}
 ```python
-max_depth = hp.int(None, name="max_depth", allow_none=True)
+max_depth = hp.int(None, name="max_depth", min=1, max=100, allow_none=True)
 ```
 {% endcode %}
 
@@ -194,11 +218,11 @@ Return what the caller needs. A small return surface makes configs easier to tes
 
 {% code overflow="wrap" %}
 ```python
-return {
-    "model": model,
-    "optimizer": optimizer,
-}
+def training_config(hp: HP) -> TrainingRunner:
+    model = hp.nest(model_config, name="model")
+    optimizer = hp.nest(optimizer_config, name="optimizer")
+    return TrainingRunner(model=model, optimizer=optimizer)
 ```
 {% endcode %}
 
-Use `hp.collect(locals(), include=[...])` when that makes the return explicit and concise.
+Use `hp.collect(locals(), include=[...])` when the caller genuinely wants a mapping and that makes the return explicit and concise.

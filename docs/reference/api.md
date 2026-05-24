@@ -18,12 +18,14 @@ Config functions are pure Python, not a DSL. `instantiate()`, `explore()`, `inte
 ```python
 from hypster import HP
 
-def config(hp: HP):
-    return {"batch_size": hp.int(32, name="batch_size")}
+def config(hp: HP) -> int:
+    return hp.int(32, name="batch_size")
 ```
 {% endcode %}
 
 The `hp: HP` annotation is recommended but not mandatory. If the first parameter has a type annotation, it must include `HP`. Callable objects are supported when `inspect.signature()` can read their `__call__` signature; signature validation errors use the class name.
+
+Reference examples use small return values for compactness. In application docs and production code, the usual pattern is to return the initialized object your application will use.
 
 Config functions may accept extra positional or keyword arguments. Pass those through `args=` and `kwargs=`.
 
@@ -75,12 +77,12 @@ Executes a config function and returns an `InstantiationOutput`.
 ```python
 from hypster import HP, instantiate_with_params
 
-def config(hp: HP):
-    return {"model": hp.select(["small", "large"], name="model", default="small")}
+def config(hp: HP) -> str:
+    return hp.select(["small", "large"], name="model", default="small")
 
 run = instantiate_with_params(config, values={"model": "large"})
 
-assert run.value == {"model": "large"}
+assert run.value == "large"
 assert run.params == {"model": "large"}
 ```
 {% endcode %}

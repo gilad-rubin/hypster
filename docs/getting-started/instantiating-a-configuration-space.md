@@ -5,17 +5,26 @@ Use `instantiate()` to execute a config function and get its returned runtime va
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate
+from sklearn.base import ClassifierMixin
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 
-def model_config(hp: HP):
-    family = hp.select(["linear", "forest"], name="family", default="forest", options_only=True)
+def linear_model(hp: HP) -> LogisticRegression:
+    C = hp.float(1.0, name="C", min=1e-4, max=100.0)
+    return LogisticRegression(C=C, max_iter=1000)
 
-    if family == "linear":
-        return {"family": family, "alpha": hp.float(0.1, name="alpha", min=0.0, max=10.0)}
+def forest_model(hp: HP) -> RandomForestClassifier:
+    n_estimators = hp.int(200, name="n_estimators", min=10, max=1000)
+    return RandomForestClassifier(n_estimators=n_estimators, random_state=42)
 
-    return {"family": family, "n_estimators": hp.int(200, name="n_estimators", min=10, max=1000)}
+model_options = {"linear": linear_model, "forest": forest_model}
 
-cfg = instantiate(model_config, values={"family": "forest", "n_estimators": 500})
-assert cfg == {"family": "forest", "n_estimators": 500}
+def model_config(hp: HP) -> ClassifierMixin:
+    selected_config = hp.select(model_options, name="family", default="forest", options_only=True)
+    return hp.nest(selected_config, name="model")
+
+model = instantiate(model_config, values={"family": "forest", "model.n_estimators": 500})
+assert isinstance(model, RandomForestClassifier)
 ```
 {% endcode %}
 
@@ -28,19 +37,20 @@ Use `instantiate_with_params()` when you need a replayable record for experiment
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate, instantiate_with_params
+from my_app.llms import OpenAIClient
 
-def llm_config(hp: HP):
-    provider = hp.select(["gemini", "openai"], name="provider", default="gemini", options_only=True)
+def llm_config(hp: HP) -> OpenAIClient:
+    model_name = hp.select(["gpt-5-mini", "gpt-5"], name="model_name", default="gpt-5-mini", options_only=True)
     temperature = hp.float(0.2, name="temperature", min=0.0, max=2.0)
-    return {"provider": provider, "temperature": temperature}
+    return OpenAIClient(model=model_name, temperature=temperature)
 
-run = instantiate_with_params(llm_config, values={"provider": "openai"})
+run = instantiate_with_params(llm_config, values={"model_name": "gpt-5"})
 
-assert run.value == {"provider": "openai", "temperature": 0.2}
-assert run.params == {"provider": "openai", "temperature": 0.2}
+assert run.value.model == "gpt-5"
+assert run.params == {"model_name": "gpt-5", "temperature": 0.2}
 
 replayed = instantiate(llm_config, values=run.params)
-assert replayed == run.value
+assert replayed.model == run.value.model
 ```
 {% endcode %}
 
@@ -97,7 +107,7 @@ See [Values & Overrides](../in-depth/values-and-overrides.md) for more examples.
 {% code overflow="wrap" %}
 ```python
 def config(hp: HP):
-    max_depth = hp.int(None, name="max_depth", allow_none=True)
+    max_depth = hp.int(None, name="max_depth", min=1, max=100, allow_none=True)
     thinking_level = hp.select(
         [None, "low", "medium", "high"],
         name="thinking_level",

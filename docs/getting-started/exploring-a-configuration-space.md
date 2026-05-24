@@ -9,28 +9,27 @@ That execution should be cheap and safe. Keep side effects, paid API calls, data
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, explore
+from my_app.backends import Application, LocalBackend, RemoteBackend
 
-def local_backend(hp: HP):
-    return {
-        "threads": hp.int(4, name="threads", min=1, max=64),
-        "cache": hp.bool(True, name="cache"),
-    }
+def local_backend(hp: HP) -> LocalBackend:
+    threads = hp.int(4, name="threads", min=1, max=64)
+    cache = hp.bool(True, name="cache")
+    return LocalBackend(threads=threads, cache=cache)
 
-def remote_backend(hp: HP):
-    return {
-        "endpoint": hp.text("https://api.example.com", name="endpoint"),
-        "timeout": hp.float(10.0, name="timeout", min=0.1, max=120.0),
-    }
+def remote_backend(hp: HP) -> RemoteBackend:
+    endpoint = hp.text("https://api.example.com", name="endpoint")
+    timeout = hp.float(10.0, name="timeout", min=0.1, max=120.0)
+    return RemoteBackend(endpoint=endpoint, timeout=timeout)
 
-def app_config(hp: HP):
-    backend = hp.select(["local", "remote"], name="backend", default="local", options_only=True)
+backend_options = {
+    "local": local_backend,
+    "remote": remote_backend,
+}
 
-    if backend == "local":
-        settings = hp.nest(local_backend, name="local")
-    else:
-        settings = hp.nest(remote_backend, name="remote")
-
-    return {"backend": backend, "settings": settings}
+def app_config(hp: HP) -> Application:
+    selected_config = hp.select(backend_options, name="backend", default="local", options_only=True)
+    backend = hp.nest(selected_config, name="backend_settings")
+    return Application(backend=backend)
 
 explore(app_config)
 ```
@@ -42,7 +41,7 @@ Expected output:
 ```text
 app_config
 ├── backend: select = "local"  (options: ["local", "remote"])
-└── local
+└── backend_settings
     ├── threads: int = 4  (1-64)
     └── cache: bool = True
 ```
@@ -56,7 +55,7 @@ Pass `values=` to choose a branch before tracing it:
 ```python
 explore(
     app_config,
-    values={"backend": "remote", "remote.timeout": 30.0},
+    values={"backend": "remote", "backend_settings.timeout": 30.0},
 )
 ```
 {% endcode %}
@@ -67,7 +66,7 @@ Expected output:
 ```text
 app_config
 ├── backend: select = "remote"  (options: ["local", "remote"])
-└── remote
+└── backend_settings
     ├── endpoint: text = "https://api.example.com"
     └── timeout: float = 30.0  (0.1-120.0)
 ```
@@ -94,8 +93,8 @@ For programmatic inspection before instantiation, use `schema = explore(config, 
 ```python
 {
     "backend": "local",
-    "local.threads": 4,
-    "local.cache": True,
+    "backend_settings.threads": 4,
+    "backend_settings.cache": True,
 }
 ```
 {% endcode %}

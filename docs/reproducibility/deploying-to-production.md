@@ -15,13 +15,13 @@ Hypster is in preview, so production use should be deliberate. When you do deplo
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate_with_params
+from my_app.deploy import ServiceDeployment
 
-def service_config(hp: HP):
-    return {
-        "replicas": hp.int(2, name="replicas", min=1, max=20),
-        "provider": hp.select(["local", "remote"], name="provider", default="remote", options_only=True),
-        "timeout": hp.float(10.0, name="timeout", min=0.1, max=120.0),
-    }
+def service_config(hp: HP) -> ServiceDeployment:
+    replicas = hp.int(2, name="replicas", min=1, max=20)
+    provider = hp.select(["local", "remote"], name="provider", default="remote", options_only=True)
+    timeout = hp.float(10.0, name="timeout", min=0.1, max=120.0)
+    return ServiceDeployment(replicas=replicas, provider=provider, timeout=timeout)
 
 def test_production_config():
     run = instantiate_with_params(

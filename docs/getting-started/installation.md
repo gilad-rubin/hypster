@@ -77,27 +77,20 @@ Run a smoke test in the same environment where your project runs:
 
 {% code overflow="wrap" %}
 ```python
-from dataclasses import dataclass
+from pathlib import Path
 
 from hypster import HP, explore, instantiate
 
 
-@dataclass(frozen=True)
-class DataSettings:
-    path: str
-    batch_size: int
-
-
-def config(hp: HP) -> DataSettings:
-    return DataSettings(
-        path=hp.text("data/train.csv", name="path"),
-        batch_size=hp.int(32, name="batch_size", min=1),
-    )
+def config(hp: HP) -> Path:
+    data_dir = hp.text("data", name="data_dir")
+    split = hp.select(["train", "validation"], name="split", default="train", options_only=True)
+    return Path(data_dir) / f"{split}.csv"
 
 
 explore(config)
-settings = instantiate(config, values={"batch_size": 64})
-assert settings.batch_size == 64
+path = instantiate(config, values={"split": "validation"})
+assert path == Path("data/validation.csv")
 ```
 {% endcode %}
 
@@ -106,8 +99,8 @@ Expected tree:
 {% code overflow="wrap" %}
 ```text
 config
-├── path: text = 'data/train.csv'
-└── batch_size: int = 32  (min: 1)
+├── data_dir: text = 'data'
+└── split: select = 'train'  (options: ['train', 'validation'])
 ```
 {% endcode %}
 
