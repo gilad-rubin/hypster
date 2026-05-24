@@ -7,21 +7,20 @@
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, instantiate
+from my_app.training import AdamW, DataLoaders, BatchSampler, TrainingRun
 
-def optimizer_config(hp: HP):
-    return {
-        "learning_rate": hp.float(0.001, name="learning_rate", min=1e-6, max=1.0),
-        "weight_decay": hp.float(0.0, name="weight_decay", min=0.0, max=1.0),
-    }
+def optimizer_config(hp: HP) -> AdamW:
+    learning_rate = hp.float(0.001, name="learning_rate", min=1e-6, max=1.0)
+    weight_decay = hp.float(0.0, name="weight_decay", min=0.0, max=1.0)
+    return AdamW(learning_rate=learning_rate, weight_decay=weight_decay)
 
-def training_config(hp: HP):
-    return {
-        "epochs": hp.int(10, name="epochs", min=1),
-        "optimizer": hp.nest(optimizer_config, name="optimizer"),
-    }
+def training_config(hp: HP) -> TrainingRun:
+    epochs = hp.int(10, name="epochs", min=1)
+    optimizer = hp.nest(optimizer_config, name="optimizer")
+    return TrainingRun(epochs=epochs, optimizer=optimizer)
 
 cfg = instantiate(training_config, values={"optimizer.learning_rate": 0.01})
-assert cfg["optimizer"]["learning_rate"] == 0.01
+assert cfg.optimizer.learning_rate == 0.01
 ```
 {% endcode %}
 
@@ -59,10 +58,10 @@ def parent(hp: HP):
         optimizer_config,
         name="optimizer",
         values={"learning_rate": 0.005},
-    )
+)
 
-assert instantiate(parent)["learning_rate"] == 0.005
-assert instantiate(parent, values={"optimizer.learning_rate": 0.02})["learning_rate"] == 0.005
+assert instantiate(parent).learning_rate == 0.005
+assert instantiate(parent, values={"optimizer.learning_rate": 0.02}).learning_rate == 0.005
 ```
 {% endcode %}
 
@@ -74,7 +73,7 @@ def overridable_parent(hp: HP):
     return hp.nest(optimizer_config, name="optimizer")
 
 cfg = instantiate(overridable_parent, values={"optimizer.learning_rate": 0.02})
-assert cfg["learning_rate"] == 0.02
+assert cfg.learning_rate == 0.02
 ```
 {% endcode %}
 
@@ -96,17 +95,15 @@ Use child-local `values=` for parent-owned policy, test fixtures, or internal co
 
 {% code overflow="wrap" %}
 ```python
-def sampler_config(hp: HP, default_batch_size: int):
-    return {
-        "batch_size": hp.int(default_batch_size, name="batch_size", min=1),
-        "shuffle": hp.bool(True, name="shuffle"),
-    }
+def sampler_config(hp: HP, default_batch_size: int) -> BatchSampler:
+    batch_size = hp.int(default_batch_size, name="batch_size", min=1)
+    shuffle = hp.bool(True, name="shuffle")
+    return BatchSampler(batch_size=batch_size, shuffle=shuffle)
 
-def data_config(hp: HP):
-    return {
-        "train": hp.nest(sampler_config, name="train", args=(128,)),
-        "eval": hp.nest(sampler_config, name="eval", kwargs={"default_batch_size": 256}),
-    }
+def data_config(hp: HP) -> DataLoaders:
+    train = hp.nest(sampler_config, name="train", args=(128,))
+    eval = hp.nest(sampler_config, name="eval", kwargs={"default_batch_size": 256})
+    return DataLoaders(train=train, eval=eval)
 ```
 {% endcode %}
 
@@ -116,21 +113,20 @@ You can choose which child config to run:
 
 {% code overflow="wrap" %}
 ```python
-def local_config(hp: HP):
-    return {"threads": hp.int(4, name="threads", min=1)}
+from my_app.backends import AppRuntime, LocalBackend, RemoteBackend
 
-def remote_config(hp: HP):
-    return {"endpoint": hp.text("https://api.example.com", name="endpoint")}
+def local_config(hp: HP) -> LocalBackend:
+    return LocalBackend(threads=hp.int(4, name="threads", min=1))
 
-def app_config(hp: HP):
-    backend = hp.select(["local", "remote"], name="backend", default="local", options_only=True)
+def remote_config(hp: HP) -> RemoteBackend:
+    return RemoteBackend(endpoint=hp.text("https://api.example.com", name="endpoint"))
 
-    if backend == "local":
-        settings = hp.nest(local_config, name="local")
-    else:
-        settings = hp.nest(remote_config, name="remote")
+backend_options = {"local": local_config, "remote": remote_config}
 
-    return {"backend": backend, "settings": settings}
+def app_config(hp: HP) -> AppRuntime:
+    selected_config = hp.select(backend_options, name="backend", default="local", options_only=True)
+    backend = hp.nest(selected_config, name="settings")
+    return AppRuntime(backend=backend)
 ```
 {% endcode %}
 
@@ -138,15 +134,15 @@ This value is valid:
 
 {% code overflow="wrap" %}
 ```python
-instantiate(app_config, values={"backend": "remote", "remote.endpoint": "https://staging.example.com"})
+instantiate(app_config, values={"backend": "remote", "settings.endpoint": "https://staging.example.com"})
 ```
 {% endcode %}
 
-This value raises by default because `local.threads` is unreachable on the `remote` branch:
+This value raises by default because `settings.threads` is unreachable on the `remote` branch:
 
 {% code overflow="wrap" %}
 ```python
-instantiate(app_config, values={"backend": "remote", "local.threads": 8})
+instantiate(app_config, values={"backend": "remote", "settings.threads": 8})
 ```
 {% endcode %}
 

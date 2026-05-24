@@ -11,35 +11,37 @@ Use `explore(config, return_info=True)` to discover fields, render controls in y
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, explore
+from my_app.search import KeywordRetriever, SearchRuntime, VectorRetriever
 
 
-def keyword_retrieval(hp: HP):
-    return {
-        "index": hp.text("documents-v1", name="index", description="Keyword index name."),
-        "top_k": hp.int(20, name="top_k", min=1, max=100),
-    }
+def keyword_retrieval(hp: HP) -> KeywordRetriever:
+    index = hp.text("documents-v1", name="index", description="Keyword index name.")
+    top_k = hp.int(20, name="top_k", min=1, max=100)
+    return KeywordRetriever(index=index, top_k=top_k)
 
 
-def vector_retrieval(hp: HP):
-    return {
-        "index": hp.text("embeddings-v1", name="index", description="Vector index name."),
-        "top_k": hp.int(10, name="top_k", min=1, max=100),
-        "score_threshold": hp.float(0.2, name="score_threshold", min=0.0, max=1.0),
-    }
+def vector_retrieval(hp: HP) -> VectorRetriever:
+    index = hp.text("embeddings-v1", name="index", description="Vector index name.")
+    top_k = hp.int(10, name="top_k", min=1, max=100)
+    score_threshold = hp.float(0.2, name="score_threshold", min=0.0, max=1.0)
+    return VectorRetriever(index=index, top_k=top_k, score_threshold=score_threshold)
 
 
-def search_config(hp: HP):
-    backend = hp.select(
-        ["keyword", "vector"],
+retrieval_options = {
+    "keyword": keyword_retrieval,
+    "vector": vector_retrieval,
+}
+
+
+def search_config(hp: HP) -> SearchRuntime:
+    selected_config = hp.select(
+        retrieval_options,
         name="backend",
         default="keyword",
         options_only=True,
         description="Chooses the retrieval branch.",
     )
-    if backend == "vector":
-        retrieval = hp.nest(vector_retrieval, name="retrieval")
-    else:
-        retrieval = hp.nest(keyword_retrieval, name="retrieval")
+    retrieval = hp.nest(selected_config, name="retrieval")
 
     features = hp.multi_select(
         [None, "cache", "trace"],
@@ -48,7 +50,7 @@ def search_config(hp: HP):
         allow_none=True,
     )
 
-    return {"backend": backend, "retrieval": retrieval, "features": features}
+    return SearchRuntime(retrieval=retrieval, features=features)
 
 
 schema = explore(search_config, return_info=True)
@@ -167,6 +169,8 @@ Schema metadata is JSON-serializable. After exploring the vector branch with val
 
 For dict-backed selects, `options` contains the replayable keys, not the mapped runtime objects.
 
+This is another reason to prefer named option dictionaries for swappable components: UIs can render simple stable keys such as `"keyword"` and `"vector"`, while the config still receives the mapped class or child config function.
+
 ## 3. Render Controls
 
 Map field kinds to controls in your UI framework:
@@ -250,8 +254,8 @@ ui_values = {
 }
 
 cfg = instantiate(search_config, values=ui_values)
-assert cfg["backend"] == "vector"
-assert cfg["retrieval"]["top_k"] == 12
+assert isinstance(cfg.retrieval, VectorRetriever)
+assert cfg.retrieval.top_k == 12
 ```
 {% endcode %}
 

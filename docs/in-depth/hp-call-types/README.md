@@ -2,6 +2,8 @@
 
 `HP` methods define the public parameters in a config function. Each call records a parameter path, validates overrides, and can be explored or replayed.
 
+The examples in this reference sometimes return small dictionaries to keep the call behavior visible. In application code, prefer returning the initialized runtime object unless the mapping itself is the object your caller needs.
+
 ## Scalar Calls
 
 | Call | Use for | Notes |

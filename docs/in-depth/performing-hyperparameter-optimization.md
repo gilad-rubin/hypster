@@ -22,24 +22,24 @@ Use `hpo_spec=` to document search semantics where the parameter is defined:
 ```python
 from hypster import HP
 from hypster.hpo.types import HpoFloat, HpoInt
+from my_app.training import Trainer
 
-def config(hp: HP):
-    return {
-        "learning_rate": hp.float(
-            0.001,
-            name="learning_rate",
-            min=1e-6,
-            max=1.0,
-            hpo_spec=HpoFloat(scale="log"),
-        ),
-        "batch_size": hp.int(
-            64,
-            name="batch_size",
-            min=16,
-            max=512,
-            hpo_spec=HpoInt(step=16),
-        ),
-    }
+def config(hp: HP) -> Trainer:
+    learning_rate = hp.float(
+        0.001,
+        name="learning_rate",
+        min=1e-6,
+        max=1.0,
+        hpo_spec=HpoFloat(scale="log"),
+    )
+    batch_size = hp.int(
+        64,
+        name="batch_size",
+        min=16,
+        max=512,
+        hpo_spec=HpoInt(step=16),
+    )
+    return Trainer(learning_rate=learning_rate, batch_size=batch_size)
 ```
 {% endcode %}
 
@@ -73,13 +73,17 @@ Nullable numeric HPO parameters are not supported directly. Model the nullable c
 
 {% code overflow="wrap" %}
 ```python
-def tree_config(hp: HP):
+from sklearn.ensemble import RandomForestClassifier
+
+def tree_config(hp: HP) -> RandomForestClassifier:
     depth_mode = hp.select(["unlimited", "bounded"], name="depth_mode", default="bounded", options_only=True)
 
     if depth_mode == "unlimited":
-        return {"max_depth": None}
+        max_depth = None
+    else:
+        max_depth = hp.int(12, name="max_depth", min=1, max=64)
 
-    return {"max_depth": hp.int(12, name="max_depth", min=1, max=64)}
+    return RandomForestClassifier(max_depth=max_depth, random_state=42)
 ```
 {% endcode %}
 

@@ -39,19 +39,22 @@ def forest_model(hp: HP) -> RandomForestClassifier:
 
 ## Choose The Active Model
 
+For model families, keep the selectable options in a dict from replayable keys to child config functions. This scales better than a long conditional, keeps each model's hyperparameters close to the object it initializes, and lets UIs show the selected model parameters as one nested group.
+
 {% code overflow="wrap" %}
 ```python
+model_options = {
+    "logistic": logistic_model,
+    "forest": forest_model,
+}
+
 def classifier_config(hp: HP) -> ClassifierMixin:
-    model_family = hp.select(["logistic", "forest"], name="model_family", default="forest", options_only=True)
-
-    if model_family == "logistic":
-        return hp.nest(logistic_model, name="logistic")
-
-    return hp.nest(forest_model, name="forest")
+    selected_config = hp.select(model_options, name="model_family", default="forest", options_only=True)
+    return hp.nest(selected_config, name="model")
 ```
 {% endcode %}
 
-The config returns a ready-to-use classifier, not a dictionary that must be assembled later.
+The config returns a ready-to-use classifier, not a dictionary that must be assembled later. The selected params record `"forest"` or `"logistic"`, while the application receives the initialized estimator.
 
 ## Explore And Instantiate
 
@@ -63,8 +66,8 @@ run = instantiate_with_params(
     classifier_config,
     values={
         "model_family": "forest",
-        "forest.n_estimators": 500,
-        "forest.max_depth": 12,
+        "model.n_estimators": 500,
+        "model.max_depth": 12,
     },
 )
 
@@ -79,10 +82,10 @@ Expected selected params:
 ```python
 {
     "model_family": "forest",
-    "forest.n_estimators": 500,
-    "forest.max_depth": 12,
-    "forest.min_samples_leaf": 2,
-    "forest.random_state": 42,
+    "model.n_estimators": 500,
+    "model.max_depth": 12,
+    "model.min_samples_leaf": 2,
+    "model.random_state": 42,
 }
 ```
 {% endcode %}
@@ -91,77 +94,56 @@ Use `model.fit(X_train, y_train)` in your training code after instantiation. Kee
 
 ## Build A Full Pipeline Config
 
-For larger experiments, nest preprocessing, training, and model configs under one parent. Each nested config owns one part of the workflow, while the selected params remain a flat replayable dictionary.
+For larger experiments, nest preprocessing and model configs under one parent. Each nested config owns one part of the workflow, while the selected params remain a flat replayable dictionary.
 
 {% code overflow="wrap" %}
 ```python
-from dataclasses import dataclass
+from sklearn.impute import SimpleImputer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import RobustScaler, StandardScaler
 
 
-@dataclass(frozen=True)
-class PreprocessingSettings:
-    scaler: str | None
-    impute_strategy: str
-
-
-@dataclass(frozen=True)
-class TrainingSettings:
-    cv_folds: int
-    scoring: str
-
-
-@dataclass(frozen=True)
-class MLExperiment:
-    preprocessing: PreprocessingSettings
-    training: TrainingSettings
-    model: ClassifierMixin
-
-
-def preprocessing_config(hp: HP) -> PreprocessingSettings:
-    return PreprocessingSettings(
-        scaler=hp.select(
-            [None, "standard", "robust"],
-            name="scaler",
-            default="standard",
-            allow_none=True,
-            options_only=True,
-        ),
-        impute_strategy=hp.select(["median", "mean"], name="impute_strategy", default="median", options_only=True),
+def preprocessing_config(hp: HP) -> Pipeline:
+    scaler = hp.select(
+        [None, "standard", "robust"],
+        name="scaler",
+        default="standard",
+        allow_none=True,
+        options_only=True,
     )
+    impute_strategy = hp.select(["median", "mean"], name="impute_strategy", default="median", options_only=True)
+
+    steps = [("imputer", SimpleImputer(strategy=impute_strategy))]
+    if scaler == "standard":
+        steps.append(("scaler", StandardScaler()))
+    elif scaler == "robust":
+        steps.append(("scaler", RobustScaler()))
+
+    return Pipeline(steps)
 
 
-def training_settings(hp: HP) -> TrainingSettings:
-    return TrainingSettings(
-        cv_folds=hp.int(5, name="cv_folds", min=2, max=10),
-        scoring=hp.select(["accuracy", "f1", "roc_auc"], name="scoring", default="f1", options_only=True),
-    )
-
-
-def experiment_config(hp: HP) -> MLExperiment:
-    return MLExperiment(
-        preprocessing=hp.nest(preprocessing_config, name="preprocessing"),
-        training=hp.nest(training_settings, name="training"),
-        model=hp.nest(classifier_config, name="model"),
-    )
+def experiment_config(hp: HP) -> Pipeline:
+    preprocessing = hp.nest(preprocessing_config, name="preprocessing")
+    classifier = hp.nest(classifier_config, name="classifier")
+    return Pipeline([("preprocessing", preprocessing), ("classifier", classifier)])
 
 
 run = instantiate_with_params(
     experiment_config,
     values={
         "preprocessing.scaler": "robust",
-        "training.cv_folds": 3,
-        "model.model_family": "forest",
-        "model.forest.n_estimators": 500,
+        "classifier.model_family": "forest",
+        "classifier.model.n_estimators": 500,
     },
 )
 
-assert isinstance(run.value.model, RandomForestClassifier)
+assert isinstance(run.value.named_steps["classifier"], RandomForestClassifier)
 assert run.params["preprocessing.scaler"] == "robust"
-assert run.params["model.forest.n_estimators"] == 500
+assert run.params["classifier.model.n_estimators"] == 500
 ```
 {% endcode %}
 
-Use `run.value.preprocessing` to build your feature transformer, `run.value.model` as the initialized estimator, and `run.params` as the exact experiment record.
+Use `run.value.fit(X_train, y_train)` in your training code, and log `run.params` as the exact experiment record.
 
 ## Make It HPO-Ready
 

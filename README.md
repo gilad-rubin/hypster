@@ -41,12 +41,12 @@
 
 ## Key Features
 
-- 🐍 **Pure Python, Not a DSL**: Use normal functions, `if` statements, loops, lists, helper functions, imports, dataclasses, and runtime objects
+- 🐍 **Pure Python, Not a DSL**: Use normal functions, `if` statements, loops, lists, helper functions, imports, and runtime objects
 - 🪆 **Hierarchical, Conditional Configurations**: Support for nested and swappable configurations
 - 📐 **Type Safety**: Built-in type hints and validation
 - 🧪 **Hyperparameter Optimization Built-In**: Native, first-class optuna support
 
-Hypster configs are ordinary Python functions rather than a separate configuration language. That keeps them flexible and readable, but it also means Hypster discovers the available parameters by executing the function. Keep config functions fast and side-effect-free: avoid paid API calls, network calls, file writes, training, database access, and costly initialization in code paths used by `explore()`, HPO, or interactive UIs.
+Hypster configs are ordinary Python functions rather than a separate configuration language. That keeps them flexible and readable, but it also means Hypster discovers the available parameters by executing the function. A config usually returns the initialized object your application needs. Keep config functions fast and side-effect-free: avoid paid API calls, network calls, file writes, training, database access, and costly initialization in code paths used by `explore()`, HPO, or interactive UIs.
 
 ## Installation
 
@@ -75,31 +75,55 @@ pip install 'hypster[optuna]'
 Define a configuration function and instantiate it with overrides:
 
 ```python
-from dataclasses import dataclass
 from hypster import HP, explore, instantiate_with_params
+from my_app.llms import GeminiClient, OpenAIClient
 
-@dataclass
-class LLMSettings:
-    provider: str
-    temperature: float
-    max_tokens: int
 
-def llm_config(hp: HP) -> LLMSettings:
-    provider = hp.select(["openai", "gemini"], name="provider", default="openai", options_only=True)
+def openai_config(hp: HP) -> OpenAIClient:
+    model = hp.select(["gpt-5", "gpt-5-mini"], name="model", default="gpt-5-mini", options_only=True)
     temperature = hp.float(0.7, name="temperature", min=0.0, max=1.0)
     max_tokens = hp.int(256, name="max_tokens", min=1, max=4096)
-    return LLMSettings(provider=provider, temperature=temperature, max_tokens=max_tokens)
+    return OpenAIClient(model=model, temperature=temperature, max_tokens=max_tokens)
+
+
+def gemini_config(hp: HP) -> GeminiClient:
+    model = hp.select(
+        ["gemini-3.5-flash", "gemini-3.1-pro"],
+        name="model",
+        default="gemini-3.5-flash",
+        options_only=True,
+    )
+    temperature = hp.float(0.3, name="temperature", min=0.0, max=1.0)
+    return GeminiClient(model=model, temperature=temperature)
+
+
+llm_options = {
+    "openai": openai_config,
+    "gemini": gemini_config,
+}
+
+# Use a named options dict for swappable components. The params log the
+# simple key, while the config receives the selected child config function.
+
+def llm_config(hp: HP):
+    selected_config = hp.select(llm_options, name="provider", default="openai", options_only=True)
+    return hp.nest(selected_config, name="llm")
 
 explore(llm_config)
 # llm_config
 # ├── provider: select = "openai"  (options: ["openai", "gemini"])
-# ├── temperature: float = 0.7  (0.0-1.0)
-# └── max_tokens: int = 256  (1-4096)
+# └── llm
+#     ├── model: select = "gpt-5-mini"  (options: ["gpt-5", "gpt-5-mini"])
+#     ├── temperature: float = 0.7  (0.0-1.0)
+#     └── max_tokens: int = 256  (1-4096)
 
-run = instantiate_with_params(llm_config, values={"provider": "gemini", "temperature": 0.3})
+run = instantiate_with_params(
+    llm_config,
+    values={"provider": "gemini", "llm.temperature": 0.1},
+)
 
-assert run.value == LLMSettings(provider="gemini", temperature=0.3, max_tokens=256)
-assert run.params == {"provider": "gemini", "temperature": 0.3, "max_tokens": 256}
+response = run.value.invoke("How's your day going?")
+assert run.params["provider"] == "gemini"
 ```
 
 Use `explore(..., values=...)` to inspect a specific conditional branch before you instantiate it, or `explore(..., return_info=True)` to get a JSON-serializable schema object.
@@ -111,42 +135,39 @@ import optuna
 from hypster import HP, instantiate
 from hypster.hpo.optuna import suggest_values
 from hypster.hpo.types import HpoFloat, HpoInt
+from sklearn.base import ClassifierMixin
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 
 
-def model_cfg(hp: HP):
-    family = hp.select(
-        ["linear", "forest"],
-        name="family",
-        default="forest",
-        options_only=True,
+def logistic_config(hp: HP) -> LogisticRegression:
+    C = hp.float(1.0, name="C", min=1e-4, max=10.0, hpo_spec=HpoFloat(scale="log"))
+    return LogisticRegression(C=C, max_iter=1000)
+
+
+def forest_config(hp: HP) -> RandomForestClassifier:
+    n_estimators = hp.int(
+        200,
+        name="n_estimators",
+        min=50,
+        max=1000,
+        hpo_spec=HpoInt(step=50),
     )
-    if family == "linear":
-        return {
-            "family": family,
-            "alpha": hp.float(
-                0.1,
-                name="alpha",
-                min=1e-4,
-                max=10.0,
-                hpo_spec=HpoFloat(scale="log"),
-            ),
-        }
-    return {
-        "family": family,
-        "n_estimators": hp.int(
-            200,
-            name="n_estimators",
-            min=50,
-            max=1000,
-            hpo_spec=HpoInt(step=50),
-        ),
-    }
+    return RandomForestClassifier(n_estimators=n_estimators, random_state=42)
+
+
+model_options = {"logistic": logistic_config, "forest": forest_config}
+
+
+def model_cfg(hp: HP) -> ClassifierMixin:
+    model_config = hp.select(model_options, name="model_family", default="forest", options_only=True)
+    return hp.nest(model_config, name="model")
 
 
 def objective(trial: optuna.Trial) -> float:
     values = suggest_values(trial, config=model_cfg)
-    cfg = instantiate(model_cfg, values=values)
-    return train_and_score(cfg)
+    model = instantiate(model_cfg, values=values)
+    return train_and_score(model)
 
 study = optuna.create_study(direction="maximize")
 study.optimize(objective, n_trials=30)

@@ -6,11 +6,13 @@ Hypster config functions are plain Python functions:
 
 {% code overflow="wrap" %}
 ```python
+from pathlib import Path
+
 from hypster import HP
 
-def config(hp: HP):
+def config(hp: HP) -> Path:
     mode = hp.select(["fast", "accurate"], name="mode", default="fast")
-    return {"mode": mode}
+    return Path("runs") / mode
 ```
 {% endcode %}
 
@@ -38,8 +40,9 @@ The same function can serve several jobs:
 {% code overflow="wrap" %}
 ```python
 from hypster import HP, explore, instantiate_with_params
+from my_app.processing import PipelineRun
 
-def pipeline_config(hp: HP):
+def pipeline_config(hp: HP) -> PipelineRun:
     stage = hp.select(["debug", "full"], name="stage", default="debug")
 
     if stage == "full":
@@ -47,7 +50,7 @@ def pipeline_config(hp: HP):
     else:
         sample_rows = hp.int(1000, name="sample_rows", min=100, max=1_000_000)
 
-    return {"stage": stage, "sample_rows": sample_rows}
+    return PipelineRun(stage=stage, sample_rows=sample_rows)
 
 explore(pipeline_config)
 
@@ -56,7 +59,8 @@ run = instantiate_with_params(
     values={"stage": "full", "sample_rows": 250_000},
 )
 
-assert run.value == {"stage": "full", "sample_rows": 250_000}
+assert run.value.stage == "full"
+assert run.value.sample_rows == 250_000
 assert run.params == {"stage": "full", "sample_rows": 250_000}
 ```
 {% endcode %}

@@ -92,7 +92,7 @@ assert run.params == {"model": "large"}
 Dictionary form is the recommended way to return:
 
 * objects or callables
-* dictionaries, lists, tuples, or dataclasses
+* dictionaries, lists, or tuples that your runtime actually consumes
 * long provider/model IDs behind short aliases
 
 {% code overflow="wrap" %}

@@ -8,18 +8,18 @@ Hypster does not define a custom serialization format. The recommended reproduci
 ```python
 import json
 from hypster import HP, explore, instantiate, instantiate_with_params
+from my_app.llms import LLMClient
 
-def config(hp: HP):
-    return {
-        "provider": hp.select(["openai", "gemini"], name="provider", default="openai", options_only=True),
-        "temperature": hp.float(0.2, name="temperature", min=0.0, max=2.0),
-    }
+def config(hp: HP) -> LLMClient:
+    provider = hp.select(["openai", "gemini"], name="provider", default="openai", options_only=True)
+    temperature = hp.float(0.2, name="temperature", min=0.0, max=2.0)
+    return LLMClient(provider=provider, temperature=temperature)
 
 run = instantiate_with_params(config, values={"provider": "gemini"})
 payload = json.dumps(run.params, sort_keys=True)
 restored = json.loads(payload)
 
-assert instantiate(config, values=restored) == run.value
+assert instantiate(config, values=restored).provider == run.value.provider
 ```
 {% endcode %}
 
@@ -29,19 +29,20 @@ Use dict-backed `select` so the serialized params contain simple keys:
 
 {% code overflow="wrap" %}
 ```python
+from my_app.models import LargeMLP, SmallMLP
+
+model_options = {
+    "small": SmallMLP,
+    "large": LargeMLP,
+}
+
 def model_config(hp: HP):
-    return hp.select(
-        {
-            "small": {"layers": 2, "units": [64, 32]},
-            "large": {"layers": 4, "units": [256, 128]},
-        },
-        name="model",
-        default="small",
-    )
+    model_cls = hp.select(model_options, name="model", default="small", options_only=True)
+    return model_cls()
 ```
 {% endcode %}
 
-`instantiate_with_params(model_config, values={"model": "large"}).params` records `{"model": "large"}`, not the mapped dictionary.
+`instantiate_with_params(model_config, values={"model": "large"}).params` records `{"model": "large"}`, not the mapped class.
 
 ## Schema Serialization
 
@@ -90,8 +91,12 @@ The versioned artifact still protects you when defaults change, because replay u
 
 {% code overflow="wrap" %}
 ```python
-def training_config(hp: HP):
-    return {"batch_size": hp.int(64, name="batch_size")}
+import json
+import hypster
+from hypster import HP, instantiate, instantiate_with_params
+
+def training_config(hp: HP) -> int:
+    return hp.int(64, name="batch_size")
 
 
 old_run = instantiate_with_params(training_config)
@@ -108,10 +113,10 @@ payload = json.dumps(artifact, sort_keys=True)
 restored = json.loads(payload)
 
 
-def training_config(hp: HP):
-    return {"batch_size": hp.int(128, name="batch_size")}
+def training_config(hp: HP) -> int:
+    return hp.int(128, name="batch_size")
 
 
-assert instantiate(training_config, values=restored["params"]) == {"batch_size": 64}
+assert instantiate(training_config, values=restored["params"]) == 64
 ```
 {% endcode %}

@@ -26,47 +26,49 @@ The `viz` extra installs the widget runtime needed by Jupyter Notebook, JupyterL
 
 {% code overflow="wrap" %}
 ```python
-from dataclasses import dataclass
-
 from hypster import HP, interact
+from my_app.llms import AnthropicClient, OpenAIClient
 
 
-@dataclass(frozen=True)
-class ModelSettings:
-    provider: str
-    model: str
-    temperature: float
-    cache: bool
+def openai_config(hp: HP) -> OpenAIClient:
+    model_name = hp.select(
+        ["gpt-5-mini", "gpt-5"],
+        name="model_name",
+        default="gpt-5-mini",
+        options_only=True,
+    )
+    temperature = hp.float(0.2, name="temperature", min=0.0, max=1.0)
+    cache = hp.bool(True, name="cache")
+    return OpenAIClient(model=model_name, temperature=temperature, cache=cache)
 
 
-def model_config(hp: HP) -> ModelSettings:
-    provider = hp.select(
-        ["openai", "anthropic"],
+def anthropic_config(hp: HP) -> AnthropicClient:
+    model_name = hp.select(
+        ["claude-sonnet", "claude-opus"],
+        name="model_name",
+        default="claude-sonnet",
+        options_only=True,
+    )
+    temperature = hp.float(0.2, name="temperature", min=0.0, max=1.0)
+    cache = hp.bool(True, name="cache")
+    return AnthropicClient(model=model_name, temperature=temperature, cache=cache)
+
+
+model_options = {
+    "openai": openai_config,
+    "anthropic": anthropic_config,
+}
+
+
+def model_config(hp: HP):
+    selected_config = hp.select(
+        model_options,
         name="provider",
         default="openai",
+        options_only=True,
         description="Chooses which provider branch is active.",
     )
-    if provider == "anthropic":
-        model = hp.select(
-            ["claude-sonnet-4-6", "claude-opus-4-7"],
-            name="model",
-            default="claude-sonnet-4-6",
-            options_only=True,
-        )
-    else:
-        model = hp.select(
-            ["gpt-5.4-mini", "gpt-5.5"],
-            name="model",
-            default="gpt-5.4-mini",
-            options_only=True,
-        )
-
-    return ModelSettings(
-        provider=provider,
-        model=model,
-        temperature=hp.float(0.2, name="temperature", min=0.0, max=1.0),
-        cache=hp.bool(True, name="cache"),
-    )
+    return hp.nest(selected_config, name="model")
 
 
 result = interact(model_config)
@@ -77,12 +79,12 @@ result = interact(model_config)
 
 {% code overflow="wrap" %}
 ```python
-settings = result.value
+client = result.value
 params = result.params
 ```
 {% endcode %}
 
-`result.value` has the same type as the config function return value. In this example it is a `ModelSettings` instance.
+`result.value` has the same type as the config function return value. In this example it is an initialized `OpenAIClient` or `AnthropicClient`.
 
 `result.params` is a flat dotted-path dictionary that can be replayed through `instantiate(..., values=result.params)` or logged to experiment-tracking tools.
 
