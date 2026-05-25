@@ -13,10 +13,14 @@ Hamilton and Hypster can be used together by keeping graph construction and para
 from hypster import HP, instantiate_with_params
 
 def hamilton_run_config(hp: HP):
+    dataset = hp.select(["sample", "warehouse"], name="dataset", default="sample", options_only=True)
+    feature_set = hp.select(["basic", "extended"], name="feature_set", default="basic", options_only=True)
+    model_family = hp.select(["linear", "forest"], name="model_family", default="linear", options_only=True)
+
     return {
-        "dataset": hp.select(["sample", "warehouse"], name="dataset", default="sample", options_only=True),
-        "feature_set": hp.select(["basic", "extended"], name="feature_set", default="basic", options_only=True),
-        "model_family": hp.select(["linear", "forest"], name="model_family", default="linear", options_only=True),
+        "dataset": dataset,
+        "feature_set": feature_set,
+        "model_family": model_family,
     }
 
 run = instantiate_with_params(

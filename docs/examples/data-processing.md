@@ -11,31 +11,45 @@ from my_app.data import Cleaner, CsvReader, DataPipeline
 from my_app.exporters import CsvExporter, JsonLinesExporter, ParquetExporter
 
 def input_config(hp: HP) -> CsvReader:
+    path = hp.text("data/raw/events.csv", name="path")
+    delimiter = hp.select([",", "\t", "|"], name="delimiter", default=",", options_only=True)
+    encoding = hp.select(["utf-8", "latin-1"], name="encoding", default="utf-8", options_only=True)
+
     return CsvReader(
-        path=hp.text("data/raw/events.csv", name="path"),
-        delimiter=hp.select([",", "\t", "|"], name="delimiter", default=",", options_only=True),
-        encoding=hp.select(["utf-8", "latin-1"], name="encoding", default="utf-8", options_only=True),
+        path=path,
+        delimiter=delimiter,
+        encoding=encoding,
     )
 
 def cleaning_config(hp: HP) -> Cleaner:
+    drop_empty_rows = hp.bool(True, name="drop_empty_rows")
+    normalize_columns = hp.bool(True, name="normalize_columns")
+    fill_missing_numeric = hp.float(None, name="fill_missing_numeric", allow_none=True)
+    date_columns = hp.multi_text(["created_at"], name="date_columns")
+
     return Cleaner(
-        drop_empty_rows=hp.bool(True, name="drop_empty_rows"),
-        normalize_columns=hp.bool(True, name="normalize_columns"),
-        fill_missing_numeric=hp.float(None, name="fill_missing_numeric", allow_none=True),
-        date_columns=hp.multi_text(["created_at"], name="date_columns"),
+        drop_empty_rows=drop_empty_rows,
+        normalize_columns=normalize_columns,
+        fill_missing_numeric=fill_missing_numeric,
+        date_columns=date_columns,
     )
 
 def parquet_export_config(hp: HP) -> ParquetExporter:
-    return ParquetExporter(path=hp.text("data/processed/events.parquet", name="path"))
+    path = hp.text("data/processed/events.parquet", name="path")
+    return ParquetExporter(path=path)
 
 def csv_export_config(hp: HP) -> CsvExporter:
+    path = hp.text("data/processed/events.csv", name="path")
+    include_header = hp.bool(True, name="include_header")
+
     return CsvExporter(
-        path=hp.text("data/processed/events.csv", name="path"),
-        include_header=hp.bool(True, name="include_header"),
+        path=path,
+        include_header=include_header,
     )
 
 def jsonl_export_config(hp: HP) -> JsonLinesExporter:
-    return JsonLinesExporter(path=hp.text("data/processed/events.jsonl", name="path"))
+    path = hp.text("data/processed/events.jsonl", name="path")
+    return JsonLinesExporter(path=path)
 
 export_options = {
     "parquet": parquet_export_config,
@@ -55,12 +69,16 @@ def data_pipeline_config(hp: HP) -> DataPipeline:
     else:
         row_limit = hp.int(10_000, name="row_limit", min=1)
 
+    reader = hp.nest(input_config, name="input")
+    cleaner = hp.nest(cleaning_config, name="cleaning")
+    exporter = hp.nest(export_config, name="export")
+
     return DataPipeline(
         mode=mode,
         row_limit=row_limit,
-        reader=hp.nest(input_config, name="input"),
-        cleaner=hp.nest(cleaning_config, name="cleaning"),
-        exporter=hp.nest(export_config, name="export"),
+        reader=reader,
+        cleaner=cleaner,
+        exporter=exporter,
     )
 ```
 {% endcode %}

@@ -45,8 +45,6 @@
 
 ## Installation
 
-You can install Hypster using uv:
-
 ```bash
 uv add hypster
 # optional notebook visualization UI
@@ -55,73 +53,47 @@ uv add 'hypster[viz]'
 uv add 'hypster[optuna]'
 ```
 
-Or using pip:
-
-```bash
-pip install hypster
-# optional notebook visualization UI
-pip install 'hypster[viz]'
-# optional HPO backend
-pip install 'hypster[optuna]'
-```
+See the [installation guide](https://gilad-rubin.gitbook.io/hypster/getting-started/installation) for pip, optional extras, and development setup.
 
 ## Quick Start
 
 Define a configuration function and instantiate it with overrides:
 
 ```python
-from hypster import HP, explore, instantiate_with_params
-from my_app.llms import GeminiClient, OpenAIClient
+from hypster import HP, explore, instantiate
+from my_app.llms import LLMClient
 
 
-def openai_config(hp: HP) -> OpenAIClient:
-    model = hp.select(["gpt-5", "gpt-5-mini"], name="model", default="gpt-5-mini", options_only=True)
+def llm_config(hp: HP) -> LLMClient:
+    model_name = hp.select(["gpt-5.5", "gpt-5.5-mini"], name="model_name")
     temperature = hp.float(0.7, name="temperature", min=0.0, max=1.0)
     max_tokens = hp.int(256, name="max_tokens", min=1, max=4096)
-    return OpenAIClient(model=model, temperature=temperature, max_tokens=max_tokens)
 
-
-def gemini_config(hp: HP) -> GeminiClient:
-    model = hp.select(
-        ["gemini-3.5-flash", "gemini-3.1-pro"],
-        name="model",
-        default="gemini-3.5-flash",
-        options_only=True,
+    return LLMClient(
+        model_name=model_name,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
-    temperature = hp.float(0.3, name="temperature", min=0.0, max=1.0)
-    return GeminiClient(model=model, temperature=temperature)
-
-
-llm_options = {
-    "openai": openai_config,
-    "gemini": gemini_config,
-}
-
-# Use a named options dict for swappable components. The params log the
-# simple key, while the config receives the selected child config function.
-
-def llm_config(hp: HP):
-    selected_config = hp.select(llm_options, name="provider", default="openai", options_only=True)
-    return hp.nest(selected_config, name="llm")
 
 explore(llm_config)
 # llm_config
-# ├── provider: select = "openai"  (options: ["openai", "gemini"])
-# └── llm
-#     ├── model: select = "gpt-5-mini"  (options: ["gpt-5", "gpt-5-mini"])
-#     ├── temperature: float = 0.7  (0.0-1.0)
-#     └── max_tokens: int = 256  (1-4096)
+# ├── model_name: select = "gpt-5.5"  (options: ["gpt-5.5", "gpt-5.5-mini"])
+# ├── temperature: float = 0.7  (0.0-1.0)
+# └── max_tokens: int = 256  (1-4096)
 
-run = instantiate_with_params(
+llm = instantiate(
     llm_config,
-    values={"provider": "gemini", "llm.temperature": 0.1},
+    values={"model_name": "gpt-5.5", "temperature": 0.2},
 )
 
-response = run.value.invoke("How's your day going?")
-assert run.params["provider"] == "gemini"
+response = llm.invoke("How's your day going?")
 ```
 
 Use `explore(..., values=...)` to inspect a specific conditional branch before you instantiate it, or `explore(..., return_info=True)` to get a JSON-serializable schema object.
+
+## AI-readable docs
+
+GitBook publishes an agent-friendly docs index at [llms.txt](https://gilad-rubin.gitbook.io/hypster/llms.txt) and a full Markdown export at [llms-full.txt](https://gilad-rubin.gitbook.io/hypster/llms-full.txt).
 
 ## HPO with Optuna
 

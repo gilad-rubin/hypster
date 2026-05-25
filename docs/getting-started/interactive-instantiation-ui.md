@@ -32,9 +32,9 @@ from my_app.llms import AnthropicClient, OpenAIClient
 
 def openai_config(hp: HP) -> OpenAIClient:
     model_name = hp.select(
-        ["gpt-5-mini", "gpt-5"],
+        ["gpt-5.5-mini", "gpt-5.5"],
         name="model_name",
-        default="gpt-5-mini",
+        default="gpt-5.5-mini",
         options_only=True,
     )
     temperature = hp.float(0.2, name="temperature", min=0.0, max=1.0)

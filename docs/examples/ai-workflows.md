@@ -11,9 +11,9 @@ from my_app.llms import GeminiClient, OpenAIClient
 
 def openai_config(hp: HP) -> OpenAIClient:
     model_name = hp.select(
-        ["gpt-5.4-mini", "gpt-5.5"],
+        ["gpt-5.5-mini", "gpt-5.5"],
         name="model_name",
-        default="gpt-5.4-mini",
+        default="gpt-5.5-mini",
         options_only=True,
     )
     temperature = hp.float(0.2, name="temperature", min=0.0, max=2.0)
@@ -115,11 +115,14 @@ from my_app.workflows import QAWorkflow
 
 def qa_workflow_config(hp: HP) -> QAWorkflow:
     selected_provider = hp.select(provider_options, name="provider", default="openai", options_only=True)
+    llm = hp.nest(selected_provider, name="llm")
+    retriever = hp.nest(retrieval_config, name="retrieval")
+    output = hp.nest(output_config, name="output")
 
     return QAWorkflow(
-        llm=hp.nest(selected_provider, name="llm"),
-        retriever=hp.nest(retrieval_config, name="retrieval"),
-        output=hp.nest(output_config, name="output"),
+        llm=llm,
+        retriever=retriever,
+        output=output,
     )
 ```
 {% endcode %}

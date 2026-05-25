@@ -19,7 +19,7 @@ from hypster import HP, instantiate
 
 def llm_config(hp: HP):
     return {
-        "model_name": hp.text("gpt-5.4-mini", name="model_name"),
+        "model_name": hp.text("gpt-5.5-mini", name="model_name"),
         "system_prompt": hp.text("Answer concisely.", name="system_prompt"),
     }
 

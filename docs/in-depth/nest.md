@@ -116,10 +116,12 @@ You can choose which child config to run:
 from my_app.backends import AppRuntime, LocalBackend, RemoteBackend
 
 def local_config(hp: HP) -> LocalBackend:
-    return LocalBackend(threads=hp.int(4, name="threads", min=1))
+    threads = hp.int(4, name="threads", min=1)
+    return LocalBackend(threads=threads)
 
 def remote_config(hp: HP) -> RemoteBackend:
-    return RemoteBackend(endpoint=hp.text("https://api.example.com", name="endpoint"))
+    endpoint = hp.text("https://api.example.com", name="endpoint")
+    return RemoteBackend(endpoint=endpoint)
 
 backend_options = {"local": local_config, "remote": remote_config}
 

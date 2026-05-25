@@ -9,7 +9,7 @@ Haystack pipelines often have swappable retrievers, rankers, prompts, and genera
 from hypster import HP, instantiate_with_params
 
 def retrieval_config(hp: HP):
-    return hp.select(
+    retrieval = hp.select(
         {
             "keyword": {"type": "bm25", "index": "docs"},
             "vector": {"type": "embedding", "index": "docs-embeddings"},
@@ -19,13 +19,24 @@ def retrieval_config(hp: HP):
         default="hybrid",
         options_only=True,
     )
+    return retrieval
 
 def haystack_pipeline_config(hp: HP):
+    retrieval = hp.nest(retrieval_config, name="retrieval")
+    top_k = hp.int(8, name="top_k", min=1, max=50)
+    rerank = hp.bool(True, name="rerank")
+    answer_style = hp.select(
+        ["brief", "sourced"],
+        name="answer_style",
+        default="sourced",
+        options_only=True,
+    )
+
     return {
-        "retrieval": hp.nest(retrieval_config, name="retrieval"),
-        "top_k": hp.int(8, name="top_k", min=1, max=50),
-        "rerank": hp.bool(True, name="rerank"),
-        "answer_style": hp.select(["brief", "sourced"], name="answer_style", default="sourced", options_only=True),
+        "retrieval": retrieval,
+        "top_k": top_k,
+        "rerank": rerank,
+        "answer_style": answer_style,
     }
 
 run = instantiate_with_params(

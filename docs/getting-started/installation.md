@@ -84,7 +84,7 @@ from hypster import HP, explore, instantiate
 
 def config(hp: HP) -> Path:
     data_dir = hp.text("data", name="data_dir")
-    split = hp.select(["train", "validation"], name="split", default="train", options_only=True)
+    split = hp.select(["train", "validation"], name="split")
     return Path(data_dir) / f"{split}.csv"
 
 

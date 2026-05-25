@@ -42,32 +42,6 @@ layout:
 uv add hypster
 ```
 {% endcode %}
-
-Or using pip:
-
-{% code overflow="wrap" %}
-```bash
-pip install hypster
-```
-{% endcode %}
-
-{% code overflow="wrap" %}
-```bash
-# optional notebook visualization UI
-uv add 'hypster[viz]'
-# optional HPO backend
-uv add 'hypster[optuna]'
-```
-{% endcode %}
-
-{% code overflow="wrap" %}
-```bash
-# optional notebook visualization UI
-pip install 'hypster[viz]'
-# optional HPO backend
-pip install 'hypster[optuna]'
-```
-{% endcode %}
 {% endstep %}
 
 {% step %}
@@ -80,13 +54,9 @@ from my_app.llms import LLMClient
 
 
 def llm_config(hp: HP) -> LLMClient:
-    model_name = hp.select(
-        ["gpt-5", "claude-sonnet-4-6", "gemini-3.5-flash"],
-        name="model_name",
-        default="gpt-5",
-        options_only=True,
-    )
+    model_name = hp.select(["gpt-5.5", "gpt-5.5-mini"], name="model_name")
     temperature = hp.float(0.0, name="temperature", min=0.0, max=1.0)
+
     return LLMClient(model_name=model_name, temperature=temperature)
 ```
 {% endcode %}
@@ -111,7 +81,7 @@ explore(llm_config)
 ```python
 from hypster import instantiate
 
-llm = instantiate(llm_config, values={"model_name": "gpt-5", "temperature": 0.7})
+llm = instantiate(llm_config, values={"model_name": "gpt-5.5", "temperature": 0.7})
 ```
 {% endcode %}
 {% endstep %}
@@ -163,3 +133,7 @@ Because exploration and interactive controls execute the config function to disc
 * [Introducing Hypster](https://medium.com/@giladrubin/introducing-hypster-a-pythonic-framework-for-managing-configurations-to-build-highly-optimized-ai-5ee004dbd6a5)
 * [Implementing Modular RAG With Haystack & Hypster](https://towardsdatascience.com/implementing-modular-rag-with-haystack-and-hypster-d2f0ecc88b8f)
 * [5 Pillars for Hyper-Optimized AI Workflows](https://medium.com/@giladrubin/5-pillars-for-a-hyper-optimized-ai-workflow-21fcaefe48ca)
+
+## AI-Readable Docs
+
+GitBook publishes Hypster's docs as an agent-friendly index at [llms.txt](https://gilad-rubin.gitbook.io/hypster/llms.txt) and as a full Markdown export at [llms-full.txt](https://gilad-rubin.gitbook.io/hypster/llms-full.txt).

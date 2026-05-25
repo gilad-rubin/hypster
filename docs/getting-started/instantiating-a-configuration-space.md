@@ -40,14 +40,14 @@ from hypster import HP, instantiate, instantiate_with_params
 from my_app.llms import OpenAIClient
 
 def llm_config(hp: HP) -> OpenAIClient:
-    model_name = hp.select(["gpt-5-mini", "gpt-5"], name="model_name", default="gpt-5-mini", options_only=True)
+    model_name = hp.select(["gpt-5.5-mini", "gpt-5.5"], name="model_name")
     temperature = hp.float(0.2, name="temperature", min=0.0, max=2.0)
     return OpenAIClient(model=model_name, temperature=temperature)
 
-run = instantiate_with_params(llm_config, values={"model_name": "gpt-5"})
+run = instantiate_with_params(llm_config, values={"model_name": "gpt-5.5"})
 
-assert run.value.model == "gpt-5"
-assert run.params == {"model_name": "gpt-5", "temperature": 0.2}
+assert run.value.model == "gpt-5.5"
+assert run.params == {"model_name": "gpt-5.5", "temperature": 0.2}
 
 replayed = instantiate(llm_config, values=run.params)
 assert replayed.model == run.value.model

@@ -27,11 +27,15 @@ from hypster import HP
 from my_app.llms import LLMClient
 
 def llm_config(hp: HP) -> LLMClient:
-    provider = hp.select(["openai", "gemini"], name="provider", default="openai", options_only=True)
+    model_name = hp.select(["gpt-5.5", "gpt-5.5-mini"], name="model_name")
     temperature = hp.float(0.2, name="temperature", min=0.0, max=2.0)
     max_tokens = hp.int(1024, name="max_tokens", min=1, max=16_384)
 
-    return LLMClient(provider=provider, temperature=temperature, max_tokens=max_tokens)
+    return LLMClient(
+        model_name=model_name,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
 ```
 {% endcode %}
 
