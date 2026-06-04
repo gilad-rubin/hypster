@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import importlib.util
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, Mapping, Optional, Tuple, TypeVar
+from typing import Any, Dict, Generic, Mapping, Optional, TypeVar
 
-from hypster.core import ConfigFunc, UnknownPolicy, instantiate_with_params
+from hypster.core import (
+    ConfigFunc,
+    UnknownPolicy,
+    _reject_removed_execution_argument_containers,
+    instantiate_with_params,
+)
 from hypster.explore import ConfigSchema, ParameterInfo, explore
 from hypster.utils import normalize_values
 
@@ -64,13 +69,13 @@ class InteractiveError:
 class InteractiveSession(Generic[T]):
     func: ConfigFunc[T]
     values: Optional[Mapping[str, Any]] = None
-    args: Tuple[Any, ...] = ()
-    kwargs: Optional[Dict[str, Any]] = None
+    execution_kwargs: Optional[Dict[str, Any]] = None
     on_unknown: UnknownPolicy = "raise"
     auto_apply: bool = True
 
     def __post_init__(self) -> None:
-        self._kwargs = dict(self.kwargs or {})
+        self._kwargs = dict(self.execution_kwargs or {})
+        _reject_removed_execution_argument_containers(self._kwargs)
         self._draft_values: Dict[str, Any] = {}
         self._applied_values: Dict[str, Any] = {}
         self._params: Dict[str, Any] = {}
@@ -233,22 +238,20 @@ class InteractiveSession(Generic[T]):
         schema = explore(
             self.func,
             values=values,
-            args=self.args,
-            kwargs=self._kwargs,
             on_unknown=self.on_unknown,
-            return_info=True,
+            return_schema=True,
+            **self._kwargs,
         )
         if schema is None:
-            raise RuntimeError("explore(..., return_info=True) did not return a schema")
+            raise RuntimeError("explore(..., return_schema=True) did not return a schema")
         return schema
 
     def _apply(self, schema: ConfigSchema, selected_values: Dict[str, Any]) -> None:
         output = instantiate_with_params(
             self.func,
             values=selected_values,
-            args=self.args,
-            kwargs=self._kwargs,
             on_unknown=self.on_unknown,
+            **self._kwargs,
         )
 
         self._schema = schema
@@ -303,17 +306,15 @@ def interact(
     func: ConfigFunc[T],
     *,
     values: Optional[Mapping[str, Any]] = None,
-    args: Tuple[Any, ...] = (),
-    kwargs: Optional[Dict[str, Any]] = None,
     on_unknown: UnknownPolicy = "raise",
     auto_apply: bool = True,
+    **kwargs: Any,
 ) -> InteractiveResult[T]:
     _ensure_viz_extra()
     session: InteractiveSession[T] = InteractiveSession(
         func=func,
         values=values,
-        args=args,
-        kwargs=kwargs,
+        execution_kwargs=kwargs,
         on_unknown=on_unknown,
         auto_apply=auto_apply,
     )

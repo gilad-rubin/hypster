@@ -36,6 +36,17 @@ def test_instantiate_with_params_returns_value_and_replayable_selected_params() 
     assert instantiate(config, values=output.params) == output.value
 
 
+def test_instantiate_with_params_forwards_execution_kwargs_without_recording_them() -> None:
+    def config(hp: HP, multiplier: int) -> Dict[str, int]:
+        base = hp.int(10, name="base")
+        return {"result": base * multiplier}
+
+    output = instantiate_with_params(config, multiplier=4)
+
+    assert output.value == {"result": 40}
+    assert output.params == {"base": 10}
+
+
 def test_instantiate_with_params_validates_on_unknown_before_execution() -> None:
     calls = []
 
@@ -44,6 +55,6 @@ def test_instantiate_with_params_validates_on_unknown_before_execution() -> None
         return {"x": hp.int(1, name="x")}
 
     with pytest.raises(ValueError, match="on_unknown must be one of"):
-        instantiate_with_params(config, on_unknown="silent")  # type: ignore[arg-type]
+        instantiate_with_params(config, on_unknown="silent")
 
     assert calls == []

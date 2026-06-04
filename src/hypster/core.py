@@ -2,7 +2,7 @@
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Any, Dict, Generic, Literal, Optional, Protocol, Tuple, TypeVar
+from typing import Any, Dict, Generic, Literal, Optional, Protocol, TypeVar
 
 from .hp import HP
 from .hp_calls import HPCallError
@@ -49,13 +49,20 @@ class ParamsTracker:
         self.params[path] = selected_value
 
 
+def _reject_removed_execution_argument_containers(execution_kwargs: Dict[str, Any]) -> None:
+    if "args" in execution_kwargs or "kwargs" in execution_kwargs:
+        raise TypeError(
+            "This Hypster execution API no longer accepts args= or kwargs=. "
+            "Pass execution arguments as direct keyword arguments."
+        )
+
+
 def instantiate(
     func: ConfigFunc[T],
     *,
     values: Optional[Dict[str, Any]] = None,
-    args: Tuple[Any, ...] = (),
-    kwargs: Optional[Dict[str, Any]] = None,
     on_unknown: UnknownPolicy = "raise",
+    **kwargs: Any,
 ) -> T:
     """
     Execute a config function with the given values.
@@ -63,7 +70,6 @@ def instantiate(
     Args:
         func: Config function with first param hp: HP
         values: Parameter values by name
-        args: Additional positional arguments for func
         kwargs: Additional keyword arguments for func
         on_unknown: How to handle unknown/unreachable parameters:
             - 'raise': Raise ValueError (default)
@@ -77,7 +83,7 @@ def instantiate(
         ValueError: If func doesn't have hp: HP as first parameter
         ValueError: If unknown parameters in values and on_unknown='raise'
     """
-    return _run_config(func, values=values, args=args, kwargs=kwargs, on_unknown=on_unknown)
+    return _run_config(func, values=values, kwargs=kwargs, on_unknown=on_unknown)
 
 
 def _validate_on_unknown(on_unknown: str) -> None:
@@ -90,7 +96,6 @@ def _run_config(
     func: ConfigFunc[T],
     *,
     values: Optional[Dict[str, Any]] = None,
-    args: Tuple[Any, ...] = (),
     kwargs: Optional[Dict[str, Any]] = None,
     on_unknown: UnknownPolicy = "raise",
     parameter_tracker: Optional[Any] = None,
@@ -101,11 +106,12 @@ def _run_config(
 
     normalized_values = normalize_values(values)
     kwargs = kwargs or {}
+    _reject_removed_execution_argument_containers(kwargs)
     hp = HP(normalized_values, parameter_tracker=parameter_tracker)
     original_called_params = hp.called_params.copy()
 
     try:
-        result = func(hp, *args, **kwargs)
+        result = func(hp, **kwargs)
         called_params = hp.called_params - original_called_params
         leaf_params = called_params - hp.nested_scope_paths
         _handle_unknown_parameters(normalized_values, leaf_params, on_unknown)
@@ -159,9 +165,8 @@ def instantiate_with_params(
     func: ConfigFunc[T],
     *,
     values: Optional[Dict[str, Any]] = None,
-    args: Tuple[Any, ...] = (),
-    kwargs: Optional[Dict[str, Any]] = None,
     on_unknown: UnknownPolicy = "raise",
+    **kwargs: Any,
 ) -> InstantiationOutput[T]:
     """
     Execute a config function and return its value with selected params.
@@ -172,7 +177,6 @@ def instantiate_with_params(
     result = _run_config(
         func,
         values=values,
-        args=args,
         kwargs=kwargs,
         on_unknown=on_unknown,
         parameter_tracker=tracker,

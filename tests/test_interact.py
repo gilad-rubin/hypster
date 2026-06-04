@@ -44,6 +44,17 @@ def test_interact_returns_live_result_matching_instantiate_with_params() -> None
     assert result.params == expected.params
 
 
+def test_interact_forwards_execution_kwargs_to_exploration_and_instantiation() -> None:
+    def config(hp: HP, multiplier: int) -> Dict[str, int]:
+        base = hp.int(2, name="base")
+        return {"result": base * multiplier}
+
+    result = interact(config, multiplier=5)
+
+    assert result.value == {"result": 10}
+    assert result.params == {"base": 2}
+
+
 def test_interact_action_updates_value_and_params() -> None:
     def openai(hp: HP) -> Dict[str, Any]:
         return {

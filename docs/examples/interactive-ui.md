@@ -2,7 +2,7 @@
 
 Hypster ships a notebook UI through `interact()`. This example shows the lower-level schema path for custom Streamlit, Gradio, Panel, web app, or internal dashboard UIs.
 
-The public schema hook is `explore(config, return_info=True)`: it returns metadata that you can map to controls and then replay through `instantiate()`.
+The public schema hook is `explore(config, return_schema=True)`: it returns metadata that you can map to controls and then replay through `instantiate()`.
 
 ## Turn A Config Into Field Metadata
 
@@ -34,7 +34,7 @@ def flatten_parameters(parameters):
             fields.append(parameter)
     return fields
 
-schema = explore(app_config, return_info=True)
+schema = explore(app_config, return_schema=True)
 fields = flatten_parameters(schema.to_dict()["parameters"])
 
 for field in fields:
@@ -55,7 +55,7 @@ ui_values = {
     "timeout": 30.0,
 }
 
-schema = explore(app_config, values=ui_values, return_info=True)
+schema = explore(app_config, values=ui_values, return_schema=True)
 cfg = instantiate(app_config, values=ui_values)
 
 assert schema.defaults()["provider"] == "local"
@@ -103,4 +103,4 @@ def render_field(st, field):
 ```
 {% endcode %}
 
-For conditional UIs, rerun `explore(config, values=current_ui_values, return_info=True)` whenever a branch-selecting value changes. That keeps the rendered fields aligned with the active branch.
+For conditional UIs, rerun `explore(config, values=current_ui_values, return_schema=True)` whenever a branch-selecting value changes. That keeps the rendered fields aligned with the active branch.

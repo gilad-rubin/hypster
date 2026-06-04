@@ -80,7 +80,7 @@ def train_and_score(model: ClassifierMixin) -> float:
     return float(scores.mean())
 
 def objective(trial: optuna.Trial) -> float:
-    values = suggest_values(trial, config=model_config)
+    values = suggest_values(trial, model_config)
     run = instantiate_with_params(model_config, values=values)
     trial.set_user_attr("hypster_params", run.params)
     return train_and_score(run.value)
@@ -112,7 +112,7 @@ def forest_only_config(hp: HP) -> RandomForestClassifier:
     )
 
 def objective(trial: optuna.Trial) -> float:
-    values = suggest_values(trial, config=forest_only_config)
+    values = suggest_values(trial, forest_only_config)
     run = instantiate_with_params(forest_only_config, values=values)
     return train_and_score(run.value)
 ```

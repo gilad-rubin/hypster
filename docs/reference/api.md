@@ -27,7 +27,7 @@ The `hp: HP` annotation is recommended but not mandatory. If the first parameter
 
 Reference examples use small return values for compactness. In application docs and production code, the usual pattern is to return the initialized object your application will use.
 
-Config functions may accept extra positional or keyword arguments. Pass those through `args=` and `kwargs=`.
+Config functions may accept extra keyword-only execution arguments. Pass those directly; Hypster-owned names such as `values`, `on_unknown`, `return_schema`, `auto_apply`, `name`, and `description` are reserved at their API boundaries.
 
 ## instantiate
 
@@ -37,9 +37,8 @@ instantiate(
     func,
     *,
     values=None,
-    args=(),
-    kwargs=None,
     on_unknown="raise",
+    **kwargs,
 )
 ```
 {% endcode %}
@@ -50,9 +49,8 @@ Executes a config function and returns whatever the function returns.
 | --- | --- |
 | `func` | Config function whose first argument is `hp`. |
 | `values` | Optional dictionary of parameter paths to overrides. Nested dictionaries are flattened to dotted paths. |
-| `args` | Extra positional arguments passed to `func`. |
-| `kwargs` | Extra keyword arguments passed to `func`. |
 | `on_unknown` | One of `"raise"`, `"warn"`, or `"ignore"`. Defaults to `"raise"`. |
+| `**kwargs` | Extra execution arguments forwarded to `func`. |
 
 `values=` keys must match parameters reached during the run. Unknown values and inactive-branch values raise by default.
 
@@ -64,9 +62,8 @@ instantiate_with_params(
     func,
     *,
     values=None,
-    args=(),
-    kwargs=None,
     on_unknown="raise",
+    **kwargs,
 )
 ```
 {% endcode %}
@@ -110,22 +107,21 @@ explore(
     func,
     *,
     values=None,
-    args=(),
-    kwargs=None,
     on_unknown="raise",
-    return_info=False,
+    return_schema=False,
+    **kwargs,
 )
 ```
 {% endcode %}
 
 Traces a config function with a schema-recording `HP`. This executes the function to discover the active branch.
 
-* With `return_info=False`, prints a tree and returns `None`.
-* With `return_info=True`, returns a `ConfigSchema`.
+* With `return_schema=False`, prints a tree and returns `None`.
+* With `return_schema=True`, returns a `ConfigSchema`.
 
 {% code overflow="wrap" %}
 ```python
-schema = explore(config, return_info=True)
+schema = explore(config, return_schema=True)
 print(schema.defaults())
 print(schema.to_dict())
 ```
@@ -133,7 +129,7 @@ print(schema.to_dict())
 
 ## ConfigSchema
 
-Returned by `explore(..., return_info=True)`.
+Returned by `explore(..., return_schema=True)`.
 
 | Method | Meaning |
 | --- | --- |
@@ -149,10 +145,9 @@ interact(
     func,
     *,
     values=None,
-    args=(),
-    kwargs=None,
     on_unknown="raise",
     auto_apply=True,
+    **kwargs,
 ) -> InteractiveResult
 ```
 {% endcode %}
@@ -179,9 +174,9 @@ current_params = result.params
 | --- | --- |
 | `func` | Config function whose first argument is `hp`. |
 | `values` | Optional starting values, using the same flat or nested path forms as `instantiate()`. |
-| `args` / `kwargs` | Extra arguments forwarded to the config function. |
 | `on_unknown` | Unknown-value policy used while exploring and applying widget state. |
 | `auto_apply` | When `True`, valid widget edits update `.value` and `.params` immediately. When `False`, edits stay draft-only until Apply succeeds. |
+| `**kwargs` | Extra execution arguments forwarded to the config function. |
 
 ## InteractiveResult
 
@@ -229,7 +224,7 @@ Each schema parameter contains:
 
 `ConfigSchema.to_dict()` is intended for rendering and inspection, not as a complete validation schema. It exposes the active branch, selected values, options, numeric bounds, descriptions, and nested groups. It does not currently expose every HP call option, such as `allow_none`, `options_only`, or `strict`.
 
-UI builders should use schema metadata to render controls, then round-trip user input through `explore(..., values=..., return_info=True)` and `instantiate(..., values=...)` for authoritative validation. For dict-backed selects, `options` contains replayable keys, not mapped runtime objects.
+UI builders should use schema metadata to render controls, then round-trip user input through `explore(..., values=..., return_schema=True)` and `instantiate(..., values=...)` for authoritative validation. For dict-backed selects, `options` contains replayable keys, not mapped runtime objects.
 
 ## HP Scalar Methods
 
@@ -314,9 +309,8 @@ hp.nest(
     *,
     name,
     values=None,
-    args=(),
-    kwargs=None,
     description=None,
+    **kwargs,
 )
 ```
 {% endcode %}

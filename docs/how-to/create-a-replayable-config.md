@@ -36,7 +36,7 @@ Use structured metadata when another tool needs to render fields:
 
 {% code overflow="wrap" %}
 ```python
-schema = explore(data_config, return_info=True)
+schema = explore(data_config, return_schema=True)
 fields = schema.to_dict()["parameters"]
 ```
 {% endcode %}

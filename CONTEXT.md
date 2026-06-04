@@ -8,6 +8,10 @@ Hypster is a Python configuration context for defining parameterized config func
 A Python function that receives `hp` and returns the configured object or data for a run.
 _Avoid_: config space when referring to the executable function itself
 
+**Execution Arguments**:
+Ordinary keyword arguments forwarded into a **Configuration Function** during execution.
+_Avoid_: values, selected params
+
 **Values**:
 User-provided parameter overrides passed into a configuration function.
 _Avoid_: params, selected params
@@ -98,8 +102,11 @@ _Avoid_: exploration error, validation error
 
 ## Relationships
 
-- A **Configuration Function** can be executed with **Values**.
+- A **Configuration Function** can be executed with **Values** and **Execution Arguments**.
 - A **Configuration Function** produces one **Instantiation Value** per execution.
+- **Execution Arguments** are direct keyword arguments at Hypster execution boundaries.
+- Hypster-owned execution control names, such as `values`, are reserved and cannot be used as direct **Execution Arguments**.
+- **Execution Arguments** are not **Values** and are not included in **Selected Params**.
 - `instantiate` returns only the **Instantiation Value**; `instantiate_with_params` returns an **Instantiation Output**.
 - An **Instantiation Output** is a lightweight container with `value` and `params` attributes; `params` is a caller-owned plain dictionary copy.
 - `instantiate_with_params` accepts the same execution arguments and unknown-parameter policy as `instantiate`.

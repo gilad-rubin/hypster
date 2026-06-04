@@ -76,7 +76,7 @@ The nested scope name is a prefix, not a leaf value. `values={"tokenizer": "word
 
 When you pass child-local values through `hp.nest(child, name="child", values=...)`, Hypster validates those explicit child values after the child runs. Typos and inactive child-branch keys raise instead of being ignored.
 
-## Pass Args And Kwargs To Children
+## Pass Execution Arguments To Children
 
 {% code overflow="wrap" %}
 ```python
@@ -88,8 +88,8 @@ def sampler_config(hp: HP, default_batch_size: int) -> BatchSampler:
     return BatchSampler(batch_size=batch_size, shuffle=shuffle)
 
 def training_config(hp: HP) -> TrainingInputs:
-    train = hp.nest(sampler_config, name="train", args=(128,))
-    eval = hp.nest(sampler_config, name="eval", kwargs={"default_batch_size": 256})
+    train = hp.nest(sampler_config, name="train", default_batch_size=128)
+    eval = hp.nest(sampler_config, name="eval", default_batch_size=256)
     return TrainingInputs(train=train, eval=eval)
 ```
 {% endcode %}

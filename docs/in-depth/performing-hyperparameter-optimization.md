@@ -7,7 +7,7 @@ For the task recipe, see [Perform Hyperparameter Optimization](../how-to/perform
 ## Mental Model
 
 1. A config function calls `hp.int`, `hp.float`, and `hp.select`.
-2. `suggest_values(trial, config=...)` runs that config with a trial-backed `HP` proxy.
+2. `suggest_values(trial, ...)` runs that config with a trial-backed `HP` proxy.
 3. The proxy asks Optuna for values and returns a `values` dictionary.
 4. You pass that dictionary to `instantiate(config, values=values)`.
 5. Your objective evaluates the instantiated runtime object.

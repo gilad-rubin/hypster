@@ -49,7 +49,7 @@ Do not replay with `on_unknown="ignore"` until you have decided which old values
 
 {% code overflow="wrap" %}
 ```python
-schema = explore(config, values=past_params, return_info=True)
+schema = explore(config, values=past_params, return_schema=True)
 current_branch_defaults = schema.defaults()
 ```
 {% endcode %}

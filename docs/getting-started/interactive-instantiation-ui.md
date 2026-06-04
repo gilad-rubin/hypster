@@ -131,4 +131,4 @@ result2 = interact(model_config, values=result.params)
 ```
 {% endcode %}
 
-For framework-specific UIs outside notebooks, use the schema returned by `explore(..., return_info=True)`. See [Build an Interactive UI](../how-to/build-an-interactive-ui.md).
+For framework-specific UIs outside notebooks, use the schema returned by `explore(..., return_schema=True)`. See [Build an Interactive UI](../how-to/build-an-interactive-ui.md).

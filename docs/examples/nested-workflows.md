@@ -36,7 +36,7 @@ def trainer_config(hp: HP, epochs_default: int = 10) -> Trainer:
 
 def experiment_config(hp: HP) -> TrainingExperiment:
     dataset = hp.select(["mnist", "cifar10"], name="dataset", default="mnist", options_only=True)
-    trainer = hp.nest(trainer_config, name="trainer", kwargs={"epochs_default": 20})
+    trainer = hp.nest(trainer_config, name="trainer", epochs_default=20)
     return TrainingExperiment(dataset=dataset, trainer=trainer)
 ```
 {% endcode %}

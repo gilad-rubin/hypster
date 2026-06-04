@@ -508,9 +508,8 @@ class HP:
         *,
         name: str,
         values: Optional[Dict[str, Any]] = None,
-        args: tuple = (),
-        kwargs: Optional[Dict[str, Any]] = None,
         description: Optional[str] = None,
+        **kwargs: Any,
     ) -> Any:
         """Nest another configuration function."""
         from .utils import validate_config_func_signature
@@ -561,11 +560,12 @@ class HP:
         self.called_params.add(full_path)
         self.nested_scope_paths.add(full_path)
 
-        # Prepare arguments
-        kwargs = kwargs or {}
+        from .core import _reject_removed_execution_argument_containers
+
+        _reject_removed_execution_argument_containers(kwargs)
 
         # Call the nested function
-        result = child(nested_hp, *args, **kwargs)
+        result = child(nested_hp, **kwargs)
 
         if explicit_values:
             from .core import _handle_unknown_parameters
