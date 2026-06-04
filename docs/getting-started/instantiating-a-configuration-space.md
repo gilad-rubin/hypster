@@ -54,7 +54,7 @@ assert replayed.model == run.value.model
 ```
 {% endcode %}
 
-`instantiate_with_params()` accepts the same `values`, `args`, `kwargs`, and `on_unknown` arguments as `instantiate()`. It does not change what your config returns; it adds a sidecar for logging and replay.
+`instantiate_with_params()` accepts the same `values` and `on_unknown` arguments as `instantiate()`, plus any direct execution arguments your config requires. It does not change what your config returns; it adds a sidecar for logging and replay.
 
 ## Unknown Parameters
 
@@ -134,9 +134,9 @@ assert instantiate(config, values=run.params) == run.value
 ```
 {% endcode %}
 
-## Passing Args/Kwargs To Nested Configs
+## Passing Execution Arguments To Nested Configs
 
-When using `hp.nest`, you can pass `args=` and `kwargs=` to the child function.
+When using `hp.nest`, pass child execution arguments directly as keyword arguments.
 
 {% code overflow="wrap" %}
 ```python
@@ -145,8 +145,8 @@ def child(hp: HP, multiplier: int, offset: int = 0) -> int:
     return base * multiplier + offset
 
 def parent(hp: HP):
-    calc1 = hp.nest(child, name="calc1", args=(2,))
-    calc2 = hp.nest(child, name="calc2", args=(3,), kwargs={"offset": 10})
+    calc1 = hp.nest(child, name="calc1", multiplier=2)
+    calc2 = hp.nest(child, name="calc2", multiplier=3, offset=10)
     return {"calc1": calc1, "calc2": calc2}
 
 result = instantiate(parent)

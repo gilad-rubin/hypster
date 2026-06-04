@@ -3,9 +3,15 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional
 
-from .core import ConfigFunc, _handle_unknown_parameters, _validate_on_unknown
+from .core import (
+    ConfigFunc,
+    _handle_unknown_parameters,
+    _reject_removed_execution_argument_containers,
+    _reject_reserved_execution_arguments,
+    _validate_on_unknown,
+)
 from .hp import HP
 from .hp_calls import HPCallError
 from .utils import normalize_values, validate_config_func_signature
@@ -231,21 +237,26 @@ def explore(
     func: ConfigFunc[Any],
     *,
     values: Optional[Dict[str, Any]] = None,
-    args: Tuple[Any, ...] = (),
-    kwargs: Optional[Dict[str, Any]] = None,
     on_unknown: Literal["warn", "raise", "ignore"] = "raise",
-    return_info: bool = False,
+    return_schema: bool = False,
+    **kwargs: Any,
 ) -> Optional[ConfigSchema]:
     validate_config_func_signature(func)
     _validate_on_unknown(on_unknown)
+    _reject_removed_execution_argument_containers(kwargs)
+    _reject_reserved_execution_arguments(
+        "explore()",
+        kwargs,
+        {"return_info"},
+        "Use return_schema=True to return a ConfigSchema, or rename this execution argument.",
+    )
 
     normalized_values: Dict[str, Any] = normalize_values(values)
     tracer = SchemaTracer(normalized_values)
-    kwargs = kwargs or {}
     original_called_params = tracer.called_params.copy()
 
     try:
-        func(tracer, *args, **kwargs)
+        func(tracer, **kwargs)
     except HPCallError as e:
         raise ValueError(str(e)) from e
 
@@ -255,7 +266,7 @@ def explore(
 
     schema = tracer.build_schema(getattr(func, "__name__", func.__class__.__name__))
 
-    if return_info:
+    if return_schema:
         return schema
 
     print(schema.format_tree())

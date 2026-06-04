@@ -74,18 +74,18 @@ app_config
 
 ## Get Structured Metadata
 
-Use `return_info=True` when you want to inspect the schema in code:
+Use `return_schema=True` when you want to inspect the schema in code:
 
 {% code overflow="wrap" %}
 ```python
-info = explore(app_config, return_info=True)
+info = explore(app_config, return_schema=True)
 
 print(info.defaults())
 print(info.to_dict())
 ```
 {% endcode %}
 
-For programmatic inspection before instantiation, use `schema = explore(config, return_info=True)` and read `schema.to_dict()["parameters"]`. Use plain `explore(config)` when a printed tree is enough.
+For programmatic inspection before instantiation, use `schema = explore(config, return_schema=True)` and read `schema.to_dict()["parameters"]`. Use plain `explore(config)` when a printed tree is enough.
 
 `defaults()` returns a flat dictionary of the active branch's default parameter values:
 
@@ -104,7 +104,7 @@ For programmatic inspection before instantiation, use `schema = explore(config, 
 | Use | API |
 | --- | --- |
 | Print the active tree | `explore(config)` |
-| Build a UI or schema export | `explore(config, return_info=True)` |
+| Build a UI or schema export | `explore(config, return_schema=True)` |
 | Inspect a conditional branch | `explore(config, values={...})` |
 | Get the runtime object | `instantiate(config, values={...})` |
 

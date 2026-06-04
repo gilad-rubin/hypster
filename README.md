@@ -89,7 +89,7 @@ llm = instantiate(
 response = llm.invoke("How's your day going?")
 ```
 
-Use `explore(..., values=...)` to inspect a specific conditional branch before you instantiate it, or `explore(..., return_info=True)` to get a JSON-serializable schema object.
+Use `explore(..., values=...)` to inspect a specific conditional branch before you instantiate it, or `explore(..., return_schema=True)` to get a JSON-serializable schema object.
 
 ## AI-readable docs
 
@@ -132,7 +132,7 @@ def model_cfg(hp: HP) -> ClassifierMixin:
 
 
 def objective(trial: optuna.Trial) -> float:
-    values = suggest_values(trial, config=model_cfg)
+    values = suggest_values(trial, model_cfg)
     model = instantiate(model_cfg, values=values)
     return train_and_score(model)
 

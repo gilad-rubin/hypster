@@ -46,11 +46,11 @@ def model_config(hp: HP):
 
 ## Schema Serialization
 
-`explore(config, return_info=True).to_dict()` returns JSON-serializable schema metadata for UIs, catalogs, and validation tools.
+`explore(config, return_schema=True).to_dict()` returns JSON-serializable schema metadata for UIs, catalogs, and validation tools.
 
 {% code overflow="wrap" %}
 ```python
-schema = explore(config, return_info=True).to_dict()
+schema = explore(config, return_schema=True).to_dict()
 json.dumps(schema)
 ```
 {% endcode %}

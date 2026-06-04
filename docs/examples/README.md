@@ -19,10 +19,10 @@ def config(hp: HP) -> Path:
 The same function can serve several jobs:
 
 * `explore(config)` prints the active parameter tree.
-* `explore(config, return_info=True)` returns a schema object for tools and UIs.
+* `explore(config, return_schema=True)` returns a schema object for tools and UIs.
 * `instantiate(config, values={...})` returns the runtime object.
 * `instantiate_with_params(config, values={...})` returns the runtime object plus replayable selected params.
-* `suggest_values(trial, config=config)` lets Optuna choose values for the reachable parameters.
+* `suggest_values(trial, config)` lets Optuna choose values for the reachable parameters.
 
 ## Example Map
 
@@ -32,7 +32,7 @@ The same function can serve several jobs:
 | [Data Processing](data-processing.md) | Ingestion, cleaning, feature flags, and export options in one pipeline config. |
 | [AI Workflows](ai-workflows.md) | Provider selection, RAG knobs, prompt settings, and dict-backed complex choices. |
 | [Nested Workflows](nested-workflows.md) | Reusable child configs, conditional nesting, deep value paths, and branch exploration. |
-| [Interactive UI From Schema](interactive-ui.md) | Generate form state from `explore(..., return_info=True)` and feed it back to `instantiate`. |
+| [Interactive UI From Schema](interactive-ui.md) | Generate form state from `explore(..., return_schema=True)` and feed it back to `instantiate`. |
 | [Experiment Tracking](experiment-tracking.md) | Capture selected params for logs, cards, and replay. |
 
 ## A Small End-to-End Pattern

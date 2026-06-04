@@ -8,6 +8,10 @@ Hypster is a Python configuration context for defining parameterized config func
 A Python function that receives `hp` and returns the configured object or data for a run.
 _Avoid_: config space when referring to the executable function itself
 
+**Execution Arguments**:
+Ordinary keyword arguments forwarded into a **Configuration Function** during execution.
+_Avoid_: values, selected params
+
 **Values**:
 User-provided parameter overrides passed into a configuration function.
 _Avoid_: params, selected params
@@ -98,8 +102,11 @@ _Avoid_: exploration error, validation error
 
 ## Relationships
 
-- A **Configuration Function** can be executed with **Values**.
+- A **Configuration Function** can be executed with **Values** and **Execution Arguments**.
 - A **Configuration Function** produces one **Instantiation Value** per execution.
+- **Execution Arguments** are direct keyword arguments at Hypster execution boundaries.
+- Hypster-owned execution control names, such as `values`, are reserved and cannot be used as direct **Execution Arguments**.
+- **Execution Arguments** are not **Values** and are not included in **Selected Params**.
 - `instantiate` returns only the **Instantiation Value**; `instantiate_with_params` returns an **Instantiation Output**.
 - An **Instantiation Output** is a lightweight container with `value` and `params` attributes; `params` is a caller-owned plain dictionary copy.
 - `instantiate_with_params` accepts the same execution arguments and unknown-parameter policy as `instantiate`.
@@ -194,7 +201,7 @@ _Avoid_: exploration error, validation error
 - Show dictionary-backed `select` with logging-safe choices mapped to complex values.
 - Show `allow_none=True` examples for scalar params and select choices.
 - Document that `allow_none=True` supports `multi_select` choices but not nullable elements for `multi_int`, `multi_float`, `multi_text`, or `multi_bool`; include the error guidance.
-- Show that `instantiate_with_params` accepts the same execution arguments as `instantiate`, including `args`, `kwargs`, and `on_unknown`.
+- Show that `instantiate_with_params` accepts the same direct **Execution Arguments** and `on_unknown` policy as `instantiate`.
 - Replace the old "nested dict wins" docs with guidance that dotted and nested forms are both supported, but duplicate **Parameter Paths** fail.
 - Document that unknown/unreachable errors are based on the current execution path and that users should run `explore(config, values=...)` to inspect branches.
 

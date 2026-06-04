@@ -33,7 +33,7 @@ See [AI Workflows](../examples/ai-workflows.md).
 
 ## Internal Tools And UIs
 
-* Generate form controls from `explore(..., return_info=True)`.
+* Generate form controls from `explore(..., return_schema=True)`.
 * Submit UI state as `values=`.
 * Recompute the schema when a branch-selecting value changes.
 

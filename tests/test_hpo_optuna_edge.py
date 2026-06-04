@@ -27,7 +27,7 @@ def cfg(hp: HP):
 
 def test_include_max_reduces_high():
     t = TrialSpy()
-    values = suggest_values(t, config=cfg)
+    values = suggest_values(t, cfg)
     assert values["n"] == 0
     name, low, high, step, log = t.calls[0]
     assert (name, low, step, log) == ("n", 0, 2, False)
@@ -39,7 +39,7 @@ def test_include_max_false_keeps_largest_valid_stepped_value_below_max():
         return hp.int(0, name="n", min=0, max=10, hpo_spec=HpoInt(step=3, include_max=False))
 
     t = TrialSpy()
-    values = suggest_values(t, config=config)
+    values = suggest_values(t, config)
 
     assert values["n"] == 0
     name, low, high, step, log = t.calls[0]
@@ -51,13 +51,13 @@ def test_hpo_proxy_rejects_invalid_names_and_nullable_numeric_params():
         return hp.int(1, name="bad-name")
 
     with pytest.raises(ValueError, match="valid Python identifiers"):
-        suggest_values(TrialSpy(), config=bad_name)
+        suggest_values(TrialSpy(), bad_name)
 
     def nullable_int(hp: HP):
         return hp.int(None, name="depth", allow_none=True)
 
     with pytest.raises(ValueError, match="not supported"):
-        suggest_values(TrialSpy(), config=nullable_int)
+        suggest_values(TrialSpy(), nullable_int)
 
 
 def test_hpo_proxy_rejects_complex_select_choices_with_dict_guidance():
@@ -69,7 +69,7 @@ def test_hpo_proxy_rejects_complex_select_choices_with_dict_guidance():
         return hp.select([{"layers": 2}], name="model")
 
     with pytest.raises(ValueError, match="Use dict-backed select"):
-        suggest_values(CategoricalTrial(), config=config)
+        suggest_values(CategoricalTrial(), config)
 
 
 def test_hpo_proxy_rejects_unsupported_optuna_spec_fields_instead_of_ignoring_them():
@@ -77,7 +77,7 @@ def test_hpo_proxy_rejects_unsupported_optuna_spec_fields_instead_of_ignoring_th
         return hp.int(1, name="depth", min=1, max=16, hpo_spec=HpoInt(scale="log", base=2.0))
 
     with pytest.raises(ValueError, match="base"):
-        suggest_values(TrialSpy(), config=int_with_custom_log_base)
+        suggest_values(TrialSpy(), int_with_custom_log_base)
 
     def normal_float(hp: HP):
         return hp.float(
@@ -89,13 +89,13 @@ def test_hpo_proxy_rejects_unsupported_optuna_spec_fields_instead_of_ignoring_th
         )
 
     with pytest.raises(ValueError, match="normal"):
-        suggest_values(TrialSpy(), config=normal_float)
+        suggest_values(TrialSpy(), normal_float)
 
     def weighted_categorical(hp: HP):
         return hp.select(["a", "b"], name="choice", hpo_spec=HpoCategorical(weights=[0.9, 0.1]))
 
     with pytest.raises(ValueError, match="weights"):
-        suggest_values(TrialSpy(), config=weighted_categorical)
+        suggest_values(TrialSpy(), weighted_categorical)
 
 
 def test_hpo_nested_overrides_are_validated_like_instantiation_values():
@@ -107,7 +107,7 @@ def test_hpo_nested_overrides_are_validated_like_instantiation_values():
         )
 
     with pytest.raises(ValueError, match="exceeds maximum bound 10"):
-        suggest_values(TrialSpy(), config=config)
+        suggest_values(TrialSpy(), config)
 
 
 def test_hpo_nested_overrides_raise_for_unknown_child_parameters():
@@ -119,4 +119,4 @@ def test_hpo_nested_overrides_raise_for_unknown_child_parameters():
         )
 
     with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
-        suggest_values(TrialSpy(), config=config)
+        suggest_values(TrialSpy(), config)

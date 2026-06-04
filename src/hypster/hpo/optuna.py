@@ -9,7 +9,7 @@ except Exception:  # pragma: no cover
     _optuna = None
 
 from .._sentinels import NO_DEFAULT as _NO_DEFAULT
-from ..core import _handle_unknown_parameters
+from ..core import _handle_unknown_parameters, _reject_removed_execution_argument_containers
 from ..hp_calls import FloatValidator, IntValidator
 from ..utils import normalize_values, validate_identifier_name, validate_select_choice
 from .types import HpoCategorical, HpoFloat, HpoInt
@@ -226,8 +226,7 @@ class _HPProxy:
         *,
         name: str,
         values: Dict[str, Any] | None = None,
-        args: tuple = (),
-        kwargs: Dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> Any:
         validate_identifier_name(name, kind="nest name")
         overrides = dict(self.overrides)
@@ -239,13 +238,13 @@ class _HPProxy:
                 overrides[prefixed_key] = v
                 prefixed_values[prefixed_key] = v
         nested = _HPProxy(self.trial, self.collector, ns=self.ns + [name], overrides=overrides)
-        kwargs = kwargs or {}
-        result = child(nested, *args, **kwargs)
+        _reject_removed_execution_argument_containers(kwargs)
+        result = child(nested, **kwargs)
         _handle_unknown_parameters(prefixed_values, set(self.collector), "raise")
         return result
 
 
-def suggest_values(trial: Any, *, config, args: tuple = (), kwargs: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def suggest_values(trial: Any, config, /, **kwargs: Any) -> Dict[str, Any]:
     """Run the config with a trial-backed HP to produce a values dict.
 
     This respects conditionals: only parameters touched in the executed path
@@ -255,6 +254,6 @@ def suggest_values(trial: Any, *, config, args: tuple = (), kwargs: Dict[str, An
     # We intentionally do not import or require optuna here for testability.
     collector: Dict[str, Any] = {}
     hp = _HPProxy(trial, collector)
-    kwargs = kwargs or {}
-    config(hp, *args, **kwargs)
+    _reject_removed_execution_argument_containers(kwargs)
+    config(hp, **kwargs)
     return collector

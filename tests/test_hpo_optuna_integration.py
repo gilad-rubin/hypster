@@ -74,7 +74,7 @@ def model_cfg(hp: HP):
 
 def test_optuna_suggest_values_rf_branch_and_instantiate():
     trial = FakeTrial({"family": "rf", "rf.n_estimators": 200, "rf.max_depth": 12.5})
-    values = suggest_values(trial, config=model_cfg)
+    values = suggest_values(trial, model_cfg)
     assert values["family"] == "rf"
     assert values["rf.n_estimators"] == 200
     assert values["rf.max_depth"] == 12.5
@@ -89,7 +89,7 @@ def test_optuna_suggest_values_rf_branch_and_instantiate():
 
 def test_optuna_suggest_values_lr_branch_and_log_float():
     trial = FakeTrial({"family": "lr", "lr.C": 0.01, "lr.solver": "saga"})
-    values = suggest_values(trial, config=model_cfg)
+    values = suggest_values(trial, model_cfg)
     assert values["family"] == "lr"
     assert values["lr.C"] == 0.01
     assert values["lr.solver"] == "saga"
@@ -112,10 +112,35 @@ def test_nested_overrides_passed_to_child():
         )
 
     trial = FakeTrial()
-    values = suggest_values(trial, config=parent)
+    values = suggest_values(trial, parent)
     assert values["tree.depth"] == 6  # took override, no suggestion
     # no int call for tree.depth recorded
     assert not any(c for c in trial.calls if c["fn"] == "int" and c["name"] == "tree.depth")
 
     out = instantiate(parent, values=values)
     assert out == 6
+
+
+def test_optuna_suggest_values_forwards_execution_kwargs() -> None:
+    def config(hp: HP, branch: str):
+        if branch == "rf":
+            return hp.nest(rf_cfg, name="rf")
+        return hp.nest(lr_cfg, name="lr")
+
+    trial = FakeTrial({"rf.n_estimators": 150, "rf.max_depth": 8.0})
+
+    values = suggest_values(trial, config, branch="rf")
+
+    assert values == {"rf.n_estimators": 150, "rf.max_depth": 8.0}
+
+
+def test_optuna_nested_proxy_forwards_execution_kwargs() -> None:
+    def child(hp: HP, min_depth: int) -> int:
+        return hp.int(min_depth, name="depth", min=min_depth, max=10, hpo_spec=HpoInt())
+
+    def parent(hp: HP) -> int:
+        return hp.nest(child, name="tree", min_depth=4)
+
+    values = suggest_values(FakeTrial(), parent)
+
+    assert values == {"tree.depth": 4}

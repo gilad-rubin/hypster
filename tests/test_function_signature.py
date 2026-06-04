@@ -42,8 +42,24 @@ def test_extra_args_allowed() -> None:
         base = hp.int(10, name="base")
         return base * multiplier
 
-    result = instantiate(config, kwargs={"multiplier": 3})
+    result = instantiate(config, multiplier=3)
     assert result == 30
+
+
+def test_removed_execution_argument_containers_are_rejected() -> None:
+    calls = []
+
+    def config(hp: HP, **execution_kwargs: object) -> int:
+        calls.append(execution_kwargs)
+        return hp.int(10, name="base")
+
+    with pytest.raises(TypeError, match="no longer accepts args= or kwargs="):
+        instantiate(config, args=(3,))
+
+    with pytest.raises(TypeError, match="no longer accepts args= or kwargs="):
+        instantiate(config, kwargs={"multiplier": 3})
+
+    assert calls == []
 
 
 def test_keyword_only_hp_is_rejected_during_signature_validation() -> None:

@@ -36,8 +36,8 @@ def test_nest_with_args_kwargs() -> None:
         return base * multiplier + offset
 
     def parent(hp: HP) -> Dict[str, int]:
-        result1 = hp.nest(child, name="calc1", args=(2,))
-        result2 = hp.nest(child, name="calc2", args=(3,), kwargs={"offset": 10})
+        result1 = hp.nest(child, name="calc1", multiplier=2)
+        result2 = hp.nest(child, name="calc2", multiplier=3, offset=10)
         return {"calc1": result1, "calc2": result2}
 
     result = instantiate(parent)
@@ -121,7 +121,7 @@ def test_nested_scope_value_is_not_a_parameter_leaf() -> None:
         instantiate_with_params(parent, values={"child": 123})
 
     with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
-        explore(parent, values={"child": 123}, return_info=True)
+        explore(parent, values={"child": 123}, return_schema=True)
 
 
 def test_explicit_nested_values_raise_for_unknown_child_parameters() -> None:
@@ -135,4 +135,4 @@ def test_explicit_nested_values_raise_for_unknown_child_parameters() -> None:
         instantiate(parent)
 
     with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
-        explore(parent, return_info=True)
+        explore(parent, return_schema=True)

@@ -61,7 +61,7 @@ def model_config(hp: HP) -> ClassifierMixin:
     return hp.nest(selected_config, name="model")
 
 def objective(trial: optuna.Trial) -> float:
-    values = suggest_values(trial, config=model_config)
+    values = suggest_values(trial, model_config)
     model = instantiate(model_config, values=values)
     return train_and_score(model)
 

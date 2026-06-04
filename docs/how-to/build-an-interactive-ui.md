@@ -2,7 +2,7 @@
 
 Use [`interact()`](../getting-started/interactive-instantiation-ui.md) when you want Hypster's built-in notebook widget. This guide is for custom Streamlit, Gradio, Panel, web app, or internal dashboard UIs.
 
-Use `explore(config, return_info=True)` to discover fields, render controls in your UI framework, then pass the collected values to `instantiate()`.
+Use `explore(config, return_schema=True)` to discover fields, render controls in your UI framework, then pass the collected values to `instantiate()`.
 
 `explore()` executes the config function to discover the active branch. A custom UI may call it on every branch-changing edit, so keep config functions cheap and side-effect-free for interactive use; avoid paid API calls, database calls, file writes, training loops, and costly resource initialization in paths that the UI will explore.
 
@@ -53,7 +53,7 @@ def search_config(hp: HP) -> SearchRuntime:
     return SearchRuntime(retrieval=retrieval, features=features)
 
 
-schema = explore(search_config, return_info=True)
+schema = explore(search_config, return_schema=True)
 metadata = schema.to_dict()
 ```
 {% endcode %}
@@ -206,7 +206,7 @@ When a branch-selecting field changes, call `explore()` again with current UI va
 {% code overflow="wrap" %}
 ```python
 ui_values = {"backend": "vector"}
-schema = explore(search_config, values=ui_values, return_info=True)
+schema = explore(search_config, values=ui_values, return_schema=True)
 fields = list(flatten_fields(schema.to_dict()["parameters"]))
 
 assert [field["path"] for field in fields] == [
@@ -227,10 +227,10 @@ def reachable_paths(schema):
     return {field["path"] for field in flatten_fields(schema.to_dict()["parameters"])}
 
 def refresh_schema(config, current_values):
-    schema = explore(config, values=current_values, on_unknown="ignore", return_info=True)
+    schema = explore(config, values=current_values, on_unknown="ignore", return_schema=True)
     reachable = reachable_paths(schema)
     pruned_values = {path: value for path, value in current_values.items() if path in reachable}
-    schema = explore(config, values=pruned_values, return_info=True)
+    schema = explore(config, values=pruned_values, return_schema=True)
     return schema, pruned_values
 ```
 {% endcode %}

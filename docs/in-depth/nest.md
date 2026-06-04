@@ -33,8 +33,7 @@ hp.nest(
     *,
     name,
     values=None,
-    args=(),
-    kwargs=None,
+    **kwargs,
 )
 ```
 {% endcode %}
@@ -44,8 +43,7 @@ hp.nest(
 | `child` | Config function whose first parameter is `hp`. |
 | `name` | Scope name. Must be a valid Python identifier. |
 | `values` | Child-local values merged into the nested call. |
-| `args` | Positional arguments passed to the child. |
-| `kwargs` | Keyword arguments passed to the child. |
+| `**kwargs` | Execution arguments forwarded to the child. |
 
 ## Child-Local Values
 
@@ -91,7 +89,7 @@ instantiate(parent_with_typo)
 
 Use child-local `values=` for parent-owned policy, test fixtures, or internal composition defaults that should win over caller-provided nested values.
 
-## Args And Kwargs
+## Execution Arguments
 
 {% code overflow="wrap" %}
 ```python
@@ -101,8 +99,8 @@ def sampler_config(hp: HP, default_batch_size: int) -> BatchSampler:
     return BatchSampler(batch_size=batch_size, shuffle=shuffle)
 
 def data_config(hp: HP) -> DataLoaders:
-    train = hp.nest(sampler_config, name="train", args=(128,))
-    eval = hp.nest(sampler_config, name="eval", kwargs={"default_batch_size": 256})
+    train = hp.nest(sampler_config, name="train", default_batch_size=128)
+    eval = hp.nest(sampler_config, name="eval", default_batch_size=256)
     return DataLoaders(train=train, eval=eval)
 ```
 {% endcode %}

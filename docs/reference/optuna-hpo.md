@@ -21,7 +21,7 @@ from hypster.hpo.types import HpoCategorical, HpoFloat, HpoInt
 
 {% code overflow="wrap" %}
 ```python
-suggest_values(trial, *, config, args=(), kwargs=None) -> dict
+suggest_values(trial, config, **kwargs) -> dict
 ```
 {% endcode %}
 
@@ -29,7 +29,7 @@ Runs `config` with a trial-backed `HP` proxy and returns a `values` dictionary t
 
 {% code overflow="wrap" %}
 ```python
-values = suggest_values(trial, config=model_config)
+values = suggest_values(trial, model_config)
 cfg = instantiate(model_config, values=values)
 ```
 {% endcode %}
@@ -140,7 +140,7 @@ def weighted_choice_config(hp: HP):
 ```
 {% endcode %}
 
-Both fail during `suggest_values(trial, config=...)` before a values dictionary is returned. Show the error as configuration feedback:
+Both fail during `suggest_values(trial, ...)` before a values dictionary is returned. Show the error as configuration feedback:
 
 {% code overflow="wrap" %}
 ```text

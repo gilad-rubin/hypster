@@ -54,7 +54,7 @@ def test_explore_returns_schema_info_and_defaults() -> None:
         temperature = hp.float(0.0, name="temperature", min=0.0, max=2.0)
         return {"batching": batching, "temperature": temperature}
 
-    info = explore(config, return_info=True)
+    info = explore(config, return_schema=True)
 
     assert info is not None
     assert info.defaults() == {
@@ -95,6 +95,30 @@ def test_explore_returns_schema_info_and_defaults() -> None:
     }
 
 
+def test_explore_forwards_execution_kwargs_to_config() -> None:
+    def config(hp: HP, default_batching: str) -> Dict[str, Any]:
+        batching = hp.select(["single", "split"], name="batching", default=default_batching)
+        return {"batching": batching}
+
+    info = explore(config, return_schema=True, default_batching="single")
+
+    assert info is not None
+    assert info.defaults() == {"batching": "single"}
+
+
+def test_explore_rejects_old_return_info_flag() -> None:
+    calls = []
+
+    def config(hp: HP, **execution_kwargs: object) -> Dict[str, int]:
+        calls.append(execution_kwargs)
+        return {"x": hp.int(1, name="x")}
+
+    with pytest.raises(TypeError, match=r"explore\(\) reserves return_info=.*return_schema=True"):
+        explore(config, return_info=True)
+
+    assert calls == []
+
+
 def test_explore_includes_descriptions_and_display_labels() -> None:
     def retrieval(hp: HP) -> Dict[str, Any]:
         top_k = hp.int(
@@ -115,7 +139,7 @@ def test_explore_includes_descriptions_and_display_labels() -> None:
             )
         }
 
-    info = explore(config, return_info=True)
+    info = explore(config, return_schema=True)
 
     assert info is not None
     schema = info.to_dict()
@@ -148,7 +172,7 @@ def test_explore_tracks_nested_defaults_with_prefixed_paths() -> None:
             "system_prompt": hp.text("", name="system_prompt"),
         }
 
-    info = explore(root, return_info=True)
+    info = explore(root, return_schema=True)
 
     assert info is not None
     assert info.defaults() == {
@@ -186,7 +210,7 @@ def test_explore_values_select_a_different_branch() -> None:
     info = explore(
         query_llm,
         values={"provider": "openai", "openai.temperature": 0.7},
-        return_info=True,
+        return_schema=True,
     )
 
     assert info is not None
@@ -256,7 +280,7 @@ def test_explore_to_dict_is_json_serializable() -> None:
         )
         return {"provider": provider}
 
-    info = explore(config, return_info=True)
+    info = explore(config, return_schema=True)
 
     assert info is not None
     assert info.to_dict() == {
