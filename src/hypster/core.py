@@ -2,7 +2,7 @@
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Any, Dict, Generic, Literal, Optional, Protocol, TypeVar
+from typing import Any, Dict, Generic, Iterable, Literal, Optional, Protocol, TypeVar
 
 from .hp import HP
 from .hp_calls import HPCallError
@@ -57,6 +57,20 @@ def _reject_removed_execution_argument_containers(execution_kwargs: Dict[str, An
         )
 
 
+def _reject_reserved_execution_arguments(
+    api_name: str,
+    execution_kwargs: Dict[str, Any],
+    reserved_names: Iterable[str],
+    guidance: str,
+) -> None:
+    reserved = sorted(name for name in reserved_names if name in execution_kwargs)
+    if not reserved:
+        return
+
+    names = ", ".join(f"{name}=" for name in reserved)
+    raise TypeError(f"{api_name} reserves {names} for Hypster execution controls. {guidance}")
+
+
 def instantiate(
     func: ConfigFunc[T],
     *,
@@ -70,7 +84,7 @@ def instantiate(
     Args:
         func: Config function with first param hp: HP
         values: Parameter values by name
-        kwargs: Additional keyword arguments for func
+        **kwargs: Execution arguments forwarded directly to func
         on_unknown: How to handle unknown/unreachable parameters:
             - 'raise': Raise ValueError (default)
             - 'warn': Issue warning and continue

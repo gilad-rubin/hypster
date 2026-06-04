@@ -8,6 +8,7 @@ from hypster.core import (
     ConfigFunc,
     UnknownPolicy,
     _reject_removed_execution_argument_containers,
+    _reject_reserved_execution_arguments,
     instantiate_with_params,
 )
 from hypster.explore import ConfigSchema, ParameterInfo, explore
@@ -76,6 +77,12 @@ class InteractiveSession(Generic[T]):
     def __post_init__(self) -> None:
         self._kwargs = dict(self.execution_kwargs or {})
         _reject_removed_execution_argument_containers(self._kwargs)
+        _reject_reserved_execution_arguments(
+            "interact()",
+            self._kwargs,
+            {"return_schema", "return_info"},
+            "Rename these execution arguments before using interact().",
+        )
         self._draft_values: Dict[str, Any] = {}
         self._applied_values: Dict[str, Any] = {}
         self._params: Dict[str, Any] = {}

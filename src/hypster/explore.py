@@ -9,6 +9,7 @@ from .core import (
     ConfigFunc,
     _handle_unknown_parameters,
     _reject_removed_execution_argument_containers,
+    _reject_reserved_execution_arguments,
     _validate_on_unknown,
 )
 from .hp import HP
@@ -243,8 +244,12 @@ def explore(
     validate_config_func_signature(func)
     _validate_on_unknown(on_unknown)
     _reject_removed_execution_argument_containers(kwargs)
-    if "return_info" in kwargs:
-        raise TypeError("explore() no longer accepts return_info=. Use return_schema=True.")
+    _reject_reserved_execution_arguments(
+        "explore()",
+        kwargs,
+        {"return_info"},
+        "Use return_schema=True to return a ConfigSchema, or rename this execution argument.",
+    )
 
     normalized_values: Dict[str, Any] = normalize_values(values)
     tracer = SchemaTracer(normalized_values)

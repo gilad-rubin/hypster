@@ -201,7 +201,7 @@ _Avoid_: exploration error, validation error
 - Show dictionary-backed `select` with logging-safe choices mapped to complex values.
 - Show `allow_none=True` examples for scalar params and select choices.
 - Document that `allow_none=True` supports `multi_select` choices but not nullable elements for `multi_int`, `multi_float`, `multi_text`, or `multi_bool`; include the error guidance.
-- Show that `instantiate_with_params` accepts the same execution arguments as `instantiate`, including `args`, `kwargs`, and `on_unknown`.
+- Show that `instantiate_with_params` accepts the same direct **Execution Arguments** and `on_unknown` policy as `instantiate`.
 - Replace the old "nested dict wins" docs with guidance that dotted and nested forms are both supported, but duplicate **Parameter Paths** fail.
 - Document that unknown/unreachable errors are based on the current execution path and that users should run `explore(config, values=...)` to inspect branches.
 

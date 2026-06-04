@@ -55,6 +55,22 @@ def test_interact_forwards_execution_kwargs_to_exploration_and_instantiation() -
     assert result.params == {"base": 2}
 
 
+def test_interact_rejects_schema_control_execution_kwargs() -> None:
+    calls = []
+
+    def config(hp: HP, **execution_kwargs: object) -> Dict[str, int]:
+        calls.append(execution_kwargs)
+        return {"base": hp.int(2, name="base")}
+
+    with pytest.raises(TypeError, match=r"interact\(\) reserves return_schema="):
+        interact(config, return_schema=True)
+
+    with pytest.raises(TypeError, match=r"interact\(\) reserves return_info="):
+        interact(config, return_info=True)
+
+    assert calls == []
+
+
 def test_interact_action_updates_value_and_params() -> None:
     def openai(hp: HP) -> Dict[str, Any]:
         return {

@@ -54,7 +54,7 @@ assert replayed.model == run.value.model
 ```
 {% endcode %}
 
-`instantiate_with_params()` accepts the same `values`, `args`, `kwargs`, and `on_unknown` arguments as `instantiate()`. It does not change what your config returns; it adds a sidecar for logging and replay.
+`instantiate_with_params()` accepts the same `values` and `on_unknown` arguments as `instantiate()`, plus any direct execution arguments your config requires. It does not change what your config returns; it adds a sidecar for logging and replay.
 
 ## Unknown Parameters
 

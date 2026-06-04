@@ -113,7 +113,7 @@ def test_explore_rejects_old_return_info_flag() -> None:
         calls.append(execution_kwargs)
         return {"x": hp.int(1, name="x")}
 
-    with pytest.raises(TypeError, match="return_schema=True"):
+    with pytest.raises(TypeError, match=r"explore\(\) reserves return_info=.*return_schema=True"):
         explore(config, return_info=True)
 
     assert calls == []
