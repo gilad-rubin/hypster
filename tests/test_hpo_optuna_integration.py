@@ -134,6 +134,40 @@ def test_optuna_suggest_values_forwards_execution_kwargs() -> None:
     assert values == {"rf.n_estimators": 150, "rf.max_depth": 8.0}
 
 
+def test_optuna_proxy_accepts_metadata_on_supported_parameter_calls() -> None:
+    def config(hp: HP):
+        n = hp.int(
+            1,
+            name="n",
+            min=0,
+            max=10,
+            hpo_spec=HpoInt(),
+            description="Trial-backed integer.",
+            metadata={"ui": "slider"},
+        )
+        x = hp.float(
+            0.1,
+            name="x",
+            min=0.0,
+            max=1.0,
+            hpo_spec=HpoFloat(),
+            description="Trial-backed float.",
+            metadata={"ui": "number"},
+        )
+        choice = hp.select(
+            ["a", "b"],
+            name="choice",
+            hpo_spec=HpoCategorical(),
+            description="Trial-backed choice.",
+            metadata={"ui": "radio"},
+        )
+        return {"n": n, "x": x, "choice": choice}
+
+    values = suggest_values(FakeTrial({"n": 3, "x": 0.4, "choice": "b"}), config)
+
+    assert values == {"n": 3, "x": 0.4, "choice": "b"}
+
+
 def test_optuna_nested_proxy_forwards_execution_kwargs() -> None:
     def child(hp: HP, min_depth: int) -> int:
         return hp.int(min_depth, name="depth", min=min_depth, max=10, hpo_spec=HpoInt())

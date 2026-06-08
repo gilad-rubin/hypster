@@ -153,6 +153,141 @@ def test_explore_includes_descriptions_and_display_labels() -> None:
     assert top_k["description"] == "Number of documents to return."
 
 
+def test_explore_includes_metadata_when_provided_and_omits_when_absent() -> None:
+    prompt_metadata = {
+        "editor": "prompt",
+        "audience": "domain_expert",
+        "tags": ["prompt", "metadata"],
+        "layout": {"rows": 12},
+        "examples": ("short", "detailed"),
+    }
+
+    def config(hp: HP) -> Dict[str, Any]:
+        metadata_prompt = hp.text(
+            "Extract concise document metadata for retrieval indexing.",
+            name="metadata_prompt",
+            description="Prompt used before chunking.",
+            metadata=prompt_metadata,
+        )
+        chunk_size = hp.int(512, name="chunk_size")
+        empty_label = hp.text("none", name="empty_label", metadata={})
+        return {"metadata_prompt": metadata_prompt, "chunk_size": chunk_size, "empty_label": empty_label}
+
+    result = hypster.instantiate(config)
+    info = explore(config, return_schema=True)
+
+    assert result == {
+        "metadata_prompt": "Extract concise document metadata for retrieval indexing.",
+        "chunk_size": 512,
+        "empty_label": "none",
+    }
+    assert info is not None
+    schema = info.to_dict()
+    prompt = schema["parameters"][0]
+    chunk_size = schema["parameters"][1]
+    empty_label = schema["parameters"][2]
+
+    assert prompt["metadata"] == {
+        "editor": "prompt",
+        "audience": "domain_expert",
+        "tags": ["prompt", "metadata"],
+        "layout": {"rows": 12},
+        "examples": ["short", "detailed"],
+    }
+    assert prompt["description"] == "Prompt used before chunking."
+    assert "metadata" not in chunk_size
+    assert "metadata" not in empty_label
+    assert json.dumps(schema)
+
+
+def test_metadata_is_available_on_all_parameter_primitives() -> None:
+    def config(hp: HP) -> Dict[str, Any]:
+        return {
+            "count": hp.int(1, name="count", metadata={"primitive": "int"}),
+            "temperature": hp.float(0.2, name="temperature", metadata={"primitive": "float"}),
+            "prompt": hp.text("hello", name="prompt", metadata={"primitive": "text"}),
+            "enabled": hp.bool(True, name="enabled", metadata={"primitive": "bool"}),
+            "mode": hp.select(["fast", "safe"], name="mode", metadata={"primitive": "select"}),
+            "layers": hp.multi_int([64, 32], name="layers", metadata={"primitive": "multi_int"}),
+            "weights": hp.multi_float([0.2, 0.8], name="weights", metadata={"primitive": "multi_float"}),
+            "labels": hp.multi_text(["a", "b"], name="labels", metadata={"primitive": "multi_text"}),
+            "flags": hp.multi_bool([True, False], name="flags", metadata={"primitive": "multi_bool"}),
+            "features": hp.multi_select(["cache", "trace"], name="features", metadata={"primitive": "multi_select"}),
+        }
+
+    info = explore(config, return_schema=True)
+
+    assert info is not None
+    assert {node["path"]: node["metadata"]["primitive"] for node in info.to_dict()["parameters"]} == {
+        "count": "int",
+        "temperature": "float",
+        "prompt": "text",
+        "enabled": "bool",
+        "mode": "select",
+        "layers": "multi_int",
+        "weights": "multi_float",
+        "labels": "multi_text",
+        "flags": "multi_bool",
+        "features": "multi_select",
+    }
+
+
+@pytest.mark.parametrize(
+    ("metadata", "match"),
+    [
+        (["prompt"], "metadata must be a dictionary"),
+        ({1: "prompt"}, "keys must be strings"),
+        ({"editor": object()}, r"metadata\['editor'\] must be JSON-compatible"),
+        ({"weight": float("inf")}, "finite float"),
+    ],
+)
+def test_metadata_must_be_json_compatible(metadata: object, match: str) -> None:
+    def config(hp: HP) -> str:
+        return hp.text("hello", name="prompt", metadata=metadata)
+
+    with pytest.raises(ValueError, match=match):
+        explore(config, return_schema=True)
+    with pytest.raises(ValueError, match=match):
+        hypster.instantiate(config)
+
+
+def test_metadata_rejects_excessive_nesting() -> None:
+    nested: Any = "leaf"
+    for _ in range(102):
+        nested = [nested]
+
+    def config(hp: HP) -> str:
+        return hp.text("hello", name="prompt", metadata={"nested": nested})
+
+    with pytest.raises(ValueError, match="maximum metadata nesting depth"):
+        explore(config, return_schema=True)
+
+
+def test_metadata_rejects_excessive_mapping_nesting() -> None:
+    nested: Any = "leaf"
+    for _ in range(60):
+        nested = {"child": nested}
+
+    def config(hp: HP) -> str:
+        return hp.text("hello", name="prompt", metadata={"nested": nested})
+
+    with pytest.raises(ValueError, match="maximum metadata nesting depth"):
+        explore(config, return_schema=True)
+
+
+def test_value_errors_are_reported_before_metadata_errors() -> None:
+    def numeric(hp: HP) -> int:
+        return hp.int(1, name="count", min=0, max=2, metadata={"bad": object()})
+
+    def categorical(hp: HP) -> str:
+        return hp.select(["a"], name="mode", options_only=True, metadata={"bad": object()})
+
+    with pytest.raises(ValueError, match="exceeds maximum"):
+        explore(numeric, values={"count": 99}, return_schema=True)
+    with pytest.raises(ValueError, match="not in allowed options"):
+        explore(categorical, values={"mode": "b"}, return_schema=True)
+
+
 def test_explore_tracks_nested_defaults_with_prefixed_paths() -> None:
     def gemini(hp: HP) -> Dict[str, Any]:
         model = hp.select(["flash-lite", "pro"], name="model", default="flash-lite")
@@ -262,7 +397,7 @@ def test_explore_validates_on_unknown_before_execution() -> None:
         return {"x": hp.int(1, name="x")}
 
     with pytest.raises(ValueError, match="on_unknown must be one of"):
-        explore(config, on_unknown="silent")  # type: ignore[arg-type]
+        explore(config, on_unknown="silent")
 
     assert calls == []
 

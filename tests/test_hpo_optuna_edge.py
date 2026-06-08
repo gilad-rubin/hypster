@@ -110,6 +110,33 @@ def test_hpo_nested_overrides_are_validated_like_instantiation_values():
         suggest_values(TrialSpy(), config)
 
 
+def test_hpo_proxy_rejects_invalid_metadata():
+    def config(hp: HP):
+        return hp.int(1, name="depth", min=0, max=10, hpo_spec=HpoInt(), metadata={"bad": object()})
+
+    with pytest.raises(ValueError, match=r"metadata\['bad'\] must be JSON-compatible"):
+        suggest_values(TrialSpy(), config)
+
+
+def test_hpo_override_errors_are_reported_before_metadata_errors():
+    def config(hp: HP):
+        return hp.nest(
+            lambda hp: hp.int(
+                0,
+                name="depth",
+                min=0,
+                max=10,
+                hpo_spec=HpoInt(),
+                metadata={"bad": object()},
+            ),
+            name="tree",
+            values={"depth": 999},
+        )
+
+    with pytest.raises(ValueError, match="exceeds maximum bound 10"):
+        suggest_values(TrialSpy(), config)
+
+
 def test_hpo_nested_overrides_raise_for_unknown_child_parameters():
     def config(hp: HP):
         return hp.nest(

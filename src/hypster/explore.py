@@ -66,13 +66,14 @@ class ParameterInfo:
     minimum: Optional[int | float] = None
     maximum: Optional[int | float] = None
     description: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
     children: List["ParameterInfo"] = field(default_factory=list)
 
     def is_group(self) -> bool:
         return self.kind == "group"
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             "name": self.name,
             "path": self.path,
             "kind": self.kind,
@@ -85,6 +86,9 @@ class ParameterInfo:
             "display_label": _humanize_name(self.name),
             "children": [child.to_dict() for child in self.children],
         }
+        if self.metadata is not None:
+            result["metadata"] = self.metadata
+        return result
 
     def defaults(self) -> Dict[str, Any]:
         if self.is_group():
@@ -177,6 +181,7 @@ class SchemaTracer(HP):
         minimum: Optional[int | float] = None,
         maximum: Optional[int | float] = None,
         description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         parent_path = path.rpartition(".")[0]
         container = self._schema.parameters if not parent_path else self._ensure_group_path(parent_path).children
@@ -191,6 +196,7 @@ class SchemaTracer(HP):
             minimum=minimum,
             maximum=maximum,
             description=description,
+            metadata=metadata,
         )
         existing = self._nodes_by_path.get(path)
         if existing is None:
@@ -205,6 +211,7 @@ class SchemaTracer(HP):
         existing.minimum = minimum
         existing.maximum = maximum
         existing.description = description
+        existing.metadata = metadata
 
     def build_schema(self, root_name: str) -> ConfigSchema:
         self._schema.name = root_name

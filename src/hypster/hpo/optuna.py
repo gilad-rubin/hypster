@@ -11,7 +11,7 @@ except Exception:  # pragma: no cover
 from .._sentinels import NO_DEFAULT as _NO_DEFAULT
 from ..core import _handle_unknown_parameters, _reject_removed_execution_argument_containers
 from ..hp_calls import FloatValidator, IntValidator
-from ..utils import normalize_values, validate_identifier_name, validate_select_choice
+from ..utils import normalize_values, validate_identifier_name, validate_metadata, validate_select_choice
 from .types import HpoCategorical, HpoFloat, HpoInt
 
 
@@ -98,6 +98,8 @@ class _HPProxy:
         strict: bool = False,
         allow_none: bool = False,
         hpo_spec: HpoInt | None = None,
+        description: str | None = None,
+        metadata: Dict[str, Any] | None = None,
     ) -> int:
         full = self._full(name)
         _validate_int_spec(full, hpo_spec)
@@ -119,8 +121,10 @@ class _HPProxy:
             validator = IntValidator()
             val = validator.validate_value(self.overrides[full], full, strict=strict)
             validator.validate_bounds(val, min, max, full)
+            metadata = validate_metadata(metadata, param_path=full)
             self.collector[full] = val
             return val
+        metadata = validate_metadata(metadata, param_path=full)
         low = default if min is None else min
         high = default if max is None else max
         step = hpo_spec.step if hpo_spec else None
@@ -142,6 +146,8 @@ class _HPProxy:
         strict: bool = False,
         allow_none: bool = False,
         hpo_spec: HpoFloat | None = None,
+        description: str | None = None,
+        metadata: Dict[str, Any] | None = None,
     ) -> float:
         full = self._full(name)
         log = _float_log_flag(full, hpo_spec)
@@ -163,8 +169,10 @@ class _HPProxy:
             validator = FloatValidator()
             val = validator.validate_value(self.overrides[full], full, strict=strict)
             validator.validate_bounds(val, min, max, full)
+            metadata = validate_metadata(metadata, param_path=full)
             self.collector[full] = val
             return val
+        metadata = validate_metadata(metadata, param_path=full)
         low = default if min is None else min
         high = default if max is None else max
         step = hpo_spec.step if hpo_spec else None
@@ -182,6 +190,8 @@ class _HPProxy:
         options_only: bool = False,
         allow_none: bool = False,
         hpo_spec: HpoCategorical | None = None,
+        description: str | None = None,
+        metadata: Dict[str, Any] | None = None,
     ) -> Any:
         full = self._full(name)
         _validate_categorical_spec(full, hpo_spec)
@@ -204,12 +214,14 @@ class _HPProxy:
                 raise ValueError(
                     f"Parameter '{full}': '{key_or_val}' not in allowed options. Available: [{options_str}]"
                 )
+            metadata = validate_metadata(metadata, param_path=full)
             if isinstance(options, Mapping) and key_or_val in options:
                 self.collector[full] = key_or_val
                 return options[key_or_val]
             self.collector[full] = key_or_val
             return key_or_val
 
+        metadata = validate_metadata(metadata, param_path=full)
         if isinstance(options, Mapping):
             key = self.trial.suggest_categorical(full, keys)
             self.collector[full] = key
@@ -226,6 +238,7 @@ class _HPProxy:
         *,
         name: str,
         values: Dict[str, Any] | None = None,
+        description: str | None = None,
         **kwargs: Any,
     ) -> Any:
         validate_identifier_name(name, kind="nest name")
