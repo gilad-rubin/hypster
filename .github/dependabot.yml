@@ -1,7 +1,8 @@
 version: 2
 
-multi-ecosystem-groups:
-  weekly-dependencies:
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -9,20 +10,22 @@ multi-ecosystem-groups:
       timezone: "Etc/UTC"
     labels:
       - "dependencies"
-
-updates:
-  - package-ecosystem: "uv"
-    directory: "/"
     patterns:
       - "*"
-    multi-ecosystem-group: "weekly-dependencies"
     cooldown:
       default-days: 7
 
   - package-ecosystem: "github-actions"
     directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "02:00"
+      timezone: "Etc/UTC"
+    labels:
+      - "dependencies"
+      - "github-actions"
     patterns:
       - "*"
-    multi-ecosystem-group: "weekly-dependencies"
     cooldown:
       default-days: 7
