@@ -73,7 +73,7 @@ fields = list(flatten_fields(metadata["parameters"]))
 ```
 {% endcode %}
 
-Each field has `path`, `kind`, `default_value`, `selected_value`, optional `options`, optional `minimum`, and optional `maximum`.
+Each field has `path`, `kind`, `default_value`, `selected_value`, optional `options`, optional `minimum`, optional `maximum`, optional `description`, and optional `metadata`. Use `metadata={...}` on parameter calls for JSON-compatible hints consumed by your UI, such as editor type, audience, or tags.
 
 Schema metadata is JSON-serializable. After exploring the vector branch with values such as `{"backend": "vector", "features": ["cache", None], "retrieval.index": "embeddings-v3", "retrieval.top_k": 12, "retrieval.score_threshold": 0.35}`, the payload looks like this shape:
 

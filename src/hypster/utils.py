@@ -2,10 +2,13 @@
 
 import inspect
 import keyword
+import math
 from collections.abc import Mapping
 from difflib import SequenceMatcher
 from functools import lru_cache
 from typing import Any, Callable, Dict, List, Optional, Tuple
+
+_MAX_METADATA_DEPTH = 100
 
 
 def suggest_similar_names(unknown: str, known: List[str], threshold: float = 0.6) -> List[Tuple[str, float]]:
@@ -164,6 +167,73 @@ def _validate_select_choice_uncached(value: Any, *, param_path: str, allow_none:
         "How to fix: Use dict-backed select so the key is simple and the mapped value can be complex. "
         "Example: hp.select({'small': {'layers': 2}}, name='model')."
     )
+
+
+def validate_metadata(metadata: Any, *, param_path: str) -> Optional[Dict[str, Any]]:
+    """Validate and normalize opaque parameter metadata for schema consumers."""
+    if metadata is None:
+        return None
+    if not isinstance(metadata, Mapping):
+        raise ValueError(
+            f"Parameter '{param_path}': metadata must be a dictionary with string keys and JSON-compatible values."
+        )
+    normalized = _validate_metadata_mapping(metadata, param_path=param_path, location="metadata", depth=0)
+    return normalized or None
+
+
+def _validate_metadata_mapping(
+    metadata: Mapping[Any, Any],
+    *,
+    param_path: str,
+    location: str,
+    depth: int,
+) -> Dict[str, Any]:
+    _validate_metadata_depth(param_path=param_path, location=location, depth=depth)
+    normalized: Dict[str, Any] = {}
+    for key, value in metadata.items():
+        if not isinstance(key, str):
+            raise ValueError(
+                f"Parameter '{param_path}': {location} keys must be strings for JSON object compatibility."
+            )
+        normalized[key] = _validate_metadata_value(
+            value,
+            param_path=param_path,
+            location=f"{location}[{key!r}]",
+            depth=depth + 1,
+        )
+    return normalized
+
+
+def _validate_metadata_value(value: Any, *, param_path: str, location: str, depth: int) -> Any:
+    _validate_metadata_depth(param_path=param_path, location=location, depth=depth)
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"Parameter '{param_path}': {location} must be a finite float for JSON compatibility.")
+        return value
+    if isinstance(value, Mapping):
+        return _validate_metadata_mapping(value, param_path=param_path, location=location, depth=depth + 1)
+    if isinstance(value, (list, tuple)):
+        return [
+            _validate_metadata_value(
+                item,
+                param_path=param_path,
+                location=f"{location}[{index}]",
+                depth=depth + 1,
+            )
+            for index, item in enumerate(value)
+        ]
+    raise ValueError(
+        f"Parameter '{param_path}': {location} must be JSON-compatible (None, bool, int, float, str, list, or dict)."
+    )
+
+
+def _validate_metadata_depth(*, param_path: str, location: str, depth: int) -> None:
+    if depth > _MAX_METADATA_DEPTH:
+        raise ValueError(
+            f"Parameter '{param_path}': {location} exceeds maximum metadata nesting depth of {_MAX_METADATA_DEPTH}."
+        )
 
 
 def normalize_values(values: Optional[Mapping[str, Any]]) -> Dict[str, Any]:

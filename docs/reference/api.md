@@ -220,9 +220,10 @@ Each schema parameter contains:
 | `options` | Select or multi-select options when available. |
 | `minimum` / `maximum` | Numeric bounds when available. |
 | `description` | Optional human-readable help text from `description=`. |
+| `metadata` | Optional opaque UI/tooling hints from `metadata=`; omitted when absent or empty. |
 | `children` | Nested parameters for groups. |
 
-`ConfigSchema.to_dict()` is intended for rendering and inspection, not as a complete validation schema. It exposes the active branch, selected values, options, numeric bounds, descriptions, and nested groups. It does not currently expose every HP call option, such as `allow_none`, `options_only`, or `strict`.
+`ConfigSchema.to_dict()` is intended for rendering and inspection, not as a complete validation schema. It exposes the active branch, selected values, options, numeric bounds, descriptions, optional metadata, and nested groups. It does not currently expose every HP call option, such as `allow_none`, `options_only`, or `strict`.
 
 UI builders should use schema metadata to render controls, then round-trip user input through `explore(..., values=..., return_schema=True)` and `instantiate(..., values=...)` for authoritative validation. For dict-backed selects, `options` contains replayable keys, not mapped runtime objects.
 
@@ -232,10 +233,10 @@ All parameter names must be valid Python identifier-style strings: use letters, 
 
 {% code overflow="wrap" %}
 ```python
-hp.int(default, *, name, min=None, max=None, strict=False, allow_none=False, hpo_spec=None, description=None)
-hp.float(default, *, name, min=None, max=None, strict=False, allow_none=False, hpo_spec=None, description=None)
-hp.text(default, *, name, allow_none=False, description=None)
-hp.bool(default, *, name, allow_none=False, description=None)
+hp.int(default, *, name, min=None, max=None, strict=False, allow_none=False, hpo_spec=None, description=None, metadata=None)
+hp.float(default, *, name, min=None, max=None, strict=False, allow_none=False, hpo_spec=None, description=None, metadata=None)
+hp.text(default, *, name, allow_none=False, description=None, metadata=None)
+hp.bool(default, *, name, allow_none=False, description=None, metadata=None)
 ```
 {% endcode %}
 
@@ -248,13 +249,14 @@ hp.bool(default, *, name, allow_none=False, description=None)
 
 Use `allow_none=True` when `None` is a real scalar value.
 Numeric coercion is consistent for top-level parameters and nested paths.
+Use `metadata={...}` for opaque JSON-compatible hints that should appear on schema nodes without affecting selected values or runtime return objects.
 
 ## HP Select Methods
 
 {% code overflow="wrap" %}
 ```python
-hp.select(options, *, name, default=NO_DEFAULT, options_only=False, allow_none=False, hpo_spec=None, description=None)
-hp.multi_select(options, *, name, default=None, options_only=False, allow_none=False, description=None)
+hp.select(options, *, name, default=NO_DEFAULT, options_only=False, allow_none=False, hpo_spec=None, description=None, metadata=None)
+hp.multi_select(options, *, name, default=None, options_only=False, allow_none=False, description=None, metadata=None)
 ```
 {% endcode %}
 
@@ -291,10 +293,10 @@ By default, `options_only=False`, so custom scalar values outside the listed opt
 
 {% code overflow="wrap" %}
 ```python
-hp.multi_int(default, *, name, min=None, max=None, strict=False, allow_none=False, description=None)
-hp.multi_float(default, *, name, min=None, max=None, strict=False, allow_none=False, description=None)
-hp.multi_text(default, *, name, allow_none=False, description=None)
-hp.multi_bool(default, *, name, allow_none=False, description=None)
+hp.multi_int(default, *, name, min=None, max=None, strict=False, allow_none=False, description=None, metadata=None)
+hp.multi_float(default, *, name, min=None, max=None, strict=False, allow_none=False, description=None, metadata=None)
+hp.multi_text(default, *, name, allow_none=False, description=None, metadata=None)
+hp.multi_bool(default, *, name, allow_none=False, description=None, metadata=None)
 ```
 {% endcode %}
 
