@@ -513,6 +513,7 @@ export default {
         const path = ruleRemove.dataset.path;
         const index = parseInt(ruleRemove.dataset.ruleIndex, 10);
         const param = findParameter(snapshot.schema?.parameters, path);
+        if (!param) return;
         const rules = valueFor(snapshot, param) || [];
         const updated = rules.filter((_, i) => i !== index);
         send(model, { type: "set_value", path, value: updated });
@@ -524,8 +525,14 @@ export default {
         const snapshot = model.get("snapshot");
         const path = ruleAdd.dataset.path;
         const param = findParameter(snapshot.schema?.parameters, path);
+        if (!param) return;
         const rules = valueFor(snapshot, param) || [];
-        const newRule = { when: { combinator: "and", conditions: [] }, then: "" };
+        const thenSpecs = param.metadata?.then_specs || [];
+        const emptyThen =
+          thenSpecs.length > 1
+            ? Object.fromEntries(thenSpecs.filter((s) => s?.name).map((s) => [s.name, ""]))
+            : "";
+        const newRule = { when: { combinator: "and", conditions: [] }, then: emptyThen };
         send(model, { type: "set_value", path, value: [...rules, newRule] });
         return;
       }

@@ -2,8 +2,9 @@
 
 import pytest
 
-from hypster import And, Leaf, Rule, field
-from hypster.explore import explore
+hyperrules = pytest.importorskip("hyperrules")
+from hypster import And, Leaf, Rule, field  # noqa: E402
+from hypster.explore import explore  # noqa: E402
 
 
 def _make_fields():

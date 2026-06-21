@@ -1025,6 +1025,14 @@ class HP:
         if combinators is None:
             combinators = ["and"]
 
+        from hypster.field_spec import FieldSpec
+
+        if not isinstance(when, list):
+            raise TypeError(f"when must be a list, got {type(when).__name__}")
+        for i, fs in enumerate(when):
+            if not isinstance(fs, FieldSpec):
+                raise TypeError(f"when[{i}]: expected a FieldSpec, got {type(fs).__name__}")
+
         then_spec = self._resolve_then_spec(then)
         field_specs = [fs.to_dict() for fs in when]
         then_specs = [then_spec.to_dict()] if not isinstance(then_spec, list) else [s.to_dict() for s in then_spec]
