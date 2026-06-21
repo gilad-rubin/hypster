@@ -1,8 +1,8 @@
 """Tests for hp.rules() and hp.text(multiline=)."""
 
 import pytest
-from hyperrules import And, Leaf, Rule, field
 
+from hypster import And, Leaf, Rule, field
 from hypster.explore import explore
 
 

@@ -1052,10 +1052,7 @@ class HP:
 
     @staticmethod
     def _resolve_then_spec(then: Any) -> Any:
-        try:
-            from hyperrules.field_spec import FieldSpec
-        except ImportError:
-            raise ImportError("hyperrules is required for hp.rules(): pip install hyperrules")
+        from hypster.field_spec import FieldSpec
 
         if isinstance(then, FieldSpec):
             if then.name is None:
@@ -1074,10 +1071,8 @@ class HP:
 
     @staticmethod
     def _coerce_rules(raw: list) -> list:
-        try:
-            from hyperrules.types import Rule
-        except ImportError:
-            return list(raw)
+        from hypster.rules import Rule
+
         result = []
         for i, item in enumerate(raw):
             if isinstance(item, Rule):
@@ -1090,10 +1085,8 @@ class HP:
 
     @staticmethod
     def _rules_to_jsonable(rules: list) -> list:
-        try:
-            from hyperrules.types import Rule
-        except ImportError:
-            return list(rules)
+        from hypster.rules import Rule
+
         return [r.to_dict() if isinstance(r, Rule) else r for r in rules]
 
     # Map public API names to internal methods

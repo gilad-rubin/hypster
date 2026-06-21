@@ -7,15 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `hp.rules(when=fields, then=spec, name=...)` primitive for declarative WHEN/THEN rules as a configuration value.
-  - `when` accepts a list of `hyperrules.FieldSpec` objects declaring the condition vocabulary.
+  - `when` accepts a list of `FieldSpec` objects declaring the condition vocabulary.
   - `then` accepts a named `FieldSpec` (or list thereof) describing the payload widget — e.g. `field.text(name="prompt", multiline=True)`.
   - Multi-then support: pass a list of FieldSpecs to `then` for composite payloads (e.g. prompt + use_citations).
   - Rules are recorded as `kind="rules"` in `explore()` schema with `field_specs`, `then_specs`, and `combinators` metadata.
-  - Values round-trip through `instantiate_with_params` as JSON/YAML-serializable dicts.
+  - `output.value` returns typed `Rule` objects; `output.params` returns serializable dicts.
+- Typed rule objects: `Rule`, `Leaf`, `Group`, `And`, `Or`, `Not` in `hypster.rules` — frozen dataclasses with `to_dict()`/`from_dict()` serialization.
+- `FieldSpec` class and `field.*` constructors (`field.select`, `field.multi_select`, `field.bool`, `field.text`, `field.int`, `field.float`) in `hypster.field` — previously required `hyperrules`, now self-contained.
 - `hp.text(multiline=True)` parameter — records `{"multiline": True}` in metadata for UI rendering hints.
 
 ### Changed
 - `then` parameter in `hp.rules()` is required and must be an explicit named `FieldSpec` — no implicit defaults or bare strings.
+- `hp.rules()` no longer requires `hyperrules` to be installed — types and field constructors are now built-in. `hyperrules` remains the reference evaluator for `matches(condition, context)`.
+- Imports changed: `from hypster import Rule, Leaf, field` (previously `from hyperrules import ...`).
 
 ## [0.6.0] - 2026-06-04
 
