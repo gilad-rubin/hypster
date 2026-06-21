@@ -57,8 +57,12 @@ class Group:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Group:
+        if "combinator" not in data or not isinstance(data["combinator"], str):
+            raise ValueError("group node must include a string 'combinator'")
         if "conditions" not in data:
             raise ValueError("group node is missing a 'conditions' key")
+        if not isinstance(data["conditions"], list):
+            raise ValueError("group node 'conditions' must be a list")
         return cls(
             combinator=data["combinator"],
             conditions=tuple(_node_from_dict(c) for c in data["conditions"]),

@@ -791,6 +791,10 @@ class HP:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """Text parameter."""
+        if metadata is not None and not isinstance(metadata, dict):
+            raise ValueError(
+                f"Parameter '{name}': metadata must be a dictionary with string keys and JSON-compatible values."
+            )
         combined_metadata = dict(metadata or {})
         if multiline:
             combined_metadata["multiline"] = True
