@@ -4,7 +4,22 @@ This page lists the public API exposed by `hypster`.
 
 {% code overflow="wrap" %}
 ```python
-from hypster import HP, InteractiveResult, explore, instantiate, instantiate_with_params, interact
+from hypster import (
+    HP,
+    And,
+    FieldSpec,
+    Group,
+    InteractiveResult,
+    Leaf,
+    Not,
+    Or,
+    Rule,
+    explore,
+    field,
+    instantiate,
+    instantiate_with_params,
+    interact,
+)
 ```
 {% endcode %}
 
@@ -250,6 +265,7 @@ hp.bool(default, *, name, allow_none=False, description=None, metadata=None)
 Use `allow_none=True` when `None` is a real scalar value.
 Numeric coercion is consistent for top-level parameters and nested paths.
 Use `metadata={...}` for opaque JSON-compatible hints that should appear on schema nodes without affecting selected values or runtime return objects.
+Use `hp.text(..., multiline=True)` for prompt blocks and other long text; schemas record this as `metadata={"multiline": True}` so UIs can render a larger editor.
 
 ## HP Select Methods
 
@@ -340,6 +356,43 @@ instantiate(parent, values={"child.x": 2})
 Nested dictionaries are normalized to the same dotted paths, so `values={"child": {"x": 2}}` is also valid. The scope name itself is not a parameter leaf: `values={"child": 2}` raises as unknown or unreachable.
 
 Explicit child-local `values=` passed to `hp.nest(child, name="child", values=...)` are validated after the child config runs. Unknown or unreachable child keys raise instead of being ignored.
+
+## HP.rules
+
+{% code overflow="wrap" %}
+```python
+hp.rules(
+    *,
+    when,
+    then,
+    name,
+    combinators=None,
+    default=None,
+    description=None,
+)
+```
+{% endcode %}
+
+Selects a list of declarative WHEN/THEN rules as a config value. `when` is a list of `FieldSpec` objects from `hypster.field`. `then` is a named `FieldSpec` or a list of named `FieldSpec` objects.
+
+{% code overflow="wrap" %}
+```python
+from hypster import HP, Rule, field
+
+audience = field.select(["clinical", "operations"], name="audience")
+prompt = field.text(name="prompt", multiline=True)
+
+def config(hp: HP) -> list[Rule[str]]:
+    return hp.rules(
+        when=[audience],
+        then=prompt,
+        name="prompt_rules",
+        default=[audience.eq("clinical").then("Prefer protocol language.")],
+    )
+```
+{% endcode %}
+
+The config return value contains `Rule` objects. Selected params contain JSON-friendly dictionaries suitable for logging and replay. `explore(..., return_schema=True)` records rules as `kind="rules"` with `metadata["field_specs"]`, `metadata["then_specs"]`, and `metadata["combinators"]` for notebook and custom UI renderers.
 
 ## HP.collect
 

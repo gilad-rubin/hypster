@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `then` parameter in `hp.rules()` is required and must be an explicit named `FieldSpec` — no implicit defaults or bare strings.
 - `hp.rules()` no longer requires `hyperrules` to be installed — types and field constructors are now built-in. `hyperrules` remains the reference evaluator for `matches(condition, context)`.
 - Imports changed: `from hypster import Rule, Leaf, field` (previously `from hyperrules import ...`).
+- Prepared the 0.7.0 release by syncing the package version constants and refreshing dependency locks/workflow actions.
 
 ## [0.6.0] - 2026-06-04
 

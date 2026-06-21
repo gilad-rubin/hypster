@@ -13,6 +13,7 @@ The examples in this reference sometimes return small dictionaries to keep the c
 | `hp.text` | Strings | Use for prompts, paths, IDs, and labels. |
 | `hp.bool` | Booleans | Requires actual `True` or `False`, not string values. |
 | `hp.select` | One categorical choice | Supports list options or dict-backed key-to-value mapping. |
+| `hp.rules` | Declarative WHEN/THEN rule lists | Returns `Rule` objects and records JSON-friendly rule dictionaries for replay. |
 
 ## Multi-Value Calls
 
@@ -32,6 +33,8 @@ Nullable elements are not supported for `multi_int`, `multi_float`, `multi_text`
 | --- | --- |
 | `hp.nest` | Run another config function under a named scope. |
 | `hp.collect` | Collect selected local variables into a returned dictionary. |
+
+For `hp.rules`, declare condition and payload fields with `hypster.field` and use [Rules](rules.md) for the full pattern.
 
 ## Shared Rules
 

@@ -132,3 +132,28 @@ result2 = interact(model_config, values=result.params)
 {% endcode %}
 
 For framework-specific UIs outside notebooks, use the schema returned by `explore(..., return_schema=True)`. See [Build an Interactive UI](../how-to/build-an-interactive-ui.md).
+
+## Rules Controls
+
+The notebook UI supports `hp.rules()` parameters. It renders the current rules, lets you add and remove rules, edits flat condition lists, and uses the `then=` field specs to render text, boolean, numeric, and select payload controls.
+
+{% code overflow="wrap" %}
+```python
+from hypster import HP, Rule, field, interact
+
+audience = field.select(["clinical", "operations"], name="audience")
+prompt = field.text(name="prompt", multiline=True)
+
+def prompt_config(hp: HP) -> list[Rule[str]]:
+    return hp.rules(
+        when=[audience],
+        then=prompt,
+        name="prompt_rules",
+        default=[audience.eq("clinical").then("Prefer protocol language.")],
+    )
+
+result = interact(prompt_config)
+```
+{% endcode %}
+
+After editing rules in the widget, `result.value` contains `Rule` objects and `result.params` contains the replayable JSON-friendly rule dictionaries. Nested boolean trees still display and round-trip, but the built-in widget edits flat condition lists; use Python or a custom UI for full tree editing.

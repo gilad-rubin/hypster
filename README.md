@@ -42,6 +42,7 @@
 - 🪆 **Hierarchical, Conditional Configurations**: Support for nested and swappable configurations
 - 📐 **Type Safety**: Built-in type hints and validation
 - 🧪 **Hyperparameter Optimization Built-In**: Native, first-class optuna support
+- 🧩 **Rules As Config**: Define replayable WHEN/THEN rule lists with built-in notebook controls
 
 ## Installation
 
