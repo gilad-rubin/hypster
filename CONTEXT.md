@@ -56,6 +56,22 @@ _Avoid_: selected params
 Optional human-written helper text attached to a parameter for lightweight display in interactive UIs and schema metadata.
 _Avoid_: docstring, tooltip-only text
 
+**Field Spec**:
+A JSON-friendly declaration of a rule condition field or rule payload field, created with `hypster.field`.
+_Avoid_: widget, form field
+
+**Rule**:
+A replayable WHEN/THEN object selected by `hp.rules()`, returned as a typed `Rule` and logged as a JSON-friendly dictionary.
+_Avoid_: callback, branch, arbitrary Python predicate
+
+**Rule Condition**:
+A `Leaf` or `Group` expression that describes when a **Rule** applies.
+_Avoid_: executing control flow
+
+**Rule Payload**:
+The `then` value carried by a **Rule**, shaped by one or more named **Field Specs**.
+_Avoid_: selected params
+
 **Display Label**:
 A human-readable label derived from a config, parameter, or group name unless explicitly provided by schema metadata.
 _Avoid_: parameter path, description
@@ -120,6 +136,9 @@ _Avoid_: exploration error, validation error
 - **Selected Params** are collected from the same parameter-recording event that powers the **Explore Schema**.
 - Replaying an **Instantiation Output** through `instantiate(config, values=output.params)` must follow the same reachable parameter choices, but does not guarantee object identity or deterministic side effects outside the selected parameters.
 - HPO-generated **Values** use the same **Parameter Path** and **Select Choice** rules as execution-generated **Selected Params**.
+- `hp.rules()` returns **Rule** objects as the **Instantiation Value** and records JSON-friendly rule dictionaries in **Selected Params**.
+- **Field Specs** describe the condition vocabulary and **Rule Payload** shape for a rules parameter; they are schema metadata, not selected params.
+- The built-in notebook UI uses rules schema metadata to render rules controls, but Python remains authoritative for validation and selected-param collection.
 - Individual `hp` parameter names and `hp.nest` names must be valid Python identifiers and cannot be Python keywords.
 - **Values** keys must be valid **Parameter Paths**, where each dotted segment or nested-dict segment is a valid Python identifier and not a Python keyword.
 - `instantiate`, `instantiate_with_params`, and `explore` all use `on_unknown="raise"` by default.

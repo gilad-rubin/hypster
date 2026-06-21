@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import pytest
 
-from hypster import HP, instantiate_with_params, interact
+from hypster import HP, And, Leaf, Rule, field, instantiate_with_params, interact
 
 
 def test_interact_requires_viz_extra(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -361,6 +361,82 @@ def test_interact_widget_decodes_empty_multi_value_transport_as_empty_list() -> 
     }
 
     assert result.params == {"values": []}
+
+
+def test_interact_snapshot_exposes_rules_metadata_for_notebook_renderer() -> None:
+    then_specs = [
+        field.text(name="prompt", multiline=True),
+        field.bool(name="use_citations"),
+    ]
+    default_rules = [
+        Rule(
+            when=And(Leaf("audience", "=", "clinical")),
+            then={"prompt": "Prefer protocol language.", "use_citations": True},
+            name="clinical",
+        )
+    ]
+
+    def config(hp: HP) -> Dict[str, list[Rule[Dict[str, Any]]]]:
+        rules = hp.rules(
+            when=[
+                field.select(["clinical", "operations"], name="audience"),
+                field.multi_select(["drug_leaflet", "formulary"], name="document_tag"),
+            ],
+            then=then_specs,
+            name="prompt_rules",
+            default=default_rules,
+        )
+        return {"rules": rules}
+
+    result = interact(config)
+    snapshot = result.snapshot
+    parameter = snapshot["schema"]["parameters"][0]
+
+    assert parameter["kind"] == "rules"
+    assert parameter["metadata"]["field_specs"][0]["name"] == "audience"
+    assert parameter["metadata"]["field_specs"][0]["operators"] == ["=", "!=", "in", "not_in"]
+    assert parameter["metadata"]["then_specs"] == [
+        {"type": "text", "name": "prompt", "multiline": True, "operators": ["=", "contains"]},
+        {"type": "bool", "name": "use_citations", "operators": ["is"]},
+    ]
+    assert snapshot["selected_params"]["prompt_rules"] == [
+        {
+            "when": {
+                "combinator": "and",
+                "conditions": [{"field": "audience", "operator": "=", "value": "clinical"}],
+            },
+            "then": {"prompt": "Prefer protocol language.", "use_citations": True},
+            "name": "clinical",
+        }
+    ]
+
+
+def test_interact_widget_round_trips_rules_action_values() -> None:
+    def config(hp: HP) -> Dict[str, list[Rule[str]]]:
+        rules = hp.rules(
+            when=[field.select(["clinical", "operations"], name="audience")],
+            then=field.text(name="prompt", multiline=True),
+            name="prompt_rules",
+        )
+        return {"rules": rules}
+
+    result = interact(config)
+    widget = result.interact()
+    new_rules = [
+        {
+            "when": {
+                "combinator": "and",
+                "conditions": [{"field": "audience", "operator": "=", "value": "operations"}],
+            },
+            "then": "Use runbook language.",
+        }
+    ]
+
+    widget.action = {"id": "rules-action", "type": "set_value", "path": "prompt_rules", "value": new_rules}
+
+    assert isinstance(result.value["rules"][0], Rule)
+    assert result.value["rules"][0].then == "Use runbook language."
+    assert result.params == {"prompt_rules": new_rules}
 
 
 def test_interact_multiple_widget_views_share_session_updates() -> None:

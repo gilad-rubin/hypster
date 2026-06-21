@@ -39,6 +39,7 @@
   * [Numeric Types](in-depth/hp-call-types/int-and-multi-int.md)
   * [Boolean Types](in-depth/hp-call-types/bool-and-multi-bool.md)
   * [Textual Types](in-depth/hp-call-types/text-and-multi-text.md)
+  * [Rules](in-depth/hp-call-types/rules.md)
 
 ## Reproducibility
 

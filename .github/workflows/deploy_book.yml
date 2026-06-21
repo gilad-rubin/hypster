@@ -21,14 +21,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - uses: actions/configure-pages@v5
       # If building a site (e.g., jupyter-book), build to a folder and upload that folder instead of docs
       # - run: uv run jupyter-book build docs
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: docs
 

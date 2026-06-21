@@ -296,12 +296,70 @@
   padding: 4px 0;
 }
 
+.hypster-rule-conditions,
 .hypster-rule-then {
+  display: grid;
+  gap: 7px;
   font-size: 13px;
   padding: 4px 0;
-  white-space: pre-wrap;
 }
 
+.hypster-rule-empty {
+  color: var(--hypster-muted);
+  font-style: italic;
+}
+
+.hypster-rule-condition-row {
+  align-items: start;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(110px, 1fr) minmax(68px, 0.55fr) minmax(130px, 1.2fr) auto;
+}
+
+.hypster-rule-condition-row select,
+.hypster-rule-condition-row input,
+.hypster-rule-condition-row textarea,
+.hypster-rule-then-field input,
+.hypster-rule-then-field select,
+.hypster-rule-then-field textarea {
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: inherit;
+  font: inherit;
+  min-height: 30px;
+  padding: 5px 8px;
+  width: 100%;
+  background: Canvas;
+}
+
+.hypster-rule-condition-row input[type="checkbox"],
+.hypster-rule-then-field input[type="checkbox"] {
+  justify-self: start;
+  min-height: auto;
+  width: auto;
+}
+
+.hypster-rule-condition-remove {
+  align-self: center;
+  background: transparent;
+  border: 0;
+  color: var(--hypster-muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+.hypster-rule-condition-remove:hover {
+  color: var(--hypster-error);
+}
+
+.hypster-rule-condition-add {
+  justify-self: start;
+}
+
+.hypster-rule-condition-add,
 .hypster-rules-add {
   background: transparent;
   border: 1px dashed var(--hypster-border);
@@ -314,7 +372,29 @@
   padding: 6px;
 }
 
+.hypster-rule-condition-add:hover,
 .hypster-rules-add:hover {
   background: var(--hypster-surface);
   border-style: solid;
+}
+
+.hypster-rule-then-field {
+  display: grid;
+  gap: 4px;
+}
+
+.hypster-rule-then-field > span {
+  color: var(--hypster-muted);
+  font-size: 12px;
+}
+
+.hypster-rule-then textarea {
+  min-height: 72px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 560px) {
+  .hypster-rule-condition-row {
+    grid-template-columns: 1fr;
+  }
 }

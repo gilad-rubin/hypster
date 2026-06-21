@@ -2,9 +2,8 @@
 
 import pytest
 
-hyperrules = pytest.importorskip("hyperrules")
-from hypster import And, Leaf, Rule, field  # noqa: E402
-from hypster.explore import explore  # noqa: E402
+from hypster import And, Leaf, Rule, field
+from hypster.explore import explore
 
 
 def _make_fields():
@@ -76,6 +75,16 @@ def test_rules_returns_list_of_rule_objects():
     assert len(result) == 1
     assert isinstance(result[0], Rule)
     assert result[0].name == "drug_leaflet"
+
+
+def test_rules_are_builtin_without_hyperrules_dependency():
+    document_tag = field.multi_select(["drug_leaflet", "formulary"], name="document_tag")
+    rule = document_tag.is_in(["formulary"]).then("Use formulary language")
+
+    assert rule.to_dict() == {
+        "when": {"field": "document_tag", "operator": "in", "value": ["formulary"]},
+        "then": "Use formulary language",
+    }
 
 
 def test_rules_schema_has_kind_rules():

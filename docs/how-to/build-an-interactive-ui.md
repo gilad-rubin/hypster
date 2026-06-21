@@ -191,6 +191,14 @@ def control_spec(field):
         }
     if field["kind"] == "text":
         return {"widget": "text", "value": field["selected_value"]}
+    if field["kind"] == "rules":
+        return {
+            "widget": "rules",
+            "value": field["selected_value"],
+            "when": field["metadata"]["field_specs"],
+            "then": field["metadata"]["then_specs"],
+            "combinators": field["metadata"]["combinators"],
+        }
     if field["kind"] in {"multi_int", "multi_float", "multi_text", "multi_bool", "multi_select"}:
         return {"widget": "list", "value": field["selected_value"], "options": field["options"]}
     raise ValueError(f"Unsupported kind: {field['kind']}")
