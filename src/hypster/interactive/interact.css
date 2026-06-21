@@ -304,6 +304,10 @@
   padding: 4px 0;
 }
 
+.hypster-rule-then {
+  white-space: pre-wrap;
+}
+
 .hypster-rule-empty {
   color: var(--hypster-muted);
   font-style: italic;

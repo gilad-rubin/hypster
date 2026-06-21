@@ -29,6 +29,11 @@ function namedSpecs(specs) {
   return (specs || []).filter((spec) => spec?.name);
 }
 
+function editableThenSpecs(thenSpecs) {
+  const specs = thenSpecs || [];
+  return specs.length === 1 ? specs : namedSpecs(specs);
+}
+
 function specByName(specs, name) {
   return namedSpecs(specs).find((spec) => spec.name === name) || namedSpecs(specs)[0] || null;
 }
@@ -49,7 +54,7 @@ function defaultSpecValue(spec) {
 }
 
 function defaultThenValue(thenSpecs) {
-  const specs = namedSpecs(thenSpecs);
+  const specs = editableThenSpecs(thenSpecs);
   if (specs.length > 1) {
     return Object.fromEntries(specs.map((spec) => [spec.name, defaultSpecValue(spec)]));
   }
@@ -105,15 +110,26 @@ function specValueFromControl(input, spec) {
     return option ? optionValue(option) : null;
   }
   if (input.type === "checkbox") return input.checked;
-  if (spec?.type === "int") return Number.parseInt(input.value, 10);
-  if (spec?.type === "float") return Number.parseFloat(input.value);
+  if (spec?.type === "int" || spec?.type === "float") {
+    const value = spec.type === "int" ? Number.parseInt(input.value, 10) : Number.parseFloat(input.value);
+    return Number.isFinite(value) ? value : defaultSpecValue(spec);
+  }
   if (spec?.type?.startsWith("multi_")) {
     if (!input.value.trim()) return [];
+    let values;
     try {
-      return JSON.parse(input.value);
+      values = JSON.parse(input.value);
     } catch {
-      return input.value.split(",").map((part) => part.trim()).filter(Boolean);
+      values = input.value
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
     }
+    const items = Array.isArray(values) ? values : [values];
+    if (spec.type === "multi_int") return items.map((item) => Number.parseInt(item, 10)).filter(Number.isFinite);
+    if (spec.type === "multi_float") return items.map((item) => Number.parseFloat(item)).filter(Number.isFinite);
+    if (spec.type === "multi_bool") return items.map((item) => item === true || String(item).toLowerCase() === "true");
+    return items;
   }
   return input.value;
 }
@@ -473,6 +489,7 @@ function renderRuleCard(parameter, fieldSpecs, thenSpecs, rule, index) {
   removeBtn.type = "button";
   removeBtn.className = "hypster-rule-remove";
   removeBtn.textContent = "×";
+  removeBtn.setAttribute("aria-label", `Remove rule ${index + 1}`);
   removeBtn.dataset.hypsterRuleRemove = "";
   removeBtn.dataset.path = parameter.path;
   removeBtn.dataset.ruleIndex = String(index);
@@ -519,14 +536,16 @@ function renderConditionEditor(parameter, fieldSpecs, ruleIndex, when) {
     editor.append(renderConditionRow(parameter, fieldSpecs, ruleIndex, conditionIndex, when.conditions[conditionIndex]));
   }
 
-  const addCondition = document.createElement("button");
-  addCondition.type = "button";
-  addCondition.className = "hypster-rule-condition-add";
-  addCondition.textContent = "+ Condition";
-  addCondition.dataset.hypsterRuleConditionAdd = "";
-  addCondition.dataset.path = parameter.path;
-  addCondition.dataset.ruleIndex = String(ruleIndex);
-  editor.append(addCondition);
+  if (namedSpecs(fieldSpecs).length > 0) {
+    const addCondition = document.createElement("button");
+    addCondition.type = "button";
+    addCondition.className = "hypster-rule-condition-add";
+    addCondition.textContent = "+ Condition";
+    addCondition.dataset.hypsterRuleConditionAdd = "";
+    addCondition.dataset.path = parameter.path;
+    addCondition.dataset.ruleIndex = String(ruleIndex);
+    editor.append(addCondition);
+  }
 
   return editor;
 }
@@ -582,6 +601,7 @@ function renderConditionRow(parameter, fieldSpecs, ruleIndex, conditionIndex, co
   remove.type = "button";
   remove.className = "hypster-rule-condition-remove";
   remove.textContent = "×";
+  remove.setAttribute("aria-label", `Remove condition ${conditionIndex + 1}`);
   remove.dataset.hypsterRuleConditionRemove = "";
   remove.dataset.path = parameter.path;
   remove.dataset.ruleIndex = String(ruleIndex);
@@ -595,7 +615,7 @@ function renderThenEditor(parameter, thenSpecs, rule, ruleIndex) {
   const editor = document.createElement("div");
   editor.className = "hypster-rule-then";
 
-  const specs = namedSpecs(thenSpecs);
+  const specs = editableThenSpecs(thenSpecs);
   if (specs.length === 0) {
     editor.textContent = typeof rule.then === "string" ? rule.then : JSON.stringify(rule.then);
     return editor;
@@ -606,7 +626,7 @@ function renderThenEditor(parameter, thenSpecs, rule, ruleIndex) {
     field.className = "hypster-rule-then-field";
 
     const label = document.createElement("span");
-    label.textContent = spec.description || spec.name;
+    label.textContent = spec.description || spec.name || "Value";
     field.append(label);
 
     const value = specs.length > 1 && rule.then && typeof rule.then === "object" && !Array.isArray(rule.then)
@@ -669,6 +689,7 @@ function renderSpecInput(spec, value, dataset) {
   input.className = className;
   input.dataset.kind = spec?.type || "text";
   for (const [key, attrValue] of Object.entries(attrs)) {
+    if (attrValue == null) continue;
     input.dataset[key] = attrValue;
   }
   return input;
@@ -745,6 +766,21 @@ function render(model, el) {
   el.append(root);
 }
 
+function updateRule(model, path, rawRuleIndex, updater) {
+  const snapshot = model.get("snapshot");
+  const param = findParameter(snapshot.schema?.parameters, path);
+  if (!param) return;
+
+  const ruleIndex = parseInt(rawRuleIndex, 10);
+  const rules = (valueFor(snapshot, param) || []).map(cloneValue);
+  const currentRule = rules[ruleIndex] || {
+    when: { combinator: "and", conditions: [] },
+    then: defaultThenValue(param.metadata?.then_specs || []),
+  };
+  rules[ruleIndex] = updater(currentRule, param);
+  send(model, { type: "set_value", path, value: rules });
+}
+
 export default {
   render({ model, el }) {
     el.addEventListener("click", (event) => {
@@ -806,6 +842,7 @@ export default {
       const conditionAdd = target.closest("[data-hypster-rule-condition-add]");
       if (conditionAdd instanceof HTMLElement && conditionAdd.dataset.path) {
         updateRule(model, conditionAdd.dataset.path, conditionAdd.dataset.ruleIndex, (rule, param) => {
+          if (namedSpecs(param.metadata?.field_specs || []).length === 0) return rule;
           const when = editableWhen(rule.when) || { combinator: "and", conditions: [] };
           return {
             ...rule,
@@ -894,7 +931,7 @@ export default {
 
       if (target.dataset.hypsterRuleThenValue != null) {
         updateRule(model, target.dataset.path, target.dataset.ruleIndex, (rule, param) => {
-          const thenSpecs = namedSpecs(param.metadata?.then_specs || []);
+          const thenSpecs = editableThenSpecs(param.metadata?.then_specs || []);
           const spec = thenSpecs.length > 1 ? specByName(thenSpecs, target.dataset.thenName) : thenSpecs[0];
           const value = specValueFromControl(target, spec);
           if (thenSpecs.length > 1) {
@@ -925,18 +962,3 @@ export default {
     };
   },
 };
-
-function updateRule(model, path, rawRuleIndex, updater) {
-  const snapshot = model.get("snapshot");
-  const param = findParameter(snapshot.schema?.parameters, path);
-  if (!param) return;
-
-  const ruleIndex = parseInt(rawRuleIndex, 10);
-  const rules = (valueFor(snapshot, param) || []).map(cloneValue);
-  const currentRule = rules[ruleIndex] || {
-    when: { combinator: "and", conditions: [] },
-    then: defaultThenValue(param.metadata?.then_specs || []),
-  };
-  rules[ruleIndex] = updater(currentRule, param);
-  send(model, { type: "set_value", path, value: rules });
-}
