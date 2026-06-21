@@ -72,6 +72,17 @@ function labelFor(parameter) {
   return parameter.display_label || parameter.name;
 }
 
+function findParameter(parameters, path) {
+  for (const p of parameters || []) {
+    if (p.path === path) return p;
+    if (p.children) {
+      const found = findParameter(p.children, path);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 function closeChoiceMenus(root) {
   for (const choice of root.querySelectorAll(".hypster-choice-open")) {
     choice.classList.remove("hypster-choice-open");
@@ -244,6 +255,20 @@ function renderControl(snapshot, parameter) {
     return checkbox;
   }
 
+  if (parameter.kind === "text" && parameter.metadata?.multiline) {
+    const textarea = document.createElement("textarea");
+    textarea.dataset.path = parameter.path;
+    textarea.dataset.kind = parameter.kind;
+    textarea.value = currentValue ?? "";
+    textarea.rows = 4;
+    textarea.className = "hypster-textarea";
+    return textarea;
+  }
+
+  if (parameter.kind === "rules") {
+    return renderRulesControl(snapshot, parameter);
+  }
+
   const input = document.createElement("input");
   input.dataset.path = parameter.path;
   input.dataset.kind = parameter.kind;
@@ -306,6 +331,90 @@ function renderChoiceControl(parameter, currentValue) {
 
   choice.append(menu);
   return choice;
+}
+
+function renderRulesControl(snapshot, parameter) {
+  const meta = parameter.metadata || {};
+  const fieldSpecs = meta.field_specs || [];
+  const thenSpecs = meta.then_specs || [];
+  const rules = valueFor(snapshot, parameter) || [];
+
+  const container = document.createElement("div");
+  container.className = "hypster-rules";
+  container.dataset.path = parameter.path;
+  container.dataset.kind = "rules";
+
+  for (let i = 0; i < rules.length; i++) {
+    const rule = rules[i];
+    container.append(renderRuleCard(parameter, fieldSpecs, thenSpecs, rule, i));
+  }
+
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "hypster-rules-add";
+  addBtn.textContent = "+ Add rule";
+  addBtn.dataset.hypsterRulesAdd = "";
+  addBtn.dataset.path = parameter.path;
+  container.append(addBtn);
+
+  return container;
+}
+
+function renderRuleCard(parameter, fieldSpecs, thenSpecs, rule, index) {
+  const card = document.createElement("div");
+  card.className = "hypster-rule-card";
+
+  const header = document.createElement("div");
+  header.className = "hypster-rule-header";
+  const title = document.createElement("span");
+  title.className = "hypster-rule-title";
+  title.textContent = rule.name || `Rule ${index + 1}`;
+  header.append(title);
+
+  const removeBtn = document.createElement("button");
+  removeBtn.type = "button";
+  removeBtn.className = "hypster-rule-remove";
+  removeBtn.textContent = "×";
+  removeBtn.dataset.hypsterRuleRemove = "";
+  removeBtn.dataset.path = parameter.path;
+  removeBtn.dataset.ruleIndex = String(index);
+  header.append(removeBtn);
+  card.append(header);
+
+  const whenLabel = document.createElement("div");
+  whenLabel.className = "hypster-rule-label";
+  whenLabel.textContent = "WHEN";
+  card.append(whenLabel);
+
+  const whenSummary = document.createElement("div");
+  whenSummary.className = "hypster-rule-when";
+  whenSummary.textContent = summarizeCondition(rule.when);
+  card.append(whenSummary);
+
+  const thenLabel = document.createElement("div");
+  thenLabel.className = "hypster-rule-label";
+  thenLabel.textContent = "THEN";
+  card.append(thenLabel);
+
+  const thenValue = document.createElement("div");
+  thenValue.className = "hypster-rule-then";
+  thenValue.textContent = typeof rule.then === "string" ? rule.then : JSON.stringify(rule.then);
+  card.append(thenValue);
+
+  return card;
+}
+
+function summarizeCondition(when) {
+  if (!when) return "(always)";
+  if (when.field) {
+    return `${when.field} ${when.operator} ${JSON.stringify(when.value)}`;
+  }
+  if (when.combinator && when.conditions) {
+    const parts = when.conditions.map(summarizeCondition);
+    const sep = ` ${when.combinator.toUpperCase()} `;
+    return parts.join(sep);
+  }
+  return JSON.stringify(when);
 }
 
 function renderStatus(snapshot) {
@@ -398,12 +507,42 @@ export default {
         return;
       }
 
+      const ruleRemove = target.closest("[data-hypster-rule-remove]");
+      if (ruleRemove instanceof HTMLElement && ruleRemove.dataset.path) {
+        const snapshot = model.get("snapshot");
+        const path = ruleRemove.dataset.path;
+        const index = parseInt(ruleRemove.dataset.ruleIndex, 10);
+        const param = findParameter(snapshot.schema?.parameters, path);
+        if (!param) return;
+        const rules = valueFor(snapshot, param) || [];
+        const updated = rules.filter((_, i) => i !== index);
+        send(model, { type: "set_value", path, value: updated });
+        return;
+      }
+
+      const ruleAdd = target.closest("[data-hypster-rules-add]");
+      if (ruleAdd instanceof HTMLElement && ruleAdd.dataset.path) {
+        const snapshot = model.get("snapshot");
+        const path = ruleAdd.dataset.path;
+        const param = findParameter(snapshot.schema?.parameters, path);
+        if (!param) return;
+        const rules = valueFor(snapshot, param) || [];
+        const thenSpecs = param.metadata?.then_specs || [];
+        const emptyThen =
+          thenSpecs.length > 1
+            ? Object.fromEntries(thenSpecs.filter((s) => s?.name).map((s) => [s.name, ""]))
+            : "";
+        const newRule = { when: { combinator: "and", conditions: [] }, then: emptyThen };
+        send(model, { type: "set_value", path, value: [...rules, newRule] });
+        return;
+      }
+
       closeChoiceMenus(el);
     });
 
     el.addEventListener("change", (event) => {
       const target = event.target;
-      if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
+      if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return;
       if (!target.dataset.path) return;
 
       send(model, {
