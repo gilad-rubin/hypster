@@ -762,6 +762,7 @@ class HP:
         default: str,
         *,
         name: str,
+        multiline: bool = False,
         allow_none: Literal[False] = False,
         description: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
@@ -773,6 +774,7 @@ class HP:
         default: Optional[str],
         *,
         name: str,
+        multiline: bool = False,
         allow_none: Literal[True],
         description: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
@@ -783,11 +785,15 @@ class HP:
         default: Optional[str],
         *,
         name: str,
+        multiline: bool = False,
         allow_none: bool = False,
         description: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         """Text parameter."""
+        combined_metadata = dict(metadata or {})
+        if multiline:
+            combined_metadata["multiline"] = True
         spec = HP.SingleValueSpec(
             name=name,
             default=default,
@@ -796,7 +802,7 @@ class HP:
             supports_strict=False,
             allow_none=allow_none,
             description=description,
-            metadata=metadata,
+            metadata=combined_metadata if combined_metadata else None,
             track_called=True,
             use_validator_name=True,
         )
@@ -995,6 +1001,101 @@ class HP:
         )
         return self._execute_select_multi(spec)
 
+    def _rules(
+        self,
+        *,
+        when: list,
+        name: str,
+        then: Any,
+        combinators: Optional[List[str]] = None,
+        default: Optional[list] = None,
+        description: Optional[str] = None,
+    ) -> list:
+        """Rules parameter — a list of WHEN/THEN rules as a config value.
+
+        ``when`` is a list of FieldSpec objects declaring the condition vocabulary.
+        ``then`` is a FieldSpec (or type shorthand) for the payload widget.
+        ``combinators`` controls the tier: ["and"] for simple, ["and","or","not"] for full.
+        """
+        full_path = self._get_full_param_path(name)
+        validate_identifier_name(name, kind="parameter name")
+        self._validate_name_not_called(name)
+        self.called_params.add(full_path)
+
+        if combinators is None:
+            combinators = ["and"]
+
+        then_spec = self._resolve_then_spec(then)
+        field_specs = [fs.to_dict() for fs in when]
+        then_specs = [then_spec.to_dict()] if not isinstance(then_spec, list) else [s.to_dict() for s in then_spec]
+
+        value, found = self._get_value_for_param(name)
+        rules_value = self._coerce_rules(value if found else (default or []))
+
+        rules_metadata: Dict[str, Any] = {
+            "field_specs": field_specs,
+            "then_specs": then_specs,
+            "combinators": combinators,
+        }
+
+        self._record_parameter(
+            path=full_path,
+            name=name,
+            kind="rules",
+            default_value=self._rules_to_jsonable(default or []),
+            selected_value=self._rules_to_jsonable(rules_value),
+            description=description,
+            metadata=rules_metadata,
+        )
+
+        return rules_value
+
+    @staticmethod
+    def _resolve_then_spec(then: Any) -> Any:
+        try:
+            from hyperrules.field_spec import FieldSpec
+        except ImportError:
+            raise ImportError("hyperrules is required for hp.rules(): pip install hyperrules")
+
+        if isinstance(then, FieldSpec):
+            if then.name is None:
+                raise ValueError("then FieldSpec must have a name, e.g. field.text(name='prompt', multiline=True)")
+            return then
+        if isinstance(then, list):
+            for i, item in enumerate(then):
+                if not isinstance(item, FieldSpec):
+                    raise TypeError(f"then[{i}]: expected a FieldSpec, got {type(item).__name__}")
+                if item.name is None:
+                    raise ValueError(f"then[{i}]: FieldSpec must have a name")
+            return then
+        raise TypeError(
+            f"then must be a FieldSpec (e.g. field.text(name='prompt', multiline=True)), got {type(then).__name__}"
+        )
+
+    @staticmethod
+    def _coerce_rules(raw: list) -> list:
+        try:
+            from hyperrules.types import Rule
+        except ImportError:
+            return list(raw)
+        result = []
+        for i, item in enumerate(raw):
+            if isinstance(item, Rule):
+                result.append(item)
+            elif isinstance(item, dict):
+                result.append(Rule.from_dict(item))
+            else:
+                raise ValueError(f"rules[{i}]: expected a Rule or dict, got {type(item).__name__}")
+        return result
+
+    @staticmethod
+    def _rules_to_jsonable(rules: list) -> list:
+        try:
+            from hyperrules.types import Rule
+        except ImportError:
+            return list(rules)
+        return [r.to_dict() if isinstance(r, Rule) else r for r in rules]
+
     # Map public API names to internal methods
     def __getattr__(self, name: str) -> Any:
         """Route public API names to internal methods."""
@@ -1009,6 +1110,7 @@ class HP:
             "multi_text": self._multi_text,
             "multi_bool": self._multi_bool,
             "multi_select": self._multi_select,
+            "rules": self._rules,
         }
 
         if name in method_map:
@@ -1029,3 +1131,4 @@ class HP:
         multi_text = _multi_text
         multi_bool = _multi_bool
         multi_select = _multi_select
+        rules = _rules

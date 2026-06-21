@@ -3,6 +3,20 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-21
+
+### Added
+- `hp.rules(when=fields, then=spec, name=...)` primitive for declarative WHEN/THEN rules as a configuration value.
+  - `when` accepts a list of `hyperrules.FieldSpec` objects declaring the condition vocabulary.
+  - `then` accepts a named `FieldSpec` (or list thereof) describing the payload widget — e.g. `field.text(name="prompt", multiline=True)`.
+  - Multi-then support: pass a list of FieldSpecs to `then` for composite payloads (e.g. prompt + use_citations).
+  - Rules are recorded as `kind="rules"` in `explore()` schema with `field_specs`, `then_specs`, and `combinators` metadata.
+  - Values round-trip through `instantiate_with_params` as JSON/YAML-serializable dicts.
+- `hp.text(multiline=True)` parameter — records `{"multiline": True}` in metadata for UI rendering hints.
+
+### Changed
+- `then` parameter in `hp.rules()` is required and must be an explicit named `FieldSpec` — no implicit defaults or bare strings.
+
 ## [0.6.0] - 2026-06-04
 
 ### Breaking Changes

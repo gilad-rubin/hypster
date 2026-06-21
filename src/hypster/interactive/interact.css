@@ -232,3 +232,89 @@
   cursor: default;
   opacity: 0.55;
 }
+
+.hypster-textarea {
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  min-height: 80px;
+  padding: 8px;
+  color: inherit;
+  background: Canvas;
+  font: inherit;
+  resize: vertical;
+}
+
+.hypster-rules {
+  display: grid;
+  gap: 8px;
+}
+
+.hypster-rule-card {
+  border: 1px solid var(--hypster-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.hypster-rule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.hypster-rule-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.hypster-rule-remove {
+  background: transparent;
+  border: 0;
+  color: var(--hypster-muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
+.hypster-rule-remove:hover {
+  color: var(--hypster-error);
+}
+
+.hypster-rule-label {
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--hypster-muted);
+}
+
+.hypster-rule-when {
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.hypster-rule-then {
+  font-size: 13px;
+  padding: 4px 0;
+  white-space: pre-wrap;
+}
+
+.hypster-rules-add {
+  background: transparent;
+  border: 1px dashed var(--hypster-border);
+  border-radius: 6px;
+  color: var(--hypster-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  min-height: 32px;
+  padding: 6px;
+}
+
+.hypster-rules-add:hover {
+  background: var(--hypster-surface);
+  border-style: solid;
+}
