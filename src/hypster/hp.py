@@ -1014,6 +1014,7 @@ class HP:
         combinators: Optional[List[str]] = None,
         default: Optional[list] = None,
         description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> list:
         """Rules parameter — a list of WHEN/THEN rules as a config value.
 
@@ -1049,6 +1050,8 @@ class HP:
             "then_specs": then_specs,
             "combinators": combinators,
         }
+        if metadata:
+            rules_metadata.update(metadata)
 
         self._record_parameter(
             path=full_path,
