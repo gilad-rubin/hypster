@@ -57,7 +57,12 @@ export function useSchemaField({
     if (!moved) return;
     next.splice(to, 0, moved);
     onChange(next);
+    if (editingIndex === null) return;
     if (editingIndex === from) setEditingIndex(to);
+    else if (from < editingIndex && to >= editingIndex)
+      setEditingIndex(editingIndex - 1);
+    else if (from > editingIndex && to <= editingIndex)
+      setEditingIndex(editingIndex + 1);
   };
 
   return {
