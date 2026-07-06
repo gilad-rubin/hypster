@@ -49,6 +49,8 @@ export function useRulesField({
   const removeRule = (index: number) => {
     onChange(rules.filter((_, i) => i !== index));
     if (editingIndex === index) setEditingIndex(null);
+    else if (editingIndex !== null && editingIndex > index)
+      setEditingIndex(editingIndex - 1);
   };
 
   const addRule = () => {
