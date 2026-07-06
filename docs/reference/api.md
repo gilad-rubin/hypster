@@ -295,7 +295,7 @@ hp.bool(default, *, name, allow_none=False, description=None, metadata=None)
 
 Use `allow_none=True` when `None` is a real scalar value.
 Numeric coercion is consistent for top-level parameters and nested paths.
-Use `metadata={...}` for opaque JSON-compatible hints that should appear on schema nodes without affecting selected values or runtime return objects; see [Custom Metadata On A Basic Parameter](../in-depth/hp-call-types/README.md#custom-metadata-on-a-basic-parameter) for the worked example.
+Use `metadata={...}` for opaque JSON-compatible hints that should appear on schema nodes without affecting selected values or runtime return objects; see [HP Call Types](../in-depth/hp-call-types/README.md) for the worked example.
 Use `hp.text(..., multiline=True)` for prompt blocks and other long text; schemas record this as `metadata={"multiline": True}` so UIs can render a larger editor.
 
 ## HP Select Methods
@@ -426,7 +426,7 @@ def config(hp: HP) -> list[Rule[str]]:
 
 The config return value contains `Rule` objects. Selected params contain JSON-friendly dictionaries suitable for logging and replay. `explore(..., return_schema=True)` records rules as `kind="rules"` with `metadata["field_specs"]`, `metadata["then_specs"]`, and `metadata["combinators"]` for notebook and custom UI renderers.
 
-For the `FieldSpec` condition-builder methods (`.eq`, `.is_in`, `.gt`, …) and each field type's default operators, see [FieldSpec Methods And Default Operators](../in-depth/hp-call-types/rules.md#fieldspec-methods-and-default-operators).
+For the `FieldSpec` condition-builder methods (`.eq`, `.is_in`, `.gt`, …) and each field type's default operators, see [Rules](../in-depth/hp-call-types/rules.md).
 
 ## HP.schema
 
