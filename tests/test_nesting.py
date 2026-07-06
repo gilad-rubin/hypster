@@ -136,3 +136,88 @@ def test_explicit_nested_values_raise_for_unknown_child_parameters() -> None:
 
     with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
         explore(parent, return_schema=True)
+
+
+def test_nest_metadata_appears_on_group_node() -> None:
+    """Metadata passed to hp.nest lands on the group ParameterInfo in the explored schema."""
+
+    def child(hp: HP) -> Dict[str, int]:
+        return {"x": hp.int(10, name="x")}
+
+    def parent(hp: HP) -> Dict[str, int]:
+        return hp.nest(child, name="child", metadata={"ui": True})
+
+    info = explore(parent, return_schema=True)
+
+    assert info is not None
+    group = info.parameters[0]
+    assert group.is_group()
+    assert group.metadata == {"ui": True}
+
+
+def test_nest_metadata_changes_the_explored_schema() -> None:
+    """Falsifier: two different metadata dicts must produce two different schema outputs."""
+
+    def child(hp: HP) -> Dict[str, int]:
+        return {"x": hp.int(10, name="x")}
+
+    def parent(hp: HP, nest_metadata: Dict[str, Any]) -> Dict[str, int]:
+        return hp.nest(child, name="child", metadata=nest_metadata)
+
+    schema_a = explore(parent, return_schema=True, nest_metadata={"ui": "wizard"})
+    schema_b = explore(parent, return_schema=True, nest_metadata={"ui": "sidebar"})
+
+    assert schema_a is not None and schema_b is not None
+    group_a = schema_a.to_dict()["parameters"][0]
+    group_b = schema_b.to_dict()["parameters"][0]
+    assert group_a["metadata"] == {"ui": "wizard"}
+    assert group_b["metadata"] == {"ui": "sidebar"}
+    assert group_a["metadata"] != group_b["metadata"]
+
+
+def test_nest_without_metadata_leaves_group_metadata_unset() -> None:
+    def child(hp: HP) -> Dict[str, int]:
+        return {"x": hp.int(10, name="x")}
+
+    def parent(hp: HP) -> Dict[str, int]:
+        return hp.nest(child, name="child")
+
+    info = explore(parent, return_schema=True)
+
+    assert info is not None
+    group = info.parameters[0]
+    assert group.is_group()
+    assert group.metadata is None
+    assert "metadata" not in info.to_dict()["parameters"][0]
+
+
+def test_nest_metadata_must_be_json_compatible() -> None:
+    def child(hp: HP) -> Dict[str, int]:
+        return {"x": hp.int(10, name="x")}
+
+    def parent(hp: HP) -> Dict[str, int]:
+        return hp.nest(child, name="child", metadata={"editor": object()})
+
+    with pytest.raises(ValueError, match=r"metadata\['editor'\] must be JSON-compatible"):
+        explore(parent, return_schema=True)
+
+    with pytest.raises(ValueError, match=r"metadata\['editor'\] must be JSON-compatible"):
+        instantiate(parent)
+
+
+def test_nest_metadata_does_not_affect_selected_params_or_replay() -> None:
+    def child(hp: HP) -> Dict[str, int]:
+        return {"x": hp.int(10, name="x")}
+
+    def parent_plain(hp: HP) -> Dict[str, int]:
+        return hp.nest(child, name="child")
+
+    def parent_with_metadata(hp: HP) -> Dict[str, int]:
+        return hp.nest(child, name="child", metadata={"ui": True})
+
+    plain = instantiate_with_params(parent_plain)
+    with_metadata = instantiate_with_params(parent_with_metadata)
+
+    assert with_metadata.params == plain.params
+    assert with_metadata.value == plain.value
+    assert instantiate(parent_with_metadata, values=with_metadata.params) == with_metadata.value

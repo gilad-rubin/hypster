@@ -165,9 +165,18 @@ class SchemaTracer(HP):
             self._schema = tracker._schema
             self._nodes_by_path = tracker._nodes_by_path
 
-    def record_nest(self, *, path: str, name: str, description: Optional[str] = None) -> None:
+    def record_nest(
+        self,
+        *,
+        path: str,
+        name: str,
+        description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         group = self._ensure_group(path, name)
         group.description = description
+        if metadata is not None:
+            group.metadata = metadata
 
     def record_parameter(
         self,

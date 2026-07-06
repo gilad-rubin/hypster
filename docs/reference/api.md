@@ -328,12 +328,13 @@ hp.nest(
     name,
     values=None,
     description=None,
+    metadata=None,
     **kwargs,
 )
 ```
 {% endcode %}
 
-Executes another config function under a named path.
+Executes another config function under a named path. Use `metadata={...}` for opaque JSON-compatible hints that appear on the nested group's schema node, matching `metadata=` on the parameter calls.
 
 {% code overflow="wrap" %}
 ```python
