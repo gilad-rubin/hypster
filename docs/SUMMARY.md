@@ -69,3 +69,5 @@
 * [Origin Story](philosophy/origin-story.md)
 * [Articles](philosophy/articles.md)
 * [ADR: Strict Unknown Values](adr/0001-strict-unknown-values.md)
+* [ADR: Interactive Snapshot and Modern Notebook Renderer](adr/0002-interactive-snapshot-and-modern-notebook-renderer.md)
+* [ADR: Direct Keyword Execution Arguments](adr/0003-direct-keyword-execution-arguments.md)

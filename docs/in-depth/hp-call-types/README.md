@@ -46,3 +46,29 @@ For `hp.rules`, declare condition and payload fields with `hypster.field` and us
 * Numeric parameters reject `True` and `False` even though Python treats `bool` as a subclass of `int`.
 
 See [Public API](../../reference/api.md) for exact signatures.
+
+## Custom Metadata On A Basic Parameter
+
+Every basic `hp.*` call accepts `metadata={...}` for opaque, JSON-compatible hints. `explore(..., return_schema=True)` carries them straight to that parameter's schema node, unread and unvalidated beyond JSON-compatibility:
+
+{% code overflow="wrap" %}
+```python
+from hypster import HP, explore
+
+def app_config(hp: HP) -> dict:
+    tier = hp.select(
+        ["basic", "advanced"],
+        name="tier",
+        default="basic",
+        metadata={"ui_group": "advanced", "help_url": "https://example.com/docs/tier"},
+    )
+    return {"tier": tier}
+
+schema = explore(app_config, return_schema=True)
+param = schema.to_dict()["parameters"][0]
+
+assert param["metadata"] == {"ui_group": "advanced", "help_url": "https://example.com/docs/tier"}
+```
+{% endcode %}
+
+This is the same `metadata=` mechanism `hp.nest(..., metadata=...)` uses for a nested group's schema node — see [Nested Configurations](../nest.md) for the group-level form.
