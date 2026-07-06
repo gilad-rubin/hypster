@@ -79,8 +79,7 @@ class FieldSpec:
         # Leaf(...) construction remains the deliberate escape hatch.
         if self.operators and operator not in self.operators:
             raise ValueError(
-                f"Operator {operator!r} is not valid for a {self.type!r} field "
-                f"(allowed: {', '.join(self.operators)})"
+                f"Operator {operator!r} is not valid for a {self.type!r} field (allowed: {', '.join(self.operators)})"
             )
         return Leaf(self._require_name(), operator, value)
 
