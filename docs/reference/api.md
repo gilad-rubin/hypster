@@ -27,6 +27,8 @@ from hypster import (
 
 A config function must be callable and its first positional parameter must be named `hp`. A keyword-only `hp` parameter is rejected before the config executes because Hypster passes the `HP` object positionally.
 
+`ConfigFunc` is the `Protocol` type for this contract, exported from `hypster` for annotating functions, variables, or parameters that accept a config function.
+
 Config functions are pure Python, not a DSL. `instantiate()`, `explore()`, `interact()`, and the HPO adapter all execute the function to discover or select values, so public API calls inherit any side effects or expensive work in the function body.
 
 {% code overflow="wrap" %}
@@ -41,6 +43,30 @@ def config(hp: HP) -> int:
 The `hp: HP` annotation is recommended but not mandatory. If the first parameter has a type annotation, it must include `HP`. Callable objects are supported when `inspect.signature()` can read their `__call__` signature; signature validation errors use the class name.
 
 Reference examples use small return values for compactness. In application docs and production code, the usual pattern is to return the initialized object your application will use.
+
+### functools.partial-Wrapped Config Functions
+
+Config functions may be wrapped with `functools.partial` to pre-bind execution arguments. Hypster validates the signature with `inspect.signature()`, which reads through a `partial` object to the underlying function's signature, so `hp` is still recognized as the first parameter:
+
+{% code overflow="wrap" %}
+```python
+from functools import partial
+from hypster import HP, instantiate_with_params
+
+def training_config(hp: HP, *, dataset_size: int) -> dict:
+    batch_size = hp.int(32, name="batch_size", min=1)
+    epochs = hp.int(10, name="epochs", min=1)
+    return {"batch_size": batch_size, "epochs": epochs, "dataset_size": dataset_size}
+
+bound_config = partial(training_config, dataset_size=50_000)
+run = instantiate_with_params(bound_config, values={"batch_size": 64})
+
+assert run.value == {"batch_size": 64, "epochs": 10, "dataset_size": 50000}
+assert run.params == {"batch_size": 64, "epochs": 10}
+```
+{% endcode %}
+
+`dataset_size` is bound by `partial`, not selected through `hp.*`, so it is passed through to the return value but does not appear in `run.params`.
 
 Config functions may accept extra keyword-only execution arguments. Pass those directly; Hypster-owned names such as `values`, `on_unknown`, `return_schema`, `auto_apply`, `name`, and `description` are reserved at their API boundaries.
 

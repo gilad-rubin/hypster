@@ -135,6 +135,46 @@ Use `explore(model_config, values={"family": "forest"})` to inspect the branch b
 
 Prefer the default for experiments and production replay. Softer policies are useful when migrating old payloads or rendering exploratory UIs.
 
+### Conditional Options Under Each Policy
+
+A later `hp.select`'s option list can depend on an earlier one, so a parameter name can exist in one branch and not another. Overriding a parameter that only exists in a branch you did not take is the same "unreachable" case as above, worked through under each `on_unknown` policy:
+
+{% code overflow="wrap" %}
+```python
+from hypster import HP, instantiate
+
+def pipeline_config(hp: HP) -> dict:
+    stage = hp.select(["ingest", "transform"], name="stage", default="ingest", options_only=True)
+    if stage == "ingest":
+        source = hp.select(["csv", "json"], name="source", default="csv", options_only=True)
+        return {"stage": stage, "source": source}
+    else:
+        strategy = hp.select(["normalize", "aggregate"], name="strategy", default="normalize", options_only=True)
+        return {"stage": stage, "strategy": strategy}
+```
+{% endcode %}
+
+Taking the `"ingest"` branch and overriding `strategy` — a parameter that only exists on the untaken `"transform"` branch:
+
+{% code overflow="wrap" %}
+```python
+# on_unknown="raise" (default): raises
+instantiate(pipeline_config, values={"stage": "ingest", "strategy": "aggregate"})
+# ValueError: Unknown or unreachable parameters
+
+# on_unknown="warn": warns, then returns the ingest branch's own default for "source"
+instantiate(pipeline_config, values={"stage": "ingest", "strategy": "aggregate"}, on_unknown="warn")
+# UserWarning: Unknown or unreachable parameters
+# => {"stage": "ingest", "source": "csv"}
+
+# on_unknown="ignore": same result, no warning
+instantiate(pipeline_config, values={"stage": "ingest", "strategy": "aggregate"}, on_unknown="ignore")
+# => {"stage": "ingest", "source": "csv"}
+```
+{% endcode %}
+
+Under `"warn"` and `"ignore"`, the override for the untaken branch is dropped, not redirected or coerced onto the active branch: the active branch (`"ingest"`) still resolves `source` to its own default, `"csv"`. Nothing about `strategy="aggregate"` leaks into the result.
+
 ## Select Keys vs Complex Values
 
 Nested dictionaries inside `values=` are interpreted as nested parameter paths. If you need a select option whose runtime value is a dictionary, use dict-backed `select`:
