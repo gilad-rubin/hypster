@@ -113,13 +113,17 @@ Default operators per type (`FieldSpec.operators`, populated from each `field.*`
 
 `.is_true()` and `.is_false()` both build an `"is"` leaf, differing only in the boolean value. There is no `.neq_in()`; the negated-membership method is `.not_in(values)`.
 
-`FieldSpec` methods do not check the `operators` tuple before building a `Leaf`. Calling a method whose operator is outside the type's own default list (for example `.gt(...)` on a `field.text(...)`) still returns a `Leaf` with that operator string instead of raising:
+`FieldSpec` methods check the `operators` tuple before building a `Leaf`. Calling a method whose operator is outside the type's own list (for example `.gt(...)` on a `field.text(...)`) raises, naming the allowed set. Constructing `Leaf(...)` directly remains unrestricted — the deliberate escape hatch for custom operators:
 
 ```python
 from hypster import field
+from hypster.rules import Leaf
 
 label = field.text(name="label")
 label.gt("x")
+# ValueError: Operator '>' is not valid for a 'text' field (allowed: =, contains)
+
+Leaf("label", ">", "x")   # unrestricted by design
 # Leaf(field='label', operator='>', value='x')
 ```
 
