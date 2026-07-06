@@ -118,13 +118,20 @@ class HP:
                 metadata=metadata,
             )
 
-    def _record_nest(self, *, path: str, name: str, description: Optional[str] = None) -> None:
+    def _record_nest(
+        self,
+        *,
+        path: str,
+        name: str,
+        description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         if self.parameter_tracker is None:
             return
 
         record = getattr(self.parameter_tracker, "record_nest", None)
         if callable(record):
-            record(path=path, name=name, description=description)
+            record(path=path, name=name, description=description, metadata=metadata)
 
     def _get_value_for_param(self, name: str) -> tuple[Any, bool]:
         """Get value for parameter, returns (value, found)."""
@@ -536,6 +543,7 @@ class HP:
         name: str,
         values: Optional[Dict[str, Any]] = None,
         description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Any:
         """Nest another configuration function."""
@@ -574,8 +582,10 @@ class HP:
         if explicit_values:
             nested_values.update(explicit_values)
 
+        metadata = validate_metadata(metadata, param_path=full_path)
+
         # Create new HP instance for nested call with namespace
-        self._record_nest(path=full_path, name=name, description=description)
+        self._record_nest(path=full_path, name=name, description=description, metadata=metadata)
 
         nested_hp = self.__class__(nested_values, parameter_tracker=self.parameter_tracker)
         nested_hp.namespace_stack = self.namespace_stack + [name]

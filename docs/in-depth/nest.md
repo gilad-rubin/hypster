@@ -33,6 +33,7 @@ hp.nest(
     *,
     name,
     values=None,
+    metadata=None,
     **kwargs,
 )
 ```
@@ -43,6 +44,7 @@ hp.nest(
 | `child` | Config function whose first parameter is `hp`. |
 | `name` | Scope name. Must be a valid Python identifier. |
 | `values` | Child-local values merged into the nested call. |
+| `metadata` | Opaque JSON-compatible hints recorded on the nested group's schema node. |
 | `**kwargs` | Execution arguments forwarded to the child. |
 
 ## Child-Local Values
@@ -145,6 +147,25 @@ This value raises by default because `settings.threads` is unreachable on the `r
 instantiate(app_config, values={"backend": "remote", "settings.threads": 8})
 ```
 {% endcode %}
+
+## Group Metadata
+
+`metadata=` attaches opaque, JSON-compatible hints to the nested group itself — the same mechanism `metadata=` provides on parameter calls, one level up. `explore(..., return_schema=True)` records it on the group's schema node, where a form renderer can read it; it never affects instantiation, selected params, or replay.
+
+{% code overflow="wrap" %}
+```python
+def retriever(hp: HP) -> dict:
+    return {"top_k": hp.int(5, name="top_k")}
+
+def pipeline(hp: HP) -> dict:
+    return hp.nest(retriever, name="retriever", metadata={"ui": "sidebar"})
+
+schema = explore(pipeline, return_schema=True)
+schema.parameters[0].metadata  # {"ui": "sidebar"}
+```
+{% endcode %}
+
+Invalid (non-JSON-compatible) metadata raises a `ValueError` naming the offending key, at `explore` and `instantiate` alike.
 
 ## Name Collisions
 
