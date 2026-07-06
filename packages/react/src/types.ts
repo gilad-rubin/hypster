@@ -2,7 +2,7 @@
 // Config schema types — mirror the JSON returned by hypster's explore().
 // ---------------------------------------------------------------------------
 
-export type ConfigNodeKind = "select" | "int" | "float" | "text" | "bool" | "group" | "rules";
+export type ConfigNodeKind = "select" | "int" | "float" | "text" | "bool" | "group" | "rules" | "schema";
 
 export type ConfigValue = string | number | boolean;
 
@@ -12,7 +12,21 @@ export type RuleValue = {
   name?: string;
 };
 
-export type AnyConfigValue = ConfigValue | RuleValue[];
+export type SchemaFieldValue = {
+  key: string;
+  value_type: "text" | "enum" | "number" | "date";
+  description?: string;
+  label?: string;
+  multi_valued?: boolean;
+  possible_values?: string[];
+  unit?: string;
+};
+
+export type SchemaMetadata = {
+  field_specs: SchemaFieldValue[];
+};
+
+export type AnyConfigValue = ConfigValue | RuleValue[] | SchemaFieldValue[];
 
 export type ConfigValues = Record<string, AnyConfigValue>;
 
@@ -42,7 +56,7 @@ export type ConfigNode = {
   maximum: number | null;
   description?: string | null;
   displayLabel?: string | null;
-  metadata?: RulesMetadata | null;
+  metadata?: RulesMetadata | Record<string, unknown> | null;
   children: ConfigNode[];
 };
 

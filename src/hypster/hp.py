@@ -1104,6 +1104,61 @@ class HP:
 
         return [r.to_dict() if isinstance(r, Rule) else r for r in rules]
 
+    def _schema_param(
+        self,
+        *,
+        name: str,
+        default: Optional[list] = None,
+        description: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> list:
+        """Schema parameter — a list of SchemaField extraction field definitions."""
+        full_path = self._get_full_param_path(name)
+        validate_identifier_name(name, kind="parameter name")
+        self._validate_name_not_called(name)
+        self.called_params.add(full_path)
+
+        value, found = self._get_value_for_param(name)
+        schema_value = self._coerce_schema(value if found else (default or []))
+
+        schema_metadata: Dict[str, Any] = {
+            "field_specs": [f.to_dict() for f in schema_value],
+        }
+        if metadata:
+            schema_metadata.update(metadata)
+
+        self._record_parameter(
+            path=full_path,
+            name=name,
+            kind="schema",
+            default_value=self._schema_to_jsonable(default or []),
+            selected_value=self._schema_to_jsonable(schema_value),
+            description=description,
+            metadata=schema_metadata,
+        )
+
+        return schema_value
+
+    @staticmethod
+    def _coerce_schema(raw: list) -> list:
+        from hypster.schema_field import SchemaField
+
+        result = []
+        for i, item in enumerate(raw):
+            if isinstance(item, SchemaField):
+                result.append(item)
+            elif isinstance(item, dict):
+                result.append(SchemaField.from_dict(item))
+            else:
+                raise ValueError(f"schema[{i}]: expected a SchemaField or dict, got {type(item).__name__}")
+        return result
+
+    @staticmethod
+    def _schema_to_jsonable(fields: list) -> list:
+        from hypster.schema_field import SchemaField
+
+        return [f.to_dict() if isinstance(f, SchemaField) else f for f in fields]
+
     # Map public API names to internal methods
     def __getattr__(self, name: str) -> Any:
         """Route public API names to internal methods."""
@@ -1119,6 +1174,7 @@ class HP:
             "multi_bool": self._multi_bool,
             "multi_select": self._multi_select,
             "rules": self._rules,
+            "schema": self._schema_param,
         }
 
         if name in method_map:
@@ -1140,3 +1196,4 @@ class HP:
         multi_bool = _multi_bool
         multi_select = _multi_select
         rules = _rules
+        schema = _schema_param

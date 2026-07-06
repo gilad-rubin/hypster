@@ -8,6 +8,7 @@ from .field_spec import FieldSpec
 from .hp import HP
 from .interactive import InteractiveResult, interact
 from .rules import And, Group, Leaf, Not, Or, Rule
+from .schema_field import SchemaField
 
 __all__ = [
     "HP",
@@ -26,5 +27,6 @@ __all__ = [
     "Or",
     "Not",
     "FieldSpec",
+    "SchemaField",
     "field",
 ]
