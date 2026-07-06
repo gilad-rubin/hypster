@@ -15,6 +15,8 @@ export type {
   RuleValue,
   RulesFieldSpec,
   RulesMetadata,
+  SchemaFieldValue,
+  SchemaMetadata,
 } from "./types.js";
 
 // Config utilities
@@ -63,3 +65,9 @@ export type {
   UseRulesFieldOptions,
   UseRulesFieldReturn,
 } from "./use-rules-field.js";
+
+export { useSchemaField } from "./use-schema-field.js";
+export type {
+  UseSchemaFieldOptions,
+  UseSchemaFieldReturn,
+} from "./use-schema-field.js";

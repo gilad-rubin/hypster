@@ -40,6 +40,7 @@
   * [Boolean Types](in-depth/hp-call-types/bool-and-multi-bool.md)
   * [Textual Types](in-depth/hp-call-types/text-and-multi-text.md)
   * [Rules](in-depth/hp-call-types/rules.md)
+  * [Schema](in-depth/hp-call-types/schema.md)
 
 ## Reproducibility
 

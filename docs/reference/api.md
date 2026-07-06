@@ -394,6 +394,40 @@ def config(hp: HP) -> list[Rule[str]]:
 
 The config return value contains `Rule` objects. Selected params contain JSON-friendly dictionaries suitable for logging and replay. `explore(..., return_schema=True)` records rules as `kind="rules"` with `metadata["field_specs"]`, `metadata["then_specs"]`, and `metadata["combinators"]` for notebook and custom UI renderers.
 
+## HP.schema
+
+{% code overflow="wrap" %}
+```python
+hp.schema(
+    *,
+    name,
+    default=None,
+    description=None,
+    metadata=None,
+)
+```
+{% endcode %}
+
+Selects a list of typed field definitions (`SchemaField` objects) as a config value — extraction targets, metadata contracts, or any form-like definition that should be user-editable, logged, and replayed. `default` is a list of `SchemaField` objects.
+
+{% code overflow="wrap" %}
+```python
+from hypster import HP
+from hypster.schema_field import SchemaField
+
+def config(hp: HP) -> list[SchemaField]:
+    return hp.schema(
+        name="extraction_fields",
+        default=[
+            SchemaField(key="invoice_number", value_type="text", label="Invoice Number"),
+            SchemaField(key="status", value_type="enum", possible_values=["paid", "unpaid"]),
+        ],
+    )
+```
+{% endcode %}
+
+`SchemaField(key, value_type, description="", label="", multi_valued=False, possible_values=None, unit=None)` with `value_type` one of `"text" | "enum" | "number" | "date"`. Each field converts to a JSON Schema property via `.to_json_schema()` (for structured-LLM output requests) and round-trips with `.to_dict()`/`.from_dict()`. `explore(..., return_schema=True)` records schema values as `kind="schema"` with `metadata["field_specs"]` for form renderers. See [Schema](../in-depth/hp-call-types/schema.md).
+
 ## HP.collect
 
 {% code overflow="wrap" %}
