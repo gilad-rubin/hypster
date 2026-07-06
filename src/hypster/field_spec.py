@@ -29,31 +29,31 @@ class FieldSpec:
     operators: tuple[str, ...] = ()
 
     def eq(self, value: Any) -> Leaf:
-        return Leaf(self._require_name(), "=", value)
+        return self._leaf("=", value)
 
     def neq(self, value: Any) -> Leaf:
-        return Leaf(self._require_name(), "!=", value)
+        return self._leaf("!=", value)
 
     def is_in(self, values: list | tuple) -> Leaf:
-        return Leaf(self._require_name(), "in", list(values))
+        return self._leaf("in", list(values))
 
     def not_in(self, values: list | tuple) -> Leaf:
-        return Leaf(self._require_name(), "not_in", list(values))
+        return self._leaf("not_in", list(values))
 
     def is_true(self) -> Leaf:
-        return Leaf(self._require_name(), "is", True)
+        return self._leaf("is", True)
 
     def is_false(self) -> Leaf:
-        return Leaf(self._require_name(), "is", False)
+        return self._leaf("is", False)
 
     def gt(self, value: Any) -> Leaf:
-        return Leaf(self._require_name(), ">", value)
+        return self._leaf(">", value)
 
     def lt(self, value: Any) -> Leaf:
-        return Leaf(self._require_name(), "<", value)
+        return self._leaf("<", value)
 
     def contains(self, value: Any) -> Leaf:
-        return Leaf(self._require_name(), "contains", value)
+        return self._leaf("contains", value)
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {"type": self.type}
@@ -72,6 +72,16 @@ class FieldSpec:
         if self.name is None:
             raise ValueError("FieldSpec must have a name to build conditions")
         return self.name
+
+    def _leaf(self, operator: str, value: Any) -> Leaf:
+        # A spec with a declared operator vocabulary refuses conditions outside it;
+        # a spec with no vocabulary (operators=()) stays unrestricted, and raw
+        # Leaf(...) construction remains the deliberate escape hatch.
+        if self.operators and operator not in self.operators:
+            raise ValueError(
+                f"Operator {operator!r} is not valid for a {self.type!r} field (allowed: {', '.join(self.operators)})"
+            )
+        return Leaf(self._require_name(), operator, value)
 
 
 def _make_spec(

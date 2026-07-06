@@ -271,3 +271,27 @@ def test_rules_in_experiment_config_pattern():
     assert result["model"] == "gpt-4"
     assert len(result["rules"]) == 1
     assert isinstance(result["rules"][0], Rule)
+
+
+def test_fieldspec_method_with_valid_operator_builds_leaf():
+    label = field.text(name="label")
+    leaf = label.contains("x")
+    assert leaf.operator == "contains"
+
+
+def test_fieldspec_method_outside_declared_operators_raises():
+    label = field.text(name="label")
+    with pytest.raises(ValueError, match=r"Operator '>' is not valid for a 'text' field \(allowed: =, contains\)"):
+        label.gt("x")
+
+
+def test_fieldspec_without_declared_operators_is_unrestricted():
+    from hypster.field_spec import FieldSpec
+
+    custom = FieldSpec(type="custom", name="thing")
+    assert custom.gt(5).operator == ">"
+
+
+def test_leaf_direct_construction_stays_unrestricted():
+    leaf = Leaf("label", ">", "x")
+    assert leaf.operator == ">"
