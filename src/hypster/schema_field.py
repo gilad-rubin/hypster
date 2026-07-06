@@ -18,6 +18,12 @@ class SchemaField:
     multi_valued: bool = False
     possible_values: list[str] | None = None
     unit: str | None = None
+    # Requiredness lives ON the field (PRD 0027 in superposition): a consumer
+    # that gates on required fields reads this flag, so renaming a field can
+    # never orphan its requiredness in a parallel key list. NOT emitted by
+    # ``to_json_schema`` — JSON Schema expresses required as an array on the
+    # PARENT object, so schema assemblers read the flag and build that array.
+    required: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {"key": self.key, "value_type": self.value_type}
@@ -31,6 +37,8 @@ class SchemaField:
             result["possible_values"] = list(self.possible_values)
         if self.unit is not None:
             result["unit"] = self.unit
+        if self.required:
+            result["required"] = True
         return result
 
     @classmethod
@@ -43,6 +51,7 @@ class SchemaField:
             multi_valued=data.get("multi_valued", False),
             possible_values=data.get("possible_values"),
             unit=data.get("unit"),
+            required=data.get("required", False),
         )
 
     def to_json_schema(self) -> dict[str, Any]:

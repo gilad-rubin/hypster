@@ -163,3 +163,18 @@ def test_schema_field_dict_round_trip():
 
 def test_schema_field_to_dict_omits_defaults():
     assert SchemaField(key="title", value_type="text").to_dict() == {"key": "title", "value_type": "text"}
+
+
+# --- SchemaField.required (PRD 0027: requiredness lives ON the field) ---
+
+
+def test_schema_field_required_defaults_false():
+    assert SchemaField(key="title", value_type="text").required is False
+
+
+def test_schema_field_required_round_trips_through_dict():
+    field = SchemaField(key="station", value_type="enum", possible_values=["a", "b"], required=True)
+    assert field.to_dict()["required"] is True
+    assert SchemaField.from_dict(field.to_dict()) == field
+    # And the default stays out of the dict, so existing pins are byte-stable.
+    assert "required" not in SchemaField(key="tags", value_type="text").to_dict()
