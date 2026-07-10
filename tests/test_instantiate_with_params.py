@@ -58,3 +58,41 @@ def test_instantiate_with_params_validates_on_unknown_before_execution() -> None
         instantiate_with_params(config, on_unknown="silent")
 
     assert calls == []
+
+
+def test_instantiate_with_params_observes_rich_parameter_events_without_changing_params() -> None:
+    class RichTracker:
+        def __init__(self) -> None:
+            self.events: list[Dict[str, Any]] = []
+
+        def record_parameter(self, **event: Any) -> None:
+            self.events.append(event)
+
+    def config(hp: HP) -> int:
+        return hp.select(
+            [3, 8],
+            name="top_k",
+            default=3,
+            options_only=True,
+            metadata={"owner": "retrieval"},
+        )
+
+    tracker = RichTracker()
+    output = instantiate_with_params(config, values={"top_k": 8}, tracker=tracker)
+
+    assert output.value == 8
+    assert output.params == {"top_k": 8}
+    assert tracker.events == [
+        {
+            "path": "top_k",
+            "name": "top_k",
+            "kind": "select",
+            "default_value": 3,
+            "selected_value": 8,
+            "options": [3, 8],
+            "minimum": None,
+            "maximum": None,
+            "description": None,
+            "metadata": {"owner": "retrieval"},
+        }
+    ]

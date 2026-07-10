@@ -50,6 +50,25 @@ class ParamsTracker:
         self.params[path] = selected_value
 
 
+class _CompositeTracker:
+    """Send HP recording events to the params collector and a caller tracker."""
+
+    def __init__(self, *trackers: Any) -> None:
+        self.trackers = trackers
+
+    def record_parameter(self, **event: Any) -> None:
+        for tracker in self.trackers:
+            record = getattr(tracker, "record_parameter", None)
+            if callable(record):
+                record(**event)
+
+    def record_nest(self, **event: Any) -> None:
+        for tracker in self.trackers:
+            record = getattr(tracker, "record_nest", None)
+            if callable(record):
+                record(**event)
+
+
 def _reject_removed_execution_argument_containers(execution_kwargs: Dict[str, Any]) -> None:
     if "args" in execution_kwargs or "kwargs" in execution_kwargs:
         raise TypeError(
@@ -181,19 +200,23 @@ def instantiate_with_params(
     *,
     values: Optional[Dict[str, Any]] = None,
     on_unknown: UnknownPolicy = "raise",
+    tracker: Optional[Any] = None,
     **kwargs: Any,
 ) -> InstantiationOutput[T]:
     """
     Execute a config function and return its value with selected params.
 
-    Args mirror instantiate().
+    Args mirror instantiate(). ``tracker`` optionally observes the same rich
+    parameter and nest events used internally while selected params continue to
+    be collected unchanged.
     """
-    tracker = ParamsTracker()
+    params_tracker = ParamsTracker()
+    parameter_tracker = params_tracker if tracker is None else _CompositeTracker(params_tracker, tracker)
     result = _run_config(
         func,
         values=values,
         kwargs=kwargs,
         on_unknown=on_unknown,
-        parameter_tracker=tracker,
+        parameter_tracker=parameter_tracker,
     )
-    return InstantiationOutput(value=result, params=tracker.params)
+    return InstantiationOutput(value=result, params=params_tracker.params)
