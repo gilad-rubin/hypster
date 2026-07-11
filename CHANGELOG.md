@@ -3,7 +3,7 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.8.0] - 2026-07-11
 
 ### Fixed
 - HPO: `suggest_values()` now works against real Optuna trials. Previously any `hp.int` without an explicit `HpoInt(step=...)` passed `step=None` to `trial.suggest_int` (a `TypeError` in Optuna), and log-scale ints/floats crashed with raw Optuna errors; the adapter now defaults the int step to 1, applies Optuna's step-1 rule for log-scale ints, and raises friendly errors for unsupported step+log combinations. A real-Optuna test suite (`tests/test_hpo_optuna_real.py`) now guards this — the previous suite only used fakes.
