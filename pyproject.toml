@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
 dependencies = []
@@ -42,14 +43,9 @@ warn_redundant_casts = true
 no_implicit_optional = true
 check_untyped_defs = true
 disallow_incomplete_defs = true
-exclude = "src/hypster/hp\\.pyi$"
 mypy_path = "src"
 explicit_package_bases = true
 follow_imports = "skip"
-disable_error_code = [
-  "attr-defined",
-  "no-untyped-def",
-]
 
 [tool.ruff]
 line-length = 120
@@ -57,7 +53,6 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
-ignore = ["F841", "F811", "F821"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["hypster"]
