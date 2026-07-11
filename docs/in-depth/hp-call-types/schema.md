@@ -67,7 +67,7 @@ SchemaField(key="tags", value_type="text", multi_valued=True).to_json_schema()
 
 ## Rendering a schema editor in a UI
 
-`explore(..., return_schema=True)` records the parameter with `kind="schema"` and `metadata` carrying `field_specs` — the `to_dict()` form of every field — which is exactly what a "define what to extract" form needs to render controls and round-trip user edits back through `values=`:
+`explore(..., return_schema=True)` records the parameter with `kind="schema"` and `metadata` carrying `schema_fields` — the `to_dict()` form of every field — which is exactly what a "define what to extract" form needs to render controls and round-trip user edits back through `values=`:
 
 {% code overflow="wrap" %}
 ```python
@@ -75,7 +75,7 @@ from hypster import explore
 
 schema = explore(extraction_config, return_schema=True)
 schema.parameters[0].kind                              # "schema"
-schema.parameters[0].metadata["field_specs"][0]["key"]  # "invoice_number"
+schema.parameters[0].metadata["schema_fields"][0]["key"]  # "invoice_number"
 ```
 {% endcode %}
 

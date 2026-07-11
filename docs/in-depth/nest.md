@@ -33,6 +33,7 @@ hp.nest(
     *,
     name,
     values=None,
+    description=None,
     metadata=None,
     **kwargs,
 )
@@ -44,6 +45,7 @@ hp.nest(
 | `child` | Config function whose first parameter is `hp`. |
 | `name` | Scope name. Must be a valid Python identifier. |
 | `values` | Child-local values merged into the nested call. |
+| `description` | Optional human-readable text recorded on the nested group's schema node. |
 | `metadata` | Opaque JSON-compatible hints recorded on the nested group's schema node. |
 | `**kwargs` | Execution arguments forwarded to the child. |
 

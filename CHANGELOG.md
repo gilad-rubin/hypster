@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- HPO: `suggest_values()` now works against real Optuna trials. Previously any `hp.int` without an explicit `HpoInt(step=...)` passed `step=None` to `trial.suggest_int` (a `TypeError` in Optuna), and log-scale ints/floats crashed with raw Optuna errors; the adapter now defaults the int step to 1, applies Optuna's step-1 rule for log-scale ints, and raises friendly errors for unsupported step+log combinations. A real-Optuna test suite (`tests/test_hpo_optuna_real.py`) now guards this — the previous suite only used fakes.
 - HPO: configs using `hp.bool`, `hp.text`, or `multi_*` parameters no longer crash under `suggest_values()` with a raw `AttributeError`. Kinds without an Optuna mapping keep their (validated) defaults and are omitted from the returned values dict.
 - HPO: trial-suggested values now pass the same validation as explicit values (bounds, types); previously suggestions were trusted unvalidated.
 - Calling a parameter without a default (e.g. `hp.int(name="x")`) now raises a friendly `Parameter 'x': requires a default value ...` error instead of a `TypeError` naming a private method.

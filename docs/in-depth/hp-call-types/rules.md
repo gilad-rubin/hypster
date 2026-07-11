@@ -78,6 +78,8 @@ Use `field.*` constructors to declare the condition vocabulary and payload shape
 | `field.int(name=...)` / `field.float(name=...)` | Numeric condition or payload fields. |
 | `field.multi_int(name=...)` / `field.multi_float(name=...)` | List-of-numeric payload fields. |
 
+Every constructor also accepts `description=`, shown by rule-builder UIs in place of the raw field name.
+
 Field specs are schema declarations, not selected params. They appear in `explore(..., return_schema=True)` under the rules parameter metadata so UIs can render the rule builder.
 
 ## FieldSpec Methods And Default Operators

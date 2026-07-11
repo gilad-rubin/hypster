@@ -4,7 +4,23 @@ Hypster validates names, values, paths, and branch reachability before it treats
 
 ## Public Exception Surface
 
-Public validation failures currently raise `ValueError`. When `on_unknown="warn"`, unknown or unreachable values emit a `UserWarning` and the run continues. Hypster does not expose a structured exception hierarchy today, so application and UI code should catch `ValueError` at the boundary where it can show a user-facing message.
+Public validation failures raise `ValueError`. Failures inside an `hp.*` call — missing default, type mismatch, bounds violation, `None` handling, select/rules/schema validation — raise `hypster.HPCallError`, a `ValueError` subclass whose message always starts with `Parameter '<path>':`. Catch `ValueError` at the boundary for full coverage, or `HPCallError` when you only want parameter-level failures:
+
+{% code overflow="wrap" %}
+```python
+from hypster import HP, HPCallError, instantiate
+
+def config(hp: HP):
+    return hp.int(5, name="n", max=3)
+
+try:
+    instantiate(config)
+except HPCallError as error:
+    print(error)  # Parameter 'n': value 5 exceeds maximum bound 3
+```
+{% endcode %}
+
+When `on_unknown="warn"`, unknown or unreachable values emit a `UserWarning` and the run continues.
 
 ## Unknown Or Unreachable Values
 
@@ -133,6 +149,24 @@ values = {
 
 Hypster raises even if both values are identical, because duplicate inputs make logs ambiguous.
 
+## Missing Defaults
+
+Every value-producing `hp.*` call requires a default as its first argument. Omitting it raises immediately:
+
+{% code overflow="wrap" %}
+```python
+hp.int(name="depth")
+```
+{% endcode %}
+
+Example message:
+
+{% code overflow="wrap" %}
+```text
+Parameter 'depth': requires a default value as its first argument. How to fix: hp.int(<default>, name='depth')
+```
+{% endcode %}
+
 ## Type And Bounds Errors
 
 Each `hp.*` call validates runtime values:
@@ -169,3 +203,11 @@ hp.select(
 {% endcode %}
 
 The selected key is replayable, and the runtime value can still be complex.
+
+## Reserved Execution Argument Names
+
+`return_schema` (and the removed `return_info`) are actively guarded: passing them as execution arguments raises a `TypeError`. Other Hypster-owned keywords — `values`, `on_unknown`, `tracker` on `instantiate_with_params()`, `auto_apply` on `interact()`, `name`/`description` on `hp.nest()` — are ordinary parameters of the calling API. They bind to the API itself and are never forwarded, so a config that declares a required execution argument with one of these names fails with a plain `TypeError: config() missing 1 required keyword-only argument` and no mention of the collision. Rename the execution argument.
+
+## Interactive Session Errors
+
+Inside a live `interact()` session, a failed `set_value` on a **reachable** parameter is captured into `snapshot["error"]` so the widget can display it, and `result.value` / `result.params` raise `RuntimeError` while the applied state is invalid. Setting an **unreachable** path is different: `result.dispatch({"type": "set_value", "path": ..., "value": ...})` raises the backend's `Unknown or unreachable parameters` `ValueError` directly out of `dispatch()`.

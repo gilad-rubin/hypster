@@ -287,3 +287,26 @@ If you intentionally allow old UI payloads while users are editing, use `on_unkn
 {% hint style="warning" %}
 Do not send stale fields from inactive branches. If the user switches from `vector` back to `keyword`, remove `retrieval.score_threshold` from the submitted values or call `instantiate(..., on_unknown="ignore")` only when you intentionally want softer handling.
 {% endhint %}
+
+## Drive a Session Headlessly
+
+For automation and tests, an `interact()` session can be driven without a widget: `result.dispatch(action)` applies one action and returns the new snapshot.
+
+{% code overflow="wrap" %}
+```python
+from hypster import HP, interact
+
+def config(hp: HP):
+    return {"count": hp.int(1, name="count", min=1, max=5)}
+
+result = interact(config)
+snapshot = result.dispatch({"type": "set_value", "path": "count", "value": 4})
+
+assert result.value == {"count": 4}
+assert snapshot["status"] == "applied"
+```
+{% endcode %}
+
+Supported actions are `{"type": "set_value", "path": ..., "value": ...}`, `{"type": "reset"}`, and `{"type": "apply"}` (manual mode). Setting an unreachable path raises the backend's `Unknown or unreachable parameters` error.
+
+See also: [Interactive UI From Schema](../examples/interactive-ui.md) for building a custom (non-widget) UI from `explore()` schemas.

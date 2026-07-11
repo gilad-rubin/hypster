@@ -95,3 +95,28 @@ assert replayed.batch_size == run.value.batch_size
 {% endcode %}
 
 If replay fails because a parameter is now unknown, inspect the old payload with `explore(training_config, values=old_params, on_unknown="warn")` and migrate it deliberately.
+
+## Streaming Events With a Tracker
+
+Instead of iterating `run.params` after the fact, pass `tracker=` to observe every parameter event live — including kind, default, options, bounds, and nesting — as the config executes:
+
+{% code overflow="wrap" %}
+```python
+class SchemaLogger:
+    def __init__(self):
+        self.events = []
+
+    def record_parameter(self, *, path, kind, default_value, selected_value, **event):
+        self.events.append({"path": path, "kind": kind, "default": default_value, "selected": selected_value})
+
+    def record_nest(self, *, path, name, **event):
+        self.events.append({"path": path, "kind": "nest"})
+
+logger = SchemaLogger()
+run = instantiate_with_params(training_config, values={"batch_size": 64}, tracker=logger)
+```
+{% endcode %}
+
+A tracker may implement `record_parameter`, `record_nest`, or both. `run.params` is unaffected.
+
+For a compact worked example, see [Experiment Tracking (Examples)](../examples/experiment-tracking.md).

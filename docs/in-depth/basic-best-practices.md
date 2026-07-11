@@ -200,6 +200,8 @@ run = instantiate_with_params(config, values={"learning_rate": 0.01})
 
 The params include defaults as well as explicit overrides, so later replay does not depend on changing defaults.
 
+When after-the-fact params are not enough, pass `tracker=` to observe every parameter event live during the run — see [Public API](../reference/api.md).
+
 ## Explore Before Instantiating Conditional Values
 
 When overriding a branch, inspect it first:

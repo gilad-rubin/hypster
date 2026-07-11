@@ -11,7 +11,7 @@ def config(hp: HP):
 ```
 {% endcode %}
 
-`hp` must be the first positional parameter; keyword-only `hp` is rejected before the config executes. The `hp: HP` annotation is recommended, but unannotated config functions are still valid.
+`hp` must be the first positional parameter and must be literally named `hp` — `def config(h: HP): ...` raises `first param must be named 'hp'. Got: h`. Keyword-only `hp` is rejected before the config executes. The `hp: HP` annotation is recommended, but unannotated config functions are still valid.
 
 The function can return anything your application needs, but the most common pattern is to return the initialized runtime object your application will use. Prefer a return type annotation when the output is a meaningful object.
 

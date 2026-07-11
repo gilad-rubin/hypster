@@ -124,10 +124,11 @@ Prefer encoding fixed branches in the config itself when possible. It keeps the 
 
 | Surface | Supported | Unsupported | Workaround |
 | --- | --- | --- | --- |
-| `hp.int(...)` | `HpoInt(step=..., scale="linear"\|"log", include_max=...)` | custom `base=...`, nullable numeric suggestions | Use default `base=10.0`; model nullable choices as categorical branches. |
+| `hp.int(...)` | `HpoInt(step=..., scale="linear"\|"log", include_max=...)` | custom `base=...`, `step` other than 1 combined with `scale="log"` (Optuna constraint), nullable numeric suggestions | Use default `base=10.0`; drop `step` for log-scale ints; model nullable choices as categorical branches. |
 | `hp.float(...)` | `HpoFloat(step=..., scale=...)`, `distribution="uniform"\|"loguniform"` | custom `base=...`, `distribution="normal"\|"lognormal"`, `center=...`, `spread=...`, nullable numeric suggestions | Use Optuna-compatible float ranges or write a custom objective branch. |
 | `hp.select(...)` | `HpoCategorical(ordered=False, weights=None)` | `ordered=True`, `weights=...` | Encode ordering/weights in your objective or sampler setup. |
 | `hp.nest(...)` | Nested paths are prefixed and branch-aware. | Unknown child-local overrides | Keep child-local `values=` reachable for the selected branch. |
+| `hp.bool(...)` / `hp.text(...)` | Not tunable. | Boolean/text search spaces | Kept as-is: each falls back to its default and is omitted from `suggest_values(...)`'s returned dict. Model a tunable on/off choice as `hp.select([True, False], ...)`. |
 | `multi_*` calls | Not expanded by the adapter. | `multi_int`, `multi_float`, `multi_text`, `multi_bool`, `multi_select` search spaces | Model each optimized choice as scalar or categorical parameters. |
 
 If an HPO numeric call omits `min` or `max`, the adapter uses the parameter default for the missing bound. Omitting both bounds collapses that parameter to the default value, so set explicit `min` and `max` for real search ranges.

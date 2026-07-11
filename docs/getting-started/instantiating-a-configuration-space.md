@@ -56,6 +56,10 @@ assert replayed.model == run.value.model
 
 `instantiate_with_params()` accepts the same `values` and `on_unknown` arguments as `instantiate()`, plus any direct execution arguments your config requires. It does not change what your config returns; it adds a sidecar for logging and replay.
 
+{% hint style="warning" %}
+`instantiate_with_params()` reserves the keyword `tracker` for its own tracker hook. If your config needs an execution argument literally named `tracker`, rename it — passing `tracker=` binds to `instantiate_with_params()`'s tracker, not to your config.
+{% endhint %}
+
 ## Unknown Parameters
 
 Unknown or conditionally unreachable values raise by default:

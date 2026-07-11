@@ -33,6 +33,7 @@
 
 * [Values & Overrides](in-depth/values-and-overrides.md)
 * [Nested Configurations](in-depth/nest.md)
+* [How HPO Works](in-depth/performing-hyperparameter-optimization.md)
 * [Best Practices](in-depth/basic-best-practices.md)
 * [HP Call Types](in-depth/hp-call-types/README.md)
   * [Selectable Types](in-depth/hp-call-types/select-and-multi-select.md)

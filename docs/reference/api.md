@@ -10,6 +10,7 @@ from hypster import (
     ConfigFunc,
     FieldSpec,
     Group,
+    HPCallError,
     InstantiationOutput,
     InteractiveResult,
     Leaf,
@@ -73,7 +74,7 @@ assert run.params == {"batch_size": 64, "epochs": 10}
 
 `dataset_size` is bound by `partial`, not selected through `hp.*`, so it is passed through to the return value but does not appear in `run.params`.
 
-Config functions may accept extra keyword-only execution arguments. Pass those directly; Hypster-owned names such as `values`, `on_unknown`, `tracker`, `return_schema`, `auto_apply`, `name`, and `description` are reserved at their API boundaries.
+Config functions may accept extra keyword-only execution arguments. Pass those directly — but do not name an execution argument after a Hypster-owned keyword. `return_schema` and the removed `return_info` are actively guarded (`explore()`/`interact()` raise a `TypeError` if you pass them as execution arguments). Names that are ordinary parameters of the calling API — `values`, `on_unknown`, `tracker` on `instantiate_with_params()`, `auto_apply` on `interact()`, and `name`/`description` on `hp.nest()` — are silently bound to the API itself and never reach your config, so a config that needs one of these as an execution argument must rename it.
 
 ## instantiate
 
@@ -232,6 +233,7 @@ current_params = result.params
 result.value
 result.params
 result.snapshot
+result.dispatch(action)
 result.interact()
 ```
 {% endcode %}
@@ -241,6 +243,7 @@ result.interact()
 | `value` | The currently applied config return value. Raises `RuntimeError` while the applied state is invalid. |
 | `params` | Replayable selected params for the currently applied state. Raises `RuntimeError` while the applied state is invalid. |
 | `snapshot` | Widget-facing state with schema, draft values, applied values, selected params, mode, status, and error. |
+| `dispatch(action)` | Applies one interactive action headlessly and returns the new snapshot. Actions: `{"type": "set_value", "path": ..., "value": ...}`, `{"type": "reset"}`, `{"type": "apply"}`. Setting an unreachable path raises the backend's unknown-parameter `ValueError`. |
 | `interact()` | Renders another live widget view backed by the same session. |
 
 Replay an interactive selection the same way you replay any Hypster run:
@@ -282,7 +285,7 @@ All parameter names must be valid Python identifier-style strings: use letters, 
 ```python
 hp.int(default, *, name, min=None, max=None, strict=False, allow_none=False, hpo_spec=None, description=None, metadata=None)
 hp.float(default, *, name, min=None, max=None, strict=False, allow_none=False, hpo_spec=None, description=None, metadata=None)
-hp.text(default, *, name, allow_none=False, description=None, metadata=None)
+hp.text(default, *, name, multiline=False, allow_none=False, description=None, metadata=None)
 hp.bool(default, *, name, allow_none=False, description=None, metadata=None)
 ```
 {% endcode %}
@@ -402,6 +405,7 @@ hp.rules(
     combinators=None,
     default=None,
     description=None,
+    metadata=None,
 )
 ```
 {% endcode %}
