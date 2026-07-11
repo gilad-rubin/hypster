@@ -29,6 +29,9 @@ class Leaf:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Leaf:
+        for key in ("field", "operator", "value"):
+            if key not in data:
+                raise ValueError(f"condition node is missing a {key!r} key")
         return cls(field=data["field"], operator=data["operator"], value=data["value"])
 
 

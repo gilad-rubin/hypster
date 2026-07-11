@@ -153,9 +153,12 @@ class InteractiveSession(Generic[T]):
             raise RuntimeError("Interactive session has not been initialized")
 
         current_parameters = _parameters(self._schema)
-        current_paths = [parameter.path for parameter in current_parameters]
-        if path not in current_paths:
-            raise ValueError(f"Cannot set unreachable parameter: {path}")
+        current_parameter = next((parameter for parameter in current_parameters if parameter.path == path), None)
+        if current_parameter is None:
+            # Unreachable path: surface the backend's own unknown-parameter error
+            # (CONTEXT.md: the controller must not duplicate backend validation).
+            self._explore({**self._draft_values, path: value})
+            return  # on_unknown is warn/ignore: nothing reachable to set
 
         self._memory.remember_many(current_parameters, self._draft_values)
 
@@ -166,8 +169,6 @@ class InteractiveSession(Generic[T]):
                 break
             if parameter.path in self._draft_values:
                 prefix_values[parameter.path] = self._draft_values[parameter.path]
-
-        current_parameter = next(parameter for parameter in current_parameters if parameter.path == path)
         self._memory.remember(current_parameter, value, _context_for(current_parameters, prefix_values, path))
 
         try:

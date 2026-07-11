@@ -961,8 +961,10 @@ class HP:
         schema_value = coerce_schema_fields(value if found else (default or []))
 
         metadata = validate_metadata(metadata, param_path=full_path)
+        # "schema_fields", not "field_specs": CONTEXT.md reserves "Field Spec"
+        # for the rules condition/payload vocabulary from hypster.field.
         schema_metadata: Dict[str, Any] = {
-            "field_specs": [f.to_dict() for f in schema_value],
+            "schema_fields": [f.to_dict() for f in schema_value],
         }
         if metadata:
             schema_metadata.update(metadata)

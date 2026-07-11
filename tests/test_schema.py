@@ -100,7 +100,7 @@ def test_schema_explore_kind_is_schema():
     assert param.kind == "schema"
 
 
-def test_schema_explore_metadata_has_field_specs():
+def test_schema_explore_metadata_has_schema_fields():
     def config(hp):
         hp.schema(name="extraction_fields", default=_make_fields())
 
@@ -109,10 +109,10 @@ def test_schema_explore_metadata_has_field_specs():
     param = schema.parameters[0]
     metadata = param.metadata
     assert metadata is not None
-    assert "field_specs" in metadata
-    assert len(metadata["field_specs"]) == 4
-    assert metadata["field_specs"][0]["key"] == "invoice_number"
-    assert metadata["field_specs"][2]["possible_values"] == ["paid", "unpaid", "overdue"]
+    assert "schema_fields" in metadata
+    assert len(metadata["schema_fields"]) == 4
+    assert metadata["schema_fields"][0]["key"] == "invoice_number"
+    assert metadata["schema_fields"][2]["possible_values"] == ["paid", "unpaid", "overdue"]
 
 
 # --- SchemaField.to_json_schema() ---
