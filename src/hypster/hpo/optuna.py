@@ -115,6 +115,17 @@ class TrialValueProvider:
             high = default if max is None else max
             step = hpo_spec.step if hpo_spec else None
             log = (hpo_spec.scale == "log") if hpo_spec else False
+            if log:
+                # Optuna only accepts step=1 when log=True.
+                if step not in (None, 1):
+                    raise ValueError(
+                        f"Parameter '{path}': HpoInt(step={step}) cannot be combined with scale='log' "
+                        "(Optuna only supports step=1 for log-scale integers). "
+                        "How to fix: remove step=, or use scale='linear'."
+                    )
+                step = 1
+            elif step is None:
+                step = 1
             if hpo_spec and not hpo_spec.include_max and high is not None:
                 high = _exclusive_high_for_int(low, high, step)
             return self.trial.suggest_int(path, low, high, step=step, log=log)
@@ -125,6 +136,13 @@ class TrialValueProvider:
             low = default if min is None else min
             high = default if max is None else max
             step = hpo_spec.step if hpo_spec else None
+            if log and step is not None:
+                # Optuna rejects step together with log=True for floats.
+                raise ValueError(
+                    f"Parameter '{path}': HpoFloat(step={step}) cannot be combined with a log scale "
+                    "(Optuna does not support step for log-scale floats). "
+                    "How to fix: remove step=, or use scale='linear'."
+                )
             return self.trial.suggest_float(path, low, high, step=step, log=log)
 
         if kind == "select":
