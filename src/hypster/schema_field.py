@@ -76,3 +76,20 @@ class SchemaField:
             prop["description"] = self.description
 
         return prop
+
+
+def coerce_schema_fields(raw: list) -> list[SchemaField]:
+    """Coerce a list of SchemaField objects or dicts into SchemaField objects."""
+    result = []
+    for i, item in enumerate(raw):
+        if isinstance(item, SchemaField):
+            result.append(item)
+        elif isinstance(item, dict):
+            result.append(SchemaField.from_dict(item))
+        else:
+            raise ValueError(f"schema[{i}]: expected a SchemaField or dict, got {type(item).__name__}")
+    return result
+
+
+def schema_fields_to_jsonable(fields: list) -> list:
+    return [f.to_dict() if isinstance(f, SchemaField) else f for f in fields]

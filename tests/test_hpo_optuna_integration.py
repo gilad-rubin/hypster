@@ -178,3 +178,38 @@ def test_optuna_nested_proxy_forwards_execution_kwargs() -> None:
     values = suggest_values(FakeTrial(), parent)
 
     assert values == {"tree.depth": 4}
+
+
+def test_hpo_falls_back_to_defaults_for_untunable_kinds() -> None:
+    """bool/text/multi_* params must not crash under HPO; they keep their defaults."""
+
+    def config(hp: HP):
+        return {
+            "cache": hp.bool(True, name="use_cache"),
+            "model": hp.text("gpt-4o", name="model"),
+            "layers": hp.multi_int([64, 32], name="layers", min=1, max=128),
+            "tags": hp.multi_select(["a", "b"], default=["a"], name="tags"),
+            "n": hp.int(3, name="n", min=1, max=8),
+        }
+
+    trial = FakeTrial({"n": 5})
+    values = suggest_values(trial, config)
+
+    assert values == {"n": 5}  # only tunable kinds are suggested and returned
+
+    out = instantiate(config, values=values)
+    assert out == {"cache": True, "model": "gpt-4o", "layers": [64, 32], "tags": ["a"], "n": 5}
+
+
+def test_suggested_values_go_through_regular_validation() -> None:
+    import pytest
+
+    class RogueTrial(FakeTrial):
+        def suggest_int(self, name: str, low: int, high: int, step: int | None = None, log: bool = False) -> int:
+            return 999
+
+    def config(hp: HP):
+        return hp.int(1, name="n", min=0, max=10)
+
+    with pytest.raises(ValueError, match="exceeds maximum bound 10"):
+        suggest_values(RogueTrial(), config)

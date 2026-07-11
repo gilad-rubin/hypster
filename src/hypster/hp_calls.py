@@ -14,13 +14,8 @@ class HPCallError(ValueError):
 class ParameterValidator:
     """Base class for parameter validation."""
 
-    def validate_name(self, name: Optional[str], param_path: str) -> None:
-        """Validate that name is provided for overrides."""
-        if name is None:
-            raise HPCallError(param_path, "requires 'name' for overrides. Example: hp.int(10, name='batch_size')")
-
-    def validate_value(self, value: Any, param_path: str) -> Any:
-        """Process and validate input value."""
+    def validate_value(self, value: Any, param_path: str, strict: bool = False) -> Any:
+        """Process and validate input value. Validators without a strict mode ignore ``strict``."""
         raise NotImplementedError
 
     def validate_bounds(
@@ -92,7 +87,7 @@ class FloatValidator(ParameterValidator):
 class TextValidator(ParameterValidator):
     """Validates text parameters."""
 
-    def validate_value(self, value: Any, param_path: str) -> str:
+    def validate_value(self, value: Any, param_path: str, strict: bool = False) -> str:
         if not isinstance(value, str):
             raise HPCallError(param_path, f"expected string but got {type(value).__name__} ({value})")
         return value
@@ -101,7 +96,7 @@ class TextValidator(ParameterValidator):
 class BoolValidator(ParameterValidator):
     """Validates boolean parameters."""
 
-    def validate_value(self, value: Any, param_path: str) -> bool:
+    def validate_value(self, value: Any, param_path: str, strict: bool = False) -> bool:
         if not isinstance(value, bool):
             raise HPCallError(param_path, f"expected boolean but got {type(value).__name__} ({value})")
         return value
@@ -109,13 +104,6 @@ class BoolValidator(ParameterValidator):
 
 class SelectValidator:
     """Validates selection from options."""
-
-    def validate_name(self, name: Optional[str], param_path: str) -> None:
-        """Validate that name is provided for overrides."""
-        if name is None:
-            raise HPCallError(
-                param_path, "requires 'name' for overrides. Example: hp.select(['a', 'b'], name='choice')"
-            )
 
     def validate_value(self, value: Any, options: List[Any], options_only: bool, param_path: str) -> Any:
         if options_only and value not in options:
@@ -134,14 +122,14 @@ class MultiValidator:
     def __init__(self, element_validator: ParameterValidator):
         self.element_validator = element_validator
 
-    def validate_value(self, value: Any, param_path: str, **kwargs: Any) -> List[Any]:
+    def validate_value(self, value: Any, param_path: str, strict: bool = False) -> List[Any]:
         if not isinstance(value, list):
             raise HPCallError(param_path, f"expected list but got {type(value).__name__} ({value})")
 
         result = []
         for i, item in enumerate(value):
             try:
-                validated_item = self.element_validator.validate_value(item, f"{param_path}[{i}]", **kwargs)
+                validated_item = self.element_validator.validate_value(item, f"{param_path}[{i}]", strict=strict)
                 result.append(validated_item)
             except HPCallError as e:
                 # Re-raise with list context
