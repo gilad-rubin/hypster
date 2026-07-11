@@ -11,12 +11,13 @@ from ._execution import (
 from .hp import HP
 from .utils import normalize_values, validate_config_func_signature
 
-T = TypeVar("T", covariant=True)
+T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 UnknownPolicy = Literal["warn", "raise", "ignore"]
 
 
-class ConfigFunc(Protocol[T]):
-    def __call__(self, hp: HP, *args: Any, **kwargs: Any) -> T: ...
+class ConfigFunc(Protocol[T_co]):
+    def __call__(self, hp: HP, *args: Any, **kwargs: Any) -> T_co: ...
 
 
 @dataclass(frozen=True)
