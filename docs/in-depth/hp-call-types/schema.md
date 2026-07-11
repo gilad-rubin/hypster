@@ -38,10 +38,13 @@ class SchemaField:
     multi_valued: bool = False            # list of value_type instead of a scalar
     possible_values: list[str] | None = None   # only for value_type="enum"
     unit: str | None = None               # e.g. "USD", "days"
+    required: bool = False                # mandatory for consumers that gate on it
 ```
 {% endcode %}
 
 Round-trip with `.to_dict()` / `SchemaField.from_dict(data)`.
+
+`required` lives on the field itself so renaming a field can never orphan its requiredness in a parallel key list. It is deliberately **not** emitted by `.to_json_schema()`: JSON Schema expresses requiredness as a `required` array on the parent object, so the code assembling the full schema reads the flag and builds that array.
 
 ## Feeding a structured-output LLM call
 

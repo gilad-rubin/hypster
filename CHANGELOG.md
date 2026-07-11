@@ -3,6 +3,29 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- HPO: configs using `hp.bool`, `hp.text`, or `multi_*` parameters no longer crash under `suggest_values()` with a raw `AttributeError`. Kinds without an Optuna mapping keep their (validated) defaults and are omitted from the returned values dict.
+- HPO: trial-suggested values now pass the same validation as explicit values (bounds, types); previously suggestions were trusted unvalidated.
+- Calling a parameter without a default (e.g. `hp.int(name="x")`) now raises a friendly `Parameter 'x': requires a default value ...` error instead of a `TypeError` naming a private method.
+- The interactive widget's notebook background shim is now scoped with `:has(.hypster-widget)` so it only affects output cells that contain a Hypster widget, instead of repainting every cell in the notebook (ADR-0002).
+- Setting an unreachable parameter in an interactive session now surfaces the backend's `Unknown or unreachable parameters` error (with typo suggestions) instead of a bespoke controller message; under `on_unknown="warn"`/`"ignore"` it is a policy-consistent no-op.
+- `Leaf.from_dict` validates its keys and raises a clear `ValueError` on malformed rule JSON instead of a raw `KeyError`.
+- `hp.rules()` and `hp.schema()` now validate user-supplied `metadata` for JSON compatibility like every other parameter kind.
+
+### Added
+- `hypster.HPCallError` is exported: parameter validation errors keep their type (still a `ValueError` subclass) instead of being re-raised as bare `ValueError`, so callers can catch Hypster errors specifically.
+- `instantiate_with_params(..., tracker=)` is documented: a tracker observes `record_parameter`/`record_nest` events for every `hp.*` call. `tracker` is now a reserved execution-argument name.
+- `SchemaField.required` flag (from 0.7.0 follow-up work) is documented; it round-trips via `to_dict`/`from_dict` and is intentionally not emitted by `to_json_schema()`.
+- `HP` accepts an internal `value_provider` seam (the mechanism behind the Optuna adapter); `hypster.hpo` now exports `suggest_values` and `TrialValueProvider` directly.
+- CI: Python 3.13 across the matrix plus macOS and Windows jobs; 3.13 classifier.
+
+### Changed
+- **Breaking:** the `hypster.integrations` namespace is removed. It was a wildcard re-export that accidentally published internals (`FloatValidator`, `normalize_values`, `typing.Mapping`, ...) as public API. Import from `hypster.hpo` / `hypster.hpo.optuna` instead.
+- **Breaking:** `hp.schema()` explore metadata key renamed `field_specs` → `schema_fields`; `field_specs` remains the rules vocabulary key (CONTEXT.md reserves "Field Spec" for rule conditions).
+- Internal restructure with no behavior change: `hp.py` public methods are defined directly (no `__getattr__` dispatch, ~2.8× lower per-call attribute overhead), the Spec/executor indirection layer is deleted, `explore()` builds schemas through a plain tracker, and shared execution policy lives in `_execution.py` (hp/core circular imports removed). `hp.py` shrank from 1209 to ~900 lines.
+
 ## [0.7.0] - 2026-06-21
 
 ### Added

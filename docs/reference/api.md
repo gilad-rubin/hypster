@@ -73,7 +73,7 @@ assert run.params == {"batch_size": 64, "epochs": 10}
 
 `dataset_size` is bound by `partial`, not selected through `hp.*`, so it is passed through to the return value but does not appear in `run.params`.
 
-Config functions may accept extra keyword-only execution arguments. Pass those directly; Hypster-owned names such as `values`, `on_unknown`, `return_schema`, `auto_apply`, `name`, and `description` are reserved at their API boundaries.
+Config functions may accept extra keyword-only execution arguments. Pass those directly; Hypster-owned names such as `values`, `on_unknown`, `tracker`, `return_schema`, `auto_apply`, `name`, and `description` are reserved at their API boundaries.
 
 ## instantiate
 
@@ -109,12 +109,13 @@ instantiate_with_params(
     *,
     values=None,
     on_unknown="raise",
+    tracker=None,
     **kwargs,
 )
 ```
 {% endcode %}
 
-Executes a config function and returns an `InstantiationOutput`.
+Executes a config function and returns an `InstantiationOutput`. Pass `tracker=` to observe the run's parameter events: for every `hp.*` call the tracker's `record_parameter(path=..., name=..., kind=..., default_value=..., selected_value=..., options=..., minimum=..., maximum=..., description=..., metadata=...)` method is invoked, and `record_nest(path=..., name=..., description=..., metadata=...)` fires for each `hp.nest`. A tracker may implement either or both methods; selected-params collection is unaffected.
 
 {% code overflow="wrap" %}
 ```python
@@ -460,7 +461,7 @@ def config(hp: HP) -> list[SchemaField]:
 ```
 {% endcode %}
 
-`SchemaField(key, value_type, description="", label="", multi_valued=False, possible_values=None, unit=None)` with `value_type` one of `"text" | "enum" | "number" | "date"`. Each field converts to a JSON Schema property via `.to_json_schema()` (for structured-LLM output requests) and round-trips with `.to_dict()`/`.from_dict()`. `explore(..., return_schema=True)` records schema values as `kind="schema"` with `metadata["field_specs"]` for form renderers. See [Schema](../in-depth/hp-call-types/schema.md).
+`SchemaField(key, value_type, description="", label="", multi_valued=False, possible_values=None, unit=None, required=False)` with `value_type` one of `"text" | "enum" | "number" | "date"`. `required` marks the field as mandatory for consumers that gate on it; it round-trips through `.to_dict()`/`.from_dict()` but is not emitted by `.to_json_schema()` — JSON Schema expresses requiredness as a `required` array on the parent object, so schema assemblers read the flag and build that array themselves. Each field converts to a JSON Schema property via `.to_json_schema()` (for structured-LLM output requests) and round-trips with `.to_dict()`/`.from_dict()`. `explore(..., return_schema=True)` records schema values as `kind="schema"` with `metadata["schema_fields"]` for form renderers. See [Schema](../in-depth/hp-call-types/schema.md).
 
 ## HP.collect
 

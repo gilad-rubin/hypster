@@ -102,7 +102,7 @@ The current Optuna adapter uses `trial.suggest_categorical()` for `hp.select`. `
 | `hp.select` | `trial.suggest_categorical(path, keys)` |
 | `hp.nest` | Prefixes child parameter paths. |
 
-`multi_int`, `multi_float`, `multi_text`, `multi_bool`, and `multi_select` are not expanded by the Optuna adapter.
+Parameter kinds without an Optuna mapping — `hp.bool`, `hp.text`, `multi_int`, `multi_float`, `multi_text`, `multi_bool`, `multi_select`, `hp.rules`, and `hp.schema` — are not tuned: during `suggest_values()` they keep their defaults (validated as usual) and are not part of the returned values dict.
 
 Explicit child-local overrides passed with `hp.nest(child, name="child", values=...)` are validated before `suggest_values()` returns. Unknown or unreachable child keys raise instead of being silently ignored.
 
