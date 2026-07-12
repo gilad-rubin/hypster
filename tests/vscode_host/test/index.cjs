@@ -4,9 +4,12 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const vscode = require("vscode");
+const { PythonExtension } = require("@vscode/python-extension");
+const pythonFacadePackage = require("@vscode/python-extension/package.json");
 const {
   classifyCommandResult,
   classifyMissingCreationMarker,
+  selectKernelStrategy,
 } = require("../creation-gate.cjs");
 const pins = require("../pins.cjs");
 
@@ -97,6 +100,25 @@ function executionSummary(cell) {
   };
 }
 
+function apiKeys(exports) {
+  return exports && (typeof exports === "object" || typeof exports === "function")
+    ? Object.keys(exports).sort()
+    : [];
+}
+
+function pythonEnvironmentEvidence(environment, requestedExecutable) {
+  const executable = environment?.executable;
+  return {
+    requestedExecutable,
+    id: environment?.id ?? environment?.environment?.id ?? null,
+    path: environment?.path ?? null,
+    executable:
+      typeof executable === "string"
+        ? executable
+        : (executable?.uri?.fsPath ?? executable?.path ?? null),
+  };
+}
+
 function recordCreationState(roundTrip, cell) {
   roundTrip.creationExecutionSummary = executionSummary(cell);
   roundTrip.creationOutputCount = cell.outputs.length;
@@ -131,6 +153,7 @@ function extensionVersions() {
 
 async function run() {
   const notebookPath = requiredPath("HYPSTER_NOTEBOOK");
+  const pythonExecutable = requiredPath("HYPSTER_VSCODE_PYTHON");
   const artifactDir = requiredPath("HYPSTER_VSCODE_ARTIFACT_DIR");
   fs.mkdirSync(artifactDir, { recursive: true });
 
@@ -179,28 +202,29 @@ async function run() {
 
   let editor;
   try {
-    const python = vscode.extensions.getExtension("ms-python.python");
     const jupyter = vscode.extensions.getExtension("ms-toolsai.jupyter");
-    await python.activate();
-    await jupyter.activate();
+    const pythonApi = await PythonExtension.api();
+    const jupyterApi = await jupyter.activate();
+    evidence.selector.pythonFacade = {
+      package: "@vscode/python-extension",
+      version: pythonFacadePackage.version,
+      apiKeys: apiKeys(pythonApi),
+    };
+    evidence.selector.jupyterApiKeys = apiKeys(jupyterApi);
+    evidence.selector.openNotebookExported = typeof jupyterApi?.openNotebook === "function";
 
     const commands = await vscode.commands.getCommands(true);
     evidence.selector.commandRegistered = commands.includes("notebook.selectKernel");
-    if (!evidence.selector.commandRegistered) {
+    evidence.selector.strategy = selectKernelStrategy({
+      openNotebookExported: evidence.selector.openNotebookExported,
+      commandRegistered: evidence.selector.commandRegistered,
+    });
+    if (evidence.selector.strategy === "kernel_selection_gate_failure") {
       evidence.outcome = "kernel_selection_gate_failure";
       evidence.reason =
-        "VS Code did not register the documented notebook.selectKernel command after Jupyter activation.";
+        "Jupyter exported no openNotebook API and VS Code did not register notebook.selectKernel after activation.";
       console.log("HYPSTER_VSCODE_KERNEL_SELECTION_GATE_REPRODUCED");
       return;
-    }
-    const forbiddenDiscoveryKeys = ["controllers", "getControllers", "getNotebookControllers"];
-    evidence.selector.publicControllerDiscoveryKeys = forbiddenDiscoveryKeys.filter((key) =>
-      Object.prototype.hasOwnProperty.call(vscode.notebooks, key),
-    );
-    if (evidence.selector.publicControllerDiscoveryKeys.length) {
-      throw new Error(
-        `public controller discovery unexpectedly appeared: ${evidence.selector.publicControllerDiscoveryKeys}`,
-      );
     }
 
     const document = await vscode.workspace.openNotebookDocument(vscode.Uri.file(notebookPath));
@@ -214,14 +238,59 @@ async function run() {
     editor = await vscode.window.showNotebookDocument(document);
     await delay(2_000);
 
-    evidence.selector.commandResult = await settleWithin(
-      vscode.commands.executeCommand("notebook.selectKernel", {
-        notebookEditor: editor,
-        id: "hypster-host",
-        extension: "ms-toolsai.jupyter",
-      }),
-      10_000,
-    );
+    if (evidence.selector.strategy === "ms-toolsai.jupyter.exports.openNotebook") {
+      if (typeof pythonApi?.environments?.resolveEnvironment !== "function") {
+        throw new Error("Python extension exported no environments.resolveEnvironment API");
+      }
+      const environmentResult = await settleWithin(
+        pythonApi.environments.resolveEnvironment(pythonExecutable),
+        30_000,
+      );
+      evidence.selector.pythonEnvironmentResolution = {
+        status: environmentResult.status,
+        ...(environmentResult.error ? { error: environmentResult.error } : {}),
+      };
+      if (environmentResult.status !== "fulfilled" || !environmentResult.value) {
+        throw new Error(
+          `Python environment resolution ${environmentResult.status} for ${pythonExecutable}`,
+        );
+      }
+      evidence.selector.pythonEnvironment = pythonEnvironmentEvidence(
+        environmentResult.value,
+        pythonExecutable,
+      );
+      if (
+        !evidence.selector.pythonEnvironment.executable ||
+        path.normalize(evidence.selector.pythonEnvironment.executable) !==
+          path.normalize(pythonExecutable)
+      ) {
+        throw new Error(
+          `Python facade resolved ${evidence.selector.pythonEnvironment.executable} instead of ${pythonExecutable}`,
+        );
+      }
+      evidence.selector.commandResult = await settleWithin(
+        jupyterApi.openNotebook(document.uri, environmentResult.value).then(() => undefined),
+        60_000,
+      );
+    } else {
+      const forbiddenDiscoveryKeys = ["controllers", "getControllers", "getNotebookControllers"];
+      evidence.selector.publicControllerDiscoveryKeys = forbiddenDiscoveryKeys.filter((key) =>
+        Object.prototype.hasOwnProperty.call(vscode.notebooks, key),
+      );
+      if (evidence.selector.publicControllerDiscoveryKeys.length) {
+        throw new Error(
+          `public controller discovery unexpectedly appeared: ${evidence.selector.publicControllerDiscoveryKeys}`,
+        );
+      }
+      evidence.selector.commandResult = await settleWithin(
+        vscode.commands.executeCommand("notebook.selectKernel", {
+          notebookEditor: editor,
+          id: "hypster-host",
+          extension: "ms-toolsai.jupyter",
+        }),
+        10_000,
+      );
+    }
 
     evidence.roundTrip.attempted = true;
     evidence.roundTrip.creationCommand = await settleWithin(

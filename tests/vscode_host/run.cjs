@@ -98,6 +98,7 @@ async function main() {
   const artifactDir = requiredPath("HYPSTER_VSCODE_ARTIFACT_DIR");
   const runtimeDir = requiredPath("HYPSTER_VSCODE_RUNTIME_DIR");
   const notebook = requiredPath("HYPSTER_NOTEBOOK");
+  const pythonExecutable = requiredPath("HYPSTER_VSCODE_PYTHON");
   const jupyterPath = requiredPath("JUPYTER_PATH");
   const userDataDir = path.join(runtimeDir, "user-data");
   const extensionsDir = path.join(runtimeDir, "extensions");
@@ -116,6 +117,7 @@ async function main() {
     HYPSTER_NOTEBOOK: notebook,
     HYPSTER_VSCODE_ARTIFACT_DIR: artifactDir,
     HYPSTER_VSCODE_RUNTIME_DIR: runtimeDir,
+    HYPSTER_VSCODE_PYTHON: pythonExecutable,
     JUPYTER_PATH: jupyterPath,
   });
   fs.writeFileSync(

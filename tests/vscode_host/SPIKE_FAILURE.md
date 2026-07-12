@@ -1,6 +1,9 @@
 # Follow-up issue payload: supported VS Code kernel selection seam
 
-> Verified by the pinned Ubuntu witness in [workflow run 29192874852](https://github.com/gilad-rubin/hypster/actions/runs/29192874852).
+> Historical observation verified by the pinned Ubuntu witness in
+> [workflow run 29192874852](https://github.com/gilad-rubin/hypster/actions/runs/29192874852).
+> Do not file this as an unavoidable gate while the supported exported
+> `openNotebook` seam is under physical verification.
 
 The uploaded `spike-result.json` records VS Code Desktop `1.128.0`, Microsoft
 Jupyter `2025.9.1`, and `selector.commandRegistered: false` after explicit
@@ -8,6 +11,14 @@ Jupyter activation. It classifies the exact observation as
 `kernel_selection_gate_failure`; no notebook cell or substitute renderer path
 was attempted. The cleanup artifact confirms that no VS Code, Electron,
 Chromium, or kernel process remained.
+
+Pinned Jupyter `2025.9.1` also publicly exports
+`openNotebook(uri, pythonEnvironment)`, which selects its internal controller
+without exposing or copying the private ID. The harness now exercises the same
+Python-environment resolution and `openNotebook` sequence as Jupyter's own
+smoke test. This payload is relevant only if the corrected physical witness
+shows that supported export is unavailable; an export invocation or round-trip
+failure is a red runtime failure, not this accepted gate.
 
 ## Title
 

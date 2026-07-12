@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   classifyCommandResult,
   classifyMissingCreationMarker,
+  selectKernelStrategy,
 } = require("../creation-gate.cjs");
 
 const fulfilled = { status: "fulfilled" };
@@ -47,6 +48,20 @@ for (const status of ["rejected", "timeout"]) {
   });
 }
 
+assert.equal(
+  selectKernelStrategy({ openNotebookExported: true, commandRegistered: false }),
+  "ms-toolsai.jupyter.exports.openNotebook",
+  "the supported export must bypass the observed missing command",
+);
+assert.equal(
+  selectKernelStrategy({ openNotebookExported: false, commandRegistered: true }),
+  "notebook.selectKernel",
+);
+assert.equal(
+  selectKernelStrategy({ openNotebookExported: false, commandRegistered: false }),
+  "kernel_selection_gate_failure",
+);
+
 console.log(
-  "host classifier rejects transient creation state and verification command failures",
+  "host classifier rejects races and prefers the supported Jupyter export",
 );

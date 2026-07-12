@@ -14,6 +14,7 @@
     "onRenderer:hypster-vscode-host-probe"
   ],
   "extensionDependencies": [
+    "ms-python.python",
     "ms-toolsai.jupyter"
   ],
   "contributes": {
@@ -35,6 +36,7 @@
     "test": "node run.cjs"
   },
   "devDependencies": {
+    "@vscode/python-extension": "1.0.6",
     "@vscode/test-electron": "3.0.0"
   }
 }

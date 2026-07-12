@@ -18,6 +18,15 @@ if (renderer.requiresMessaging !== "always") {
 if (manifest.devDependencies["@vscode/test-electron"] !== "3.0.0") {
   throw new Error("@vscode/test-electron must remain exactly pinned");
 }
+if (manifest.devDependencies["@vscode/python-extension"] !== "1.0.6") {
+  throw new Error("@vscode/python-extension must remain exactly pinned");
+}
+if (
+  JSON.stringify(manifest.extensionDependencies) !==
+  JSON.stringify(["ms-python.python", "ms-toolsai.jupyter"])
+) {
+  throw new Error("the host probe must activate the exact Python and Jupyter extension APIs");
+}
 if (manifest.packageManager !== `npm@${pins.npm}` || manifest.engines.node !== pins.node) {
   throw new Error("Node.js and npm must remain exactly pinned");
 }

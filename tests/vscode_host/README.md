@@ -27,26 +27,43 @@ boundary:
 
 The harness determines the outcome rather than assuming it in advance:
 
-- if the pinned Jupyter extension activates but VS Code does not register the
-  documented `notebook.selectKernel` command, the artifact reports
-  `kernel_selection_gate_failure`;
-- once the command is registered, a rejected or timed-out selector/execution
-  command, any creation-marker timeout, any execution summary, or any
-  non-marker output is a red `runtime_failure`. An empty cell at the marker
-  deadline is inconclusive because uncancelled execution may still start;
+- if the pinned Jupyter extension exposes neither its public `openNotebook`
+  API nor the documented `notebook.selectKernel` command after activation, the
+  artifact reports `kernel_selection_gate_failure`;
+- once either supported selection route is available, a rejected or timed-out
+  selection/execution request, any creation-marker timeout, any execution
+  summary, or any non-marker output is a red `runtime_failure`. An empty cell at
+  the marker deadline is inconclusive because uncancelled execution may still
+  start;
 - if the creation marker appears, every later renderer, messaging, or Python
   oracle failure—including verification-command rejection or timeout—is a red
   `runtime_failure`;
 - only the complete renderer-to-Python round trip reports
   `basic_scenario_green`.
 
-The exact pinned witness completed in
+The first exact pinned witness completed in
 [workflow run 29192874852](https://github.com/gilad-rubin/hypster/actions/runs/29192874852).
 After explicit activation, Microsoft Jupyter `2025.9.1` did not register the
 documented `notebook.selectKernel` command in VS Code Desktop `1.128.0`. The
 uploaded evidence therefore records `kernel_selection_gate_failure`, with no
 round-trip attempt and complete process cleanup. [`SPIKE_FAILURE.md`](SPIKE_FAILURE.md)
-is the verified root-owned follow-up payload for the missing supported seam.
+captures that verified historical observation.
+
+## Supported exported seam
+
+Follow-up source review found a supported route that does not require the
+missing built-in command or copying Jupyter's private controller IDs. In pinned
+Jupyter `2025.9.1`, the extension's public, non-breaking API exports
+`openNotebook(uri, pythonEnvironment)`. Jupyter's own smoke test resolves an
+exact executable with `PythonExtension.api().environments.resolveEnvironment()`
+and passes the resolved environment to that export.
+
+The harness now follows that same path first. It pins
+`@vscode/python-extension==1.0.6`, records both facade/export keys, requires the
+resolved executable to equal the isolated installed-wheel Python, and calls
+`jupyterApi.openNotebook()` before cell execution. The command-based route is
+only a fallback when the public export is absent. A new Ubuntu witness is still
+required to prove the full renderer-to-Python round trip.
 
 ## Before / after
 
@@ -71,6 +88,7 @@ real VS Code 1.128.0 Electron on Ubuntu/Xvfb
 
 - Node.js `24.18.0`
 - npm `11.16.0`
+- `@vscode/python-extension==1.0.6`
 - `@vscode/test-electron==3.0.0`
 - VS Code Desktop `1.128.0`
 - Microsoft Python `2026.4.0` (stable)
@@ -106,6 +124,11 @@ outputs.
 - [VS Code API](https://code.visualstudio.com/api/references/vscode-api)
   documents that an extension may create messaging only for a renderer it
   contributes; it exposes no foreign-controller discovery API.
+- [Jupyter 2025.9.1 public API](https://github.com/microsoft/vscode-jupyter/blob/v2025.9.1/src/standalone/api/index.ts)
+  exports `openNotebook` and forbids breaking changes to the extension API.
+- [Jupyter 2025.9.1 smoke test](https://github.com/microsoft/vscode-jupyter/blob/v2025.9.1/src/test/smoke/datascience.smoke.test.ts)
+  resolves an exact Python environment through the official Python-extension
+  facade before calling `jupyterExt.exports.openNotebook`.
 
 ## Local structural proof
 
@@ -128,5 +151,6 @@ timeout --signal=TERM --kill-after=30s 8m xvfb-run -a npm test
 ```
 
 Required absolute environment variables are `HYPSTER_NOTEBOOK`,
-`HYPSTER_VSCODE_ARTIFACT_DIR`, and `HYPSTER_VSCODE_RUNTIME_DIR`. The workflow
-also supplies `JUPYTER_PATH` pointing at the isolated clean-kernel prefix.
+`HYPSTER_VSCODE_ARTIFACT_DIR`, `HYPSTER_VSCODE_RUNTIME_DIR`, and
+`HYPSTER_VSCODE_PYTHON`. The workflow also supplies `JUPYTER_PATH` pointing at
+the isolated clean-kernel prefix.

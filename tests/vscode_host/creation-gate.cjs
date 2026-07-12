@@ -43,4 +43,18 @@ function classifyCommandResult(label, commandResult) {
   };
 }
 
-module.exports = { classifyCommandResult, classifyMissingCreationMarker };
+function selectKernelStrategy({ openNotebookExported, commandRegistered }) {
+  if (openNotebookExported) {
+    return "ms-toolsai.jupyter.exports.openNotebook";
+  }
+  if (commandRegistered) {
+    return "notebook.selectKernel";
+  }
+  return "kernel_selection_gate_failure";
+}
+
+module.exports = {
+  classifyCommandResult,
+  classifyMissingCreationMarker,
+  selectKernelStrategy,
+};
