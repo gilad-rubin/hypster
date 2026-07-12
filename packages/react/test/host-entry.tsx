@@ -33,7 +33,13 @@ function render(snapshot: BridgeSnapshot) {
   rootElement.dataset.renderer = "@hypster/react";
   rootElement.dataset.executionId = snapshot.bridge_execution_id;
   rootElement.dataset.sequence = String(snapshot.bridge_sequence);
-  root.render(<HypsterRenderer snapshot={snapshot} onAction={onAction} />);
+  root.render(
+    <HypsterRenderer
+      key={snapshot.bridge_sequence}
+      snapshot={snapshot}
+      onAction={onAction}
+    />,
+  );
 }
 
 async function onAction(action: InteractiveAction) {

@@ -170,8 +170,15 @@ def test_production_react_renderer_round_trips_through_python() -> None:
                 assert page.locator(".hypster-renderer").count() == 1
                 assert page.locator(".hypster-widget").count() == 0
                 page.get_by_label("Mode").select_option(label="remote")
-                page.get_by_label("Temperature").fill("1.25")
+                old_temperature = page.get_by_label("Temperature").element_handle()
+                assert old_temperature is not None
+                old_temperature.evaluate("element => { element.dataset.hostNode = 'old'; }")
+                old_temperature.fill("1.25")
                 page.wait_for_function("window.__hypsterHost.sequence === 2")
+                page.wait_for_function("element => !element.isConnected", arg=old_temperature)
+                new_temperature = page.get_by_label("Temperature")
+                assert new_temperature.get_attribute("data-host-node") is None
+                assert new_temperature.input_value() == "1.25"
                 assert bridge.session.params == {"mode": "remote", "remote.temperature": 1.25}
                 assert page.locator("#root").get_attribute("data-execution-id") == bridge.execution_id
                 page.screenshot(path=artifact_dir / "react-round-trip.png")
