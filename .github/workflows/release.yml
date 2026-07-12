@@ -38,8 +38,10 @@ jobs:
     steps:
       - name: Require master
         if: github.ref != 'refs/heads/master'
+        env:
+          REF: ${{ github.ref }}
         run: |
-          echo "::error::Releases are dispatched from master only (got ${{ github.ref }})."
+          echo "::error::Releases are dispatched from master only (got $REF)."
           exit 1
 
       - uses: actions/checkout@v6.0.2
@@ -48,8 +50,10 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$ ]]; then
-            echo "::error::Invalid version format: $VERSION"
+          # Stable versions only: PEP 440 normalizes prerelease names (0.9.0-alpha.1
+          # -> 0.9.0a1) so raw prerelease input would break filename-based gating.
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version: $VERSION. This workflow releases stable X.Y.Z versions only."
             exit 1
           fi
 
@@ -174,10 +178,14 @@ jobs:
 
       # pypa's action performs Trusted Publishing via OIDC and generates
       # PEP 740 attestations for the uploaded files by default.
+      # skip-existing lets a rerun recover when PyPI accepted the files but a
+      # later job failed; the github-release job re-verifies the published
+      # hashes, so a silent skip can never tag bytes PyPI does not have.
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          skip-existing: true
 
   github-release:
     # Tag + public release happen only after PyPI accepted the same bytes.
@@ -194,6 +202,43 @@ jobs:
         with:
           name: dist-${{ inputs.version }}
           path: dist
+
+      - name: Verify PyPI serves exactly the bytes we built
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import time
+          import urllib.request
+
+          version = os.environ["VERSION"]
+          local = {}
+          with open("dist/SHA256SUMS") as fh:
+              for line in fh:
+                  digest, name = line.split()
+                  name = name.lstrip("./")
+                  if name != "SHA256SUMS":
+                      local[name] = digest
+
+          data = None
+          for _ in range(12):
+              try:
+                  with urllib.request.urlopen(f"https://pypi.org/pypi/hypster/{version}/json") as resp:
+                      data = json.load(resp)
+                  break
+              except Exception:
+                  time.sleep(10)
+          assert data is not None, f"PyPI never served metadata for {version}"
+
+          remote = {u["filename"]: u["digests"]["sha256"] for u in data["urls"]}
+          for name, digest in local.items():
+              assert name in remote, f"{name} missing from PyPI"
+              assert remote[name] == digest, f"{name}: PyPI has {remote[name]}, we built {digest}"
+          print(f"PyPI serves the exact bytes we built: {sorted(local)}")
+          PY
 
       - name: Extract changelog section
         env:

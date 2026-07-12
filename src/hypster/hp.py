@@ -183,14 +183,20 @@ class HP:
             hpo_spec=hpo_spec,
         )
 
-    def _register_param(self, name: Optional[str], full_path: str) -> None:
-        """Validate a parameter name and register it as called."""
+    def _register_param(self, name: Optional[str]) -> str:
+        """Validate a parameter name, register it as called, and return its full path.
+
+        Name validation must run before path construction: joining the
+        namespace stack with a non-string name would raise a raw TypeError.
+        """
         if name is None:
-            raise HPCallError(full_path, "requires 'name' for overrides. How to fix: pass name='...'")
+            raise HPCallError("<unnamed>", "requires 'name' for overrides. How to fix: pass name='...'")
         validate_identifier_name(name, kind="parameter name")
+        full_path = self._get_full_param_path(name)
         if full_path in self.called_params:
             raise HPCallError(full_path, "has already been defined")
         self.called_params.add(full_path)
+        return full_path
 
     def _require_default(self, default: Any, full_path: str, param_type: str, name: str) -> None:
         if default is _NO_DEFAULT:
@@ -216,8 +222,7 @@ class HP:
         description: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        full_path = self._get_full_param_path(name)
-        self._register_param(name, full_path)
+        full_path = self._register_param(name)
         self._require_default(default, full_path, param_type, name)
 
         if default is None and not allow_none:
@@ -285,8 +290,7 @@ class HP:
         description: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> List[Any]:
-        full_path = self._get_full_param_path(name)
-        self._register_param(name, full_path)
+        full_path = self._register_param(name)
         self._require_default(default, full_path, param_type, name)
 
         if allow_none:
@@ -332,8 +336,7 @@ class HP:
         description: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Any:
-        full_path = self._get_full_param_path(name)
-        self._register_param(name, full_path)
+        full_path = self._register_param(name)
 
         is_mapping = isinstance(options, Mapping)
         adapter = OptionsAdapter(options=options)
@@ -393,8 +396,7 @@ class HP:
         description: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> List[Any]:
-        full_path = self._get_full_param_path(name)
-        self._register_param(name, full_path)
+        full_path = self._register_param(name)
 
         is_mapping = isinstance(options, Mapping)
         adapter = OptionsAdapter(options=options)
@@ -441,12 +443,12 @@ class HP:
         **kwargs: Any,
     ) -> Any:
         """Nest another configuration function."""
-        full_path = self._get_full_param_path(name)
-
-        # Validate name
+        # Validate the name before building the path: joining the namespace
+        # stack with a non-string name would raise a raw TypeError.
         if name is None:
-            raise HPCallError(full_path, "requires 'name' for nesting")
+            raise HPCallError("<unnamed>", "requires 'name' for nesting")
         validate_identifier_name(name, kind="nest name")
+        full_path = self._get_full_param_path(name)
 
         # Disallow nesting under a prefix that already has parameters defined by the parent
         # but allow repeated nesting with the same name to surface duplicate param errors later
@@ -902,8 +904,7 @@ class HP:
         ``then`` is a FieldSpec (or type shorthand) for the payload widget.
         ``combinators`` controls the tier: ["and"] for simple, ["and","or","not"] for full.
         """
-        full_path = self._get_full_param_path(name)
-        self._register_param(name, full_path)
+        full_path = self._register_param(name)
 
         if combinators is None:
             combinators = ["and"]
@@ -954,8 +955,7 @@ class HP:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> list:
         """Schema parameter — a list of SchemaField extraction field definitions."""
-        full_path = self._get_full_param_path(name)
-        self._register_param(name, full_path)
+        full_path = self._register_param(name)
 
         value, found = self._get_value_for_param(name)
         schema_value = coerce_schema_fields(value if found else (default or []))

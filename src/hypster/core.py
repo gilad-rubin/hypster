@@ -116,7 +116,8 @@ def _run_config(
 
     result = func(hp, **kwargs)
     leaf_params = hp.called_params - hp.nested_scope_paths
-    handle_unknown_parameters(normalized_values, leaf_params, on_unknown)
+    # stacklevel 4: warn -> here -> public entry point (instantiate/explore/...) -> user code
+    handle_unknown_parameters(normalized_values, leaf_params, on_unknown, stacklevel=4)
     return result
 
 
