@@ -73,10 +73,9 @@ refused an interactive widget-CDN prompt in its test host.
 
 Jupyter's own standard and widget tests avoid that prompt by globally setting
 `jupyter.widgetScriptSources` to exactly `['jsdelivr.com', 'unpkg.com']`. The
-harness now writes that supported setting before activating Jupyter or creating
-the widget, records its global and effective values, and fails if either value
-differs. A new Ubuntu witness is still required to prove the full
-renderer-to-Python round trip.
+harness first wrote that supported setting before activating Jupyter or
+creating the widget, recorded its global and effective values, and failed if
+either value differed.
 
 [Workflow run 29193526092](https://github.com/gilad-rubin/hypster/actions/runs/29193526092)
 confirmed that both inspected global values persisted exactly, but exposed a
@@ -86,23 +85,44 @@ now reacquires configuration after writing the setting and verifies the
 effective value again after Jupyter activation, at the point the widget
 consumer reads it.
 
+[Workflow run 29193666883](https://github.com/gilad-rubin/hypster/actions/runs/29193666883)
+then proved the exact setting before and after activation, the exact clean
+interpreter, and successful kernel startup. It also exposed the next concrete
+boundary: pinned Jupyter tries configured CDN providers before its installed
+local nbextension provider, and the Electron webview could not fetch
+`https://unpkg.com/`. The unchanged 30-second creation timeout therefore stayed
+correctly red.
+
+The harness now uses Jupyter's public custom-source setting without depending
+on an external network. Before Jupyter activation it derives the selected
+kernel prefix from `HYPSTER_VSCODE_PYTHON`, requires parser-compatible
+`share/jupyter/nbextensions/anywidget/extension.js`, and serves that same
+installation's `index.js` from a loopback-only HTTP endpoint. It configures the
+exact dynamic template
+`http://127.0.0.1:<port>/${packageName}/${fileNameWithExt}` globally and verifies
+the effective value again after activation. The artifact records both asset
+paths, byte counts, SHA-256 hashes, and every request. Even if the renderer
+probe otherwise succeeds, the run remains red unless the exact
+`/anywidget/index.js` route received a successful GET.
+
 ## Before / after
 
 Before:
 
 ```text
-The repo had no VS Code Desktop process, no isolated extension installation,
-and no supported renderer bridge.
+configured CDN source
+  -> Jupyter tries unpkg before its installed local provider
+  -> Electron webview cannot fetch unpkg
+  -> widget never renders and the strict execution deadline stays red
 ```
 
 After:
 
 ```text
-real VS Code 1.128.0 Electron on Ubuntu/Xvfb
-  -> exact stable Python/Jupyter/Jupyter-renderers extensions
-  -> clean installed-wheel kernelspec
-  -> documented notebook.selectKernel attempt
-  -> raw gate evidence (and full renderer/Python oracle if execution proceeds)
+exact selected kernel prefix
+  -> validate anywidget extension.js mapping and hash installed index.js
+  -> loopback-only custom Jupyter source serves that exact index.js
+  -> artifact proves path + hash + successful GET before green is possible
 ```
 
 ## Exact pins
@@ -117,6 +137,7 @@ real VS Code 1.128.0 Electron on Ubuntu/Xvfb
 - Microsoft Jupyter Notebook Renderers `1.3.0` (stable)
 - Python `3.13.13`
 - `uv==0.11.8`
+- `anywidget==0.11.0`
 - kernel packages: the checked-in
   `tests/jupyterlab_host/kernel-requirements.lock`
 
@@ -128,7 +149,9 @@ result/timeout, cell outputs, and VS Code/Jupyter logs.
 The local structural check includes pure classifier falsifiers for transient
 empty creation state, rejected and timed-out commands, missing kernelspec
 errors, completed/failed execution summaries, text errors, and non-text
-outputs.
+outputs. It also builds a temporary exact-prefix nbextension, proves the custom
+template's HEAD/GET behavior and SHA-256 evidence, rejects other routes, and
+proves an incompatible `extension.js` fails before server startup.
 
 ## Supported upstream seams read before implementation
 
@@ -153,6 +176,11 @@ outputs.
 - [Jupyter 2025.9.1 standard widget test](https://github.com/microsoft/vscode-jupyter/blob/v2025.9.1/src/test/datascience/widgets/standardWidgets.vscode.common.test.ts)
   sets `widgetScriptSources` globally to `jsdelivr.com` and `unpkg.com` before
   initializing widgets in CI.
+- [Jupyter 2025.9.1 script-source factory](https://github.com/microsoft/vscode-jupyter/blob/v2025.9.1/src/notebooks/controllers/ipywidgets/scriptSourceProvider/scriptSourceProviderFactory.node.ts)
+  orders configured CDN/custom sources before the installed local provider.
+- [Jupyter 2025.9.1 local widget manager](https://github.com/microsoft/vscode-jupyter/blob/v2025.9.1/src/notebooks/controllers/ipywidgets/scriptSourceProvider/localIPyWidgetScriptManager.node.ts)
+  discovers `extension.js` below the interpreter's Jupyter data directories and
+  parses its RequireJS mapping.
 
 ## Local structural proof
 

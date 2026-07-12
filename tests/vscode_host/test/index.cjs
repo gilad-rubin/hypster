@@ -12,6 +12,7 @@ const {
   selectKernelStrategy,
 } = require("../creation-gate.cjs");
 const pins = require("../pins.cjs");
+const { startLocalWidgetSource } = require("../widget-source.cjs");
 
 const decoder = new TextDecoder();
 
@@ -119,9 +120,9 @@ function pythonEnvironmentEvidence(environment, requestedExecutable) {
   };
 }
 
-async function configureWidgetScriptSources(evidence) {
+async function configureWidgetScriptSources(evidence, sourceTemplate) {
   const configuration = vscode.workspace.getConfiguration("jupyter");
-  const expected = [...pins.widgetScriptSources];
+  const expected = [sourceTemplate];
   await configuration.update(
     "widgetScriptSources",
     expected,
@@ -149,9 +150,9 @@ async function configureWidgetScriptSources(evidence) {
   }
 }
 
-function verifyWidgetScriptSourcesAfterActivation(evidence) {
+function verifyWidgetScriptSourcesAfterActivation(evidence, sourceTemplate) {
   const configuration = vscode.workspace.getConfiguration("jupyter");
-  const expected = [...pins.widgetScriptSources];
+  const expected = [sourceTemplate];
   const inspected = configuration.inspect("widgetScriptSources");
   const effective = configuration.get("widgetScriptSources");
   evidence.rendererBoundary.widgetScriptSources.globalLocalValueAfterActivation =
@@ -253,12 +254,15 @@ async function run() {
   }
 
   let editor;
+  let localWidgetSource;
   try {
-    await configureWidgetScriptSources(evidence);
+    localWidgetSource = await startLocalWidgetSource(pythonExecutable);
+    evidence.rendererBoundary.localWidgetSource = localWidgetSource.evidence;
+    await configureWidgetScriptSources(evidence, localWidgetSource.template);
     const jupyter = vscode.extensions.getExtension("ms-toolsai.jupyter");
     const pythonApi = await PythonExtension.api();
     const jupyterApi = await jupyter.activate();
-    verifyWidgetScriptSourcesAfterActivation(evidence);
+    verifyWidgetScriptSourcesAfterActivation(evidence, localWidgetSource.template);
     evidence.selector.pythonFacade = {
       package: "@vscode/python-extension",
       version: pythonFacadePackage.version,
@@ -387,6 +391,7 @@ async function run() {
     }
     const probe = await probeExtension.activate();
     evidence.roundTrip.renderer = await probe.exercise(editor);
+    localWidgetSource.assertUsed();
 
     evidence.roundTrip.verificationCommand = await settleWithin(
       vscode.commands.executeCommand("notebook.cell.execute", {
@@ -419,6 +424,9 @@ async function run() {
     evidence.error = error instanceof Error ? `${error.message}\n${error.stack}` : String(error);
     throw error;
   } finally {
+    if (localWidgetSource) {
+      await localWidgetSource.close();
+    }
     fs.writeFileSync(
       path.join(artifactDir, "spike-result.json"),
       `${JSON.stringify(evidence, null, 2)}\n`,

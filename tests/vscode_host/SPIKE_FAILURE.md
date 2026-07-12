@@ -20,6 +20,16 @@ smoke test. Workflow run 29193331802 proved that export against the exact clean
 Python environment and reached the widget. Its later widget-CDN prompt failure
 is a red harness-configuration failure, not this accepted gate.
 
+Workflow run 29193666883 subsequently proved the exact global widget setting
+before and after activation, plus successful startup of that exact clean
+kernel. The remaining failure was a concrete renderer source error:
+`Failed to access CDN https://unpkg.com/ ... TypeError: Failed to fetch`.
+Pinned Jupyter orders configured network/custom providers before its installed
+local provider. The harness now uses the public custom-source setting to serve
+the exact selected kernel prefix's installed `anywidget/index.js` on loopback,
+and requires path/hash/request evidence before green. This does not change the
+historical kernel-selection gate recorded by this payload.
+
 ## Title
 
 Expose or adopt a supported VS Code kernel-controller discovery seam for the

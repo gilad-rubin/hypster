@@ -33,8 +33,8 @@ if (manifest.packageManager !== `npm@${pins.npm}` || manifest.engines.node !== p
 if (pins.vscode !== "1.128.0") {
   throw new Error("VS Code Desktop must remain exactly pinned");
 }
-if (JSON.stringify(pins.widgetScriptSources) !== JSON.stringify(["jsdelivr.com", "unpkg.com"])) {
-  throw new Error("Jupyter's exact standard-test widget script sources must remain pinned");
+if (pins.widgetScriptSourcePathTemplate !== "/${packageName}/${fileNameWithExt}") {
+  throw new Error("Jupyter's local widget source path template must remain exactly pinned");
 }
 
 const hostTestSource = fs.readFileSync(path.join(root, "test", "index.cjs"), "utf8");
@@ -45,6 +45,8 @@ for (const fragment of [
   'inspect("widgetScriptSources")',
   "effectiveBeforeActivation",
   "effectiveAfterActivation",
+  "startLocalWidgetSource(pythonExecutable)",
+  "localWidgetSource.assertUsed()",
 ]) {
   if (!hostTestSource.includes(fragment)) {
     throw new Error(`host test must configure and verify the global widget allowlist: ${fragment}`);
@@ -56,7 +58,7 @@ if (configurationReads.length < 3) {
 }
 const activationIndex = hostTestSource.indexOf("const jupyterApi = await jupyter.activate();");
 const consumerVerificationIndex = hostTestSource.indexOf(
-  "verifyWidgetScriptSourcesAfterActivation(evidence);",
+  "verifyWidgetScriptSourcesAfterActivation(evidence, localWidgetSource.template);",
 );
 if (activationIndex < 0 || consumerVerificationIndex < activationIndex) {
   throw new Error("effective widget settings must be verified after Jupyter activation");
@@ -87,8 +89,10 @@ for (const file of [
   "creation-gate.cjs",
   "renderer.mjs",
   "run.cjs",
+  "widget-source.cjs",
   "scripts/assert-runtime.cjs",
   "scripts/test-creation-gate.cjs",
+  "scripts/test-widget-source.cjs",
   "test/index.cjs",
 ]) {
   const completed = spawnSync(process.execPath, ["--check", path.join(root, file)], {
@@ -99,4 +103,4 @@ for (const file of [
   }
 }
 
-console.log("VS Code host structure and global widget allowlist are valid");
+console.log("VS Code host structure and fail-loud local widget source are valid");

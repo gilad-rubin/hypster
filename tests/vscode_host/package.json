@@ -32,7 +32,7 @@
   },
   "scripts": {
     "assert-runtime": "node scripts/assert-runtime.cjs",
-    "check": "node scripts/check.cjs && node scripts/test-creation-gate.cjs",
+    "check": "node scripts/check.cjs && node scripts/test-creation-gate.cjs && node scripts/test-widget-source.cjs",
     "test": "node run.cjs"
   },
   "devDependencies": {
