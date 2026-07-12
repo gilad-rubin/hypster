@@ -300,13 +300,15 @@ def config(hp: HP):
     return {"count": hp.int(1, name="count", min=1, max=5)}
 
 result = interact(config)
-snapshot = result.dispatch({"type": "set_value", "path": "count", "value": 4})
+snapshot = result.dispatch(
+    {"protocol_version": 1, "type": "set_value", "path": "count", "value": 4}
+)
 
 assert result.value == {"count": 4}
 assert snapshot["status"] == "applied"
 ```
 {% endcode %}
 
-Supported actions are `{"type": "set_value", "path": ..., "value": ...}`, `{"type": "reset"}`, and `{"type": "apply"}` (manual mode). Setting an unreachable path raises the backend's `Unknown or unreachable parameters` error.
+Every action must include `"protocol_version": 1`. Supported actions are `{"protocol_version": 1, "type": "set_value", "path": ..., "value": ...}`, `{"protocol_version": 1, "type": "reset"}`, and `{"protocol_version": 1, "type": "apply"}` (manual mode). A missing or mismatched version raises `ValueError` without changing session state. Setting an unreachable path raises the backend's `Unknown or unreachable parameters` error.
 
 See also: [Interactive UI From Schema](../examples/interactive-ui.md) for building a custom (non-widget) UI from `explore()` schemas.

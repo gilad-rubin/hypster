@@ -1,4 +1,9 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { createInterface } from "node:readline";
 import { afterEach, test } from "node:test";
 
 import { JSDOM } from "jsdom";
@@ -21,6 +26,9 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const React = await import("react");
 const { cleanup, fireEvent, render, screen } = await import("@testing-library/react");
 const { HypsterRenderer } = await import("../dist/index.js");
+const protocolFixture = JSON.parse(
+  readFileSync(new URL("./fixtures/protocol-v1.json", import.meta.url), "utf8"),
+);
 
 afterEach(cleanup);
 
@@ -65,6 +73,35 @@ function renderer(currentSnapshot, onAction = () => {}) {
     snapshot: currentSnapshot,
     onAction,
   });
+}
+
+async function withTimeout(promise, message) {
+  let timeout;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), 5_000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function terminateProcess(process, exited) {
+  if (process.exitCode !== null || process.signalCode !== null) {
+    await exited;
+    return;
+  }
+
+  process.kill("SIGTERM");
+  try {
+    await withTimeout(exited, "Python protocol process ignored SIGTERM for 5s");
+  } catch {
+    process.kill("SIGKILL");
+    await withTimeout(exited, "Python protocol process did not exit after SIGKILL within 5s");
+  }
 }
 
 test("renders every current snapshot parameter kind from snake_case data", () => {
@@ -185,6 +222,68 @@ test("adds a dependent control only when the replacement snapshot contains it", 
   assert.equal(screen.getByRole("textbox", { name: "remote token" }).value, "secret");
 });
 
+test("consumes Python-generated Protocol V1 snapshots and actions", () => {
+  const actions = [];
+  const view = render(renderer(protocolFixture.initial_snapshot, (action) => actions.push(action)));
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Mode" }), { target: { value: "1" } });
+  assert.deepEqual(actions, [protocolFixture.actions[0]]);
+
+  view.rerender(renderer(protocolFixture.branch_snapshot, (action) => actions.push(action)));
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Temperature" }), { target: { value: "1.25" } });
+  assert.deepEqual(actions, protocolFixture.actions);
+
+  view.rerender(renderer(protocolFixture.final_snapshot, (action) => actions.push(action)));
+  assert.equal(screen.getByRole("spinbutton", { name: "Temperature" }).value, "1.25");
+  assert.deepEqual(protocolFixture.final_params, { mode: "remote", temperature: 1.25 });
+});
+
+test("completes a live Python to React to Python round trip", async (context) => {
+  const reactRoot = fileURLToPath(new URL("..", import.meta.url));
+  const python = spawn("uv", ["run", "python", "test/python_protocol.py", "--serve"], {
+    cwd: reactRoot,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const lines = createInterface({ input: python.stdout });
+  const snapshots = lines[Symbol.asyncIterator]();
+  const exited = once(python, "exit");
+  let stderr = "";
+  python.stderr.on("data", (chunk) => {
+    stderr += chunk.toString();
+  });
+  context.after(async () => {
+    if (!python.stdin.destroyed) python.stdin.end();
+    lines.close();
+    await terminateProcess(python, exited);
+  });
+
+  const initialLine = await withTimeout(snapshots.next(), "Python did not emit the initial snapshot within 5s");
+  assert.equal(initialLine.done, false, stderr);
+  const initialSnapshot = JSON.parse(initialLine.value);
+  const actions = [];
+  const view = render(renderer(initialSnapshot, (action) => actions.push(action)));
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Mode" }), { target: { value: "1" } });
+  python.stdin.write(`${JSON.stringify(actions.at(-1))}\n`);
+  const branchLine = await withTimeout(snapshots.next(), "Python did not emit the branch snapshot within 5s");
+  assert.equal(branchLine.done, false, stderr);
+  view.rerender(renderer(JSON.parse(branchLine.value), (action) => actions.push(action)));
+
+  fireEvent.change(screen.getByRole("spinbutton", { name: "Temperature" }), { target: { value: "1.25" } });
+  python.stdin.write(`${JSON.stringify(actions.at(-1))}\n`);
+  const finalLine = await withTimeout(snapshots.next(), "Python did not emit the final snapshot within 5s");
+  assert.equal(finalLine.done, false, stderr);
+  const finalSnapshot = JSON.parse(finalLine.value);
+  view.rerender(renderer(finalSnapshot, (action) => actions.push(action)));
+
+  assert.deepEqual(finalSnapshot.selected_params, { mode: "remote", temperature: 1.25 });
+  assert.equal(screen.getByRole("spinbutton", { name: "Temperature" }).value, "1.25");
+
+  python.stdin.end();
+  const [exitCode, signal] = await withTimeout(exited, "Python protocol process did not exit within 5s");
+  assert.equal(exitCode, 0, `Python exited via ${signal ?? "code"}: ${stderr}`);
+});
+
 test("renders snapshot errors and missing authoritative values visibly", () => {
   const count = parameter("int", "count", 2);
   const current = snapshot([count], {}, {
@@ -195,4 +294,26 @@ test("renders snapshot errors and missing authoritative values visibly", () => {
 
   assert.match(screen.getAllByRole("alert")[0].textContent, /exploration: count must be positive/);
   assert.match(screen.getAllByRole("alert")[1].textContent, /missing draft_values\["count"\]/);
+});
+
+test("renders missing or mismatched protocol versions visibly and exposes no action surfaces", () => {
+  const count = parameter("int", "count", 2);
+
+  for (const invalidSnapshot of [
+    { ...snapshot([count], { count: 2 }), protocol_version: 2 },
+    Object.fromEntries(
+      Object.entries(snapshot([count], { count: 2 })).filter(([key]) => key !== "protocol_version"),
+    ),
+  ]) {
+    const actions = [];
+    const view = render(renderer(invalidSnapshot, (action) => actions.push(action)));
+
+    assert.match(screen.getByRole("alert").textContent, /protocol version/i);
+    assert.equal(screen.queryByRole("spinbutton", { name: "count" }), null);
+    assert.equal(screen.queryByRole("button", { name: "Apply" }), null);
+    assert.equal(screen.queryByRole("button", { name: "Reset" }), null);
+    assert.deepEqual(actions, []);
+
+    view.unmount();
+  }
 });

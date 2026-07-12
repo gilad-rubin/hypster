@@ -1,0 +1,170 @@
+{
+  "actions": [
+    {
+      "path": "mode",
+      "protocol_version": 1,
+      "type": "set_value",
+      "value": "remote"
+    },
+    {
+      "path": "temperature",
+      "protocol_version": 1,
+      "type": "set_value",
+      "value": 1.25
+    }
+  ],
+  "branch_snapshot": {
+    "applied_values": {
+      "mode": "remote",
+      "temperature": 0.25
+    },
+    "draft_values": {
+      "mode": "remote",
+      "temperature": 0.25
+    },
+    "error": null,
+    "mode": {
+      "auto_apply": true
+    },
+    "protocol_version": 1,
+    "schema": {
+      "display_label": "Branch Config",
+      "name": "branch_config",
+      "parameters": [
+        {
+          "children": [],
+          "default_value": "local",
+          "description": null,
+          "display_label": "Mode",
+          "kind": "select",
+          "maximum": null,
+          "minimum": null,
+          "name": "mode",
+          "options": [
+            "local",
+            "remote"
+          ],
+          "path": "mode",
+          "selected_value": "remote"
+        },
+        {
+          "children": [],
+          "default_value": 0.25,
+          "description": null,
+          "display_label": "Temperature",
+          "kind": "float",
+          "maximum": 2.0,
+          "minimum": 0.0,
+          "name": "temperature",
+          "options": null,
+          "path": "temperature",
+          "selected_value": 0.25
+        }
+      ]
+    },
+    "selected_params": {
+      "mode": "remote",
+      "temperature": 0.25
+    },
+    "status": "applied"
+  },
+  "final_params": {
+    "mode": "remote",
+    "temperature": 1.25
+  },
+  "final_snapshot": {
+    "applied_values": {
+      "mode": "remote",
+      "temperature": 1.25
+    },
+    "draft_values": {
+      "mode": "remote",
+      "temperature": 1.25
+    },
+    "error": null,
+    "mode": {
+      "auto_apply": true
+    },
+    "protocol_version": 1,
+    "schema": {
+      "display_label": "Branch Config",
+      "name": "branch_config",
+      "parameters": [
+        {
+          "children": [],
+          "default_value": "local",
+          "description": null,
+          "display_label": "Mode",
+          "kind": "select",
+          "maximum": null,
+          "minimum": null,
+          "name": "mode",
+          "options": [
+            "local",
+            "remote"
+          ],
+          "path": "mode",
+          "selected_value": "remote"
+        },
+        {
+          "children": [],
+          "default_value": 0.25,
+          "description": null,
+          "display_label": "Temperature",
+          "kind": "float",
+          "maximum": 2.0,
+          "minimum": 0.0,
+          "name": "temperature",
+          "options": null,
+          "path": "temperature",
+          "selected_value": 1.25
+        }
+      ]
+    },
+    "selected_params": {
+      "mode": "remote",
+      "temperature": 1.25
+    },
+    "status": "applied"
+  },
+  "initial_snapshot": {
+    "applied_values": {
+      "mode": "local"
+    },
+    "draft_values": {
+      "mode": "local"
+    },
+    "error": null,
+    "mode": {
+      "auto_apply": true
+    },
+    "protocol_version": 1,
+    "schema": {
+      "display_label": "Branch Config",
+      "name": "branch_config",
+      "parameters": [
+        {
+          "children": [],
+          "default_value": "local",
+          "description": null,
+          "display_label": "Mode",
+          "kind": "select",
+          "maximum": null,
+          "minimum": null,
+          "name": "mode",
+          "options": [
+            "local",
+            "remote"
+          ],
+          "path": "mode",
+          "selected_value": "local"
+        }
+      ]
+    },
+    "selected_params": {
+      "mode": "local"
+    },
+    "status": "applied"
+  },
+  "protocol_version": 1
+}

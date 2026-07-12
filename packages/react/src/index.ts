@@ -1,4 +1,5 @@
 export { HypsterRenderer } from "./renderer.js";
+export { INTERACTIVE_PROTOCOL_VERSION } from "./types.js";
 export type { HypsterRendererProps } from "./renderer.js";
 export type {
   FieldSpec,
