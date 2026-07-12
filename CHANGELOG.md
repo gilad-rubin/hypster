@@ -3,6 +3,24 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-07-12
+
+### Added
+- `@hypster/react` is now an experimental thin renderer for Python-owned Interactive Snapshots. It accepts a snapshot, emits semantic actions, and leaves validation, reachability, Branch Choice Memory, selected parameters, and apply/reset semantics in Python. The package remains repository-private and is not published to npm.
+- Real installed-wheel host gates now exercise the notebook widget in JupyterLab 4 with Chromium, Notebook 7 with Firefox, and VS Code Desktop with its stable Python and Jupyter extensions. These are currently tested environments for the 0.9 line, not a permanent compatibility guarantee.
+- A physical Python → React → Python browser witness verifies snapshot replacement and fail-closed protocol mismatch behavior.
+
+### Changed
+- **Breaking for custom interactive clients:** snapshots and actions now require `"protocol_version": 1`. Missing or mismatched action versions fail before session state changes; renderers show a visible mismatch and emit no actions for an incompatible snapshot. Protocol V1 detects incompatible peers during 0.x development; it is not a 1.x stability promise.
+- **Breaking for repository consumers of `@hypster/react`:** the browser-side `fetchSchema` configuration model, value reconciliation, rules hooks, and branch memory were removed. Hosts now render `<HypsterRenderer snapshot={...} onAction={...} />`, send each action to Python, and replace the rendered snapshot with Python's response.
+- The release workflow accepts only stable `X.Y.Z` inputs, supports safe recovery after PyPI accepts artifacts, and verifies that PyPI serves the built hashes before creating the immutable tag and GitHub release.
+
+### Fixed
+- `on_unknown="warn"` warnings now point to the user's call site instead of a Hypster internal frame.
+- A missing parameter or nested-config name now raises a friendly `HPCallError` instead of a raw path-joining `TypeError`.
+
+Migration instructions: [0.7 → 0.8](docs/migration/upgrade-0.7-to-0.8.md) and [0.8 → 0.9](docs/migration/upgrade-0.8-to-0.9.md).
+
 ## [0.8.0] - 2026-07-11
 
 ### Fixed

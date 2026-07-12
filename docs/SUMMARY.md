@@ -55,6 +55,16 @@
 * [Public API](reference/api.md)
 * [Optuna HPO API](reference/optuna-hpo.md)
 * [Error Handling](reference/error-handling.md)
+* [Currently Tested Environments](reference/currently-tested-environments.md)
+
+## Migration
+
+* [Upgrade From 0.7 To 0.8](migration/upgrade-0.7-to-0.8.md)
+* [Upgrade From 0.8 To 0.9](migration/upgrade-0.8-to-0.9.md)
+
+## Contributing
+
+* [Release Hypster](contributing/releasing.md)
 
 ## Integrations
 

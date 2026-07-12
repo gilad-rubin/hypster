@@ -14,6 +14,10 @@ on:
         description: "Version to release — must equal the committed version (e.g., 0.8.0)"
         required: true
         type: string
+      expected_sha:
+        description: "Exact 40-character master commit to release — must match the dry run"
+        required: true
+        type: string
       publish_to_pypi:
         description: "Publish to PyPI (false = dry run: build, test, and retain artifacts only)"
         required: true
@@ -46,6 +50,20 @@ jobs:
 
       - uses: actions/checkout@v6.0.2
 
+      - name: Assert exact source commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if ! [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::expected_sha must be a lowercase 40-character commit SHA (got $EXPECTED_SHA)."
+            exit 1
+          fi
+          if [ "$GITHUB_SHA" != "$EXPECTED_SHA" ]; then
+            echo "::error::Source drift: expected $EXPECTED_SHA but this run resolved master to $GITHUB_SHA."
+            echo "Repeat the dry run for the new commit before publishing."
+            exit 1
+          fi
+
       - name: Validate version format
         env:
           VERSION: ${{ inputs.version }}
@@ -69,14 +87,19 @@ jobs:
             exit 1
           fi
 
-      - name: Assert tag does not already exist (tags are never rewritten)
+      - name: Assert tag is absent or recoverable (tags are never rewritten)
         env:
           VERSION: ${{ inputs.version }}
         run: |
           git fetch --tags --quiet
           if git tag -l | grep -qx "v$VERSION"; then
-            echo "::error::Tag v$VERSION already exists. Released bytes and tags are immutable — bump to a new patch version instead."
-            exit 1
+            TAG_SHA=$(git rev-list -n 1 "v$VERSION")
+            if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "::error::Tag v$VERSION points to $TAG_SHA, not this release commit $GITHUB_SHA."
+              echo "Released tags are immutable — bump to a new patch version instead."
+              exit 1
+            fi
+            echo "Tag v$VERSION already points to this commit; allowing idempotent GitHub-release recovery."
           fi
 
       - name: Assert changelog section exists
@@ -266,19 +289,72 @@ jobs:
             echo "SHA-256 checksums of the published files are attached as SHA256SUMS."
           } >> release_notes.md
 
-      - name: Create tag and GitHub release with artifacts
+      - name: Create or recover tag and GitHub release with immutable artifacts
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
+          TAG="v$VERSION"
           DRAFT_FLAG=""
           if [ "${{ inputs.create_draft }}" = "true" ]; then DRAFT_FLAG="--draft"; fi
-          gh release create "v$VERSION" \
-            --target "$GITHUB_SHA" \
-            --title "hypster v$VERSION" \
-            --notes-file release_notes.md \
-            $DRAFT_FLAG \
-            dist/*
+
+          git fetch --tags --quiet
+          if git tag -l | grep -qx "$TAG"; then
+            TAG_SHA=$(git rev-list -n 1 "$TAG")
+            if [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "::error::$TAG points to $TAG_SHA, not $GITHUB_SHA; refusing to move it."
+              exit 1
+            fi
+          fi
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            ACTUAL_DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft)
+            if [ "$ACTUAL_DRAFT" != "${{ inputs.create_draft }}" ]; then
+              echo "::error::Existing $TAG draft state is $ACTUAL_DRAFT, expected ${{ inputs.create_draft }}."
+              exit 1
+            fi
+
+            EXPECTED_ASSETS=$(for path in dist/*; do basename "$path"; done | sort)
+            EXISTING_ASSETS=$(gh release view "$TAG" --json assets --jq '.assets[].name' | sort)
+            while IFS= read -r name; do
+              [ -z "$name" ] && continue
+              if ! echo "$EXPECTED_ASSETS" | grep -Fxq "$name"; then
+                echo "::error::Existing $TAG contains unexpected immutable asset $name."
+                exit 1
+              fi
+            done <<< "$EXISTING_ASSETS"
+
+            for path in dist/*; do
+              name=$(basename "$path")
+              if echo "$EXISTING_ASSETS" | grep -Fxq "$name"; then
+                verify_dir=$(mktemp -d)
+                gh release download "$TAG" --pattern "$name" --dir "$verify_dir"
+                if ! cmp -s "$path" "$verify_dir/$name"; then
+                  echo "::error::Existing $TAG asset $name differs from the verified build; refusing replacement."
+                  exit 1
+                fi
+                rm -rf "$verify_dir"
+                echo "Verified existing immutable asset: $name"
+              else
+                gh release upload "$TAG" "$path"
+                echo "Uploaded missing recovery asset: $name"
+              fi
+            done
+          elif git tag -l | grep -qx "$TAG"; then
+            gh release create "$TAG" \
+              --verify-tag \
+              --title "hypster v$VERSION" \
+              --notes-file release_notes.md \
+              $DRAFT_FLAG \
+              dist/*
+          else
+            gh release create "$TAG" \
+              --target "$GITHUB_SHA" \
+              --title "hypster v$VERSION" \
+              --notes-file release_notes.md \
+              $DRAFT_FLAG \
+              dist/*
+          fi
 
       - name: Summary
         env:
