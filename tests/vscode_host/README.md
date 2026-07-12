@@ -13,7 +13,7 @@ reaches the widget, it emits real branch and numeric DOM events and requires a
 replacement numeric node containing `1.25` before the notebook's Python oracle
 runs.
 
-Static analysis identifies a possible kernel-selection gate at the public API
+The pinned Ubuntu witness identifies a kernel-selection gate at the public API
 boundary:
 
 - `notebook.selectKernel` is a documented built-in command and accepts
@@ -25,25 +25,28 @@ boundary:
 - Microsoft Jupyter 2025.9.1 computes its controller IDs with private kernel
   metadata/path logic. This harness deliberately does not copy that algorithm.
 
-The Ubuntu witness determines the outcome rather than assuming it in advance:
+The harness determines the outcome rather than assuming it in advance:
 
 - if the pinned Jupyter extension activates but VS Code does not register the
   documented `notebook.selectKernel` command, the artifact reports
   `kernel_selection_gate_failure`;
-- if both supported commands fulfill but the creation marker is absent while
-  the cell has no execution summary and zero outputs, the cell never executed;
-  the artifact reports `kernel_selection_gate_failure` and the job may complete
-  successfully;
-- a rejected or timed-out selector/execution command, any execution summary,
-  or any non-marker output is a red `runtime_failure` rather than a gate;
+- once the command is registered, a rejected or timed-out selector/execution
+  command, any creation-marker timeout, any execution summary, or any
+  non-marker output is a red `runtime_failure`. An empty cell at the marker
+  deadline is inconclusive because uncancelled execution may still start;
 - if the creation marker appears, every later renderer, messaging, or Python
-  oracle failure is a red `runtime_failure`;
+  oracle failure—including verification-command rejection or timeout—is a red
+  `runtime_failure`;
 - only the complete renderer-to-Python round trip reports
   `basic_scenario_green`.
 
-[`SPIKE_FAILURE.md`](SPIKE_FAILURE.md) is a draft root-owned follow-up payload.
-It must not be filed or described as observed until corrected Ubuntu CI
-produces a `kernel_selection_gate_failure` artifact.
+The exact pinned witness completed in
+[workflow run 29192874852](https://github.com/gilad-rubin/hypster/actions/runs/29192874852).
+After explicit activation, Microsoft Jupyter `2025.9.1` did not register the
+documented `notebook.selectKernel` command in VS Code Desktop `1.128.0`. The
+uploaded evidence therefore records `kernel_selection_gate_failure`, with no
+round-trip attempt and complete process cleanup. [`SPIKE_FAILURE.md`](SPIKE_FAILURE.md)
+is the verified root-owned follow-up payload for the missing supported seam.
 
 ## Before / after
 
@@ -83,9 +86,10 @@ every extension/package version, the wheel SHA-256, the explicit Electron
 environment-key allowlist, runtime public notebook API keys, command
 result/timeout, cell outputs, and VS Code/Jupyter logs.
 
-The local structural check includes pure classifier falsifiers for rejected and
-timed-out commands, missing kernelspec errors, completed/failed execution
-summaries, text errors, and non-text outputs.
+The local structural check includes pure classifier falsifiers for transient
+empty creation state, rejected and timed-out commands, missing kernelspec
+errors, completed/failed execution summaries, text errors, and non-text
+outputs.
 
 ## Supported upstream seams read before implementation
 

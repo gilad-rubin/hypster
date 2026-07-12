@@ -35,6 +35,10 @@ for (const marker of ["HYPSTER_IMPORT_PATH=", "HYPSTER_PARAMS_VERIFIED="]) {
   if (matches.length !== 1) {
     throw new Error(`expected one shared-fixture cell containing ${marker}, got ${matches.length}`);
   }
+  const [cell] = matches;
+  if (cell.execution_count !== null || cell.outputs.length !== 0) {
+    throw new Error(`shared-fixture cell containing ${marker} must not carry stale execution state`);
+  }
 }
 const copiedNotebooks = fs.readdirSync(root).filter((name) => name.endsWith(".ipynb"));
 if (copiedNotebooks.length) {

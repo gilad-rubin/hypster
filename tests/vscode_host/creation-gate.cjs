@@ -20,14 +20,10 @@ function classifyMissingCreationMarker({
   if (outputCount !== 0 || rawOutput.length !== 0) {
     runtimeEvidence.push(`creation cell has ${outputCount} output(s)`);
   }
-
   if (runtimeEvidence.length === 0) {
-    return {
-      accepted: true,
-      outcome: "kernel_selection_gate_failure",
-      reason:
-        "Kernel selection and execution commands fulfilled, but the creation cell never executed.",
-    };
+    runtimeEvidence.push(
+      "creation state was still empty at the marker deadline; uncancelled execution may start later",
+    );
   }
   return {
     accepted: false,
@@ -36,4 +32,15 @@ function classifyMissingCreationMarker({
   };
 }
 
-module.exports = { classifyMissingCreationMarker };
+function classifyCommandResult(label, commandResult) {
+  if (commandResult.status === "fulfilled") {
+    return { ok: true };
+  }
+  return {
+    ok: false,
+    outcome: "runtime_failure",
+    reason: `${label} command ${commandResult.status}`,
+  };
+}
+
+module.exports = { classifyCommandResult, classifyMissingCreationMarker };

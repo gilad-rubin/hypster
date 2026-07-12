@@ -1,13 +1,13 @@
 # Follow-up issue payload: supported VS Code kernel selection seam
 
-> Draft only. Do not file this payload or claim the failure was observed until
-> a corrected Ubuntu run records `kernel_selection_gate_failure` in
-> `host-evidence/vscode/spike-result.json`.
+> Verified by the pinned Ubuntu witness in [workflow run 29192874852](https://github.com/gilad-rubin/hypster/actions/runs/29192874852).
 
-The qualifying artifact must show fulfilled selector and creation commands,
-`creationExecutionSummary: null`, `creationOutputCount: 0`, and an empty
-`creationRawOutput`. Command rejection/timeout, any execution summary, or any
-output is a runtime failure and does not qualify this payload for filing.
+The uploaded `spike-result.json` records VS Code Desktop `1.128.0`, Microsoft
+Jupyter `2025.9.1`, and `selector.commandRegistered: false` after explicit
+Jupyter activation. It classifies the exact observation as
+`kernel_selection_gate_failure`; no notebook cell or substitute renderer path
+was attempted. The cleanup artifact confirms that no VS Code, Electron,
+Chromium, or kernel process remained.
 
 ## Title
 
@@ -42,7 +42,7 @@ kernelspec name `hypster-host` is not that ID. The exact pinned Jupyter
 extension derives controller IDs with private kernel metadata/path logic; the
 host harness is forbidden from copying or importing that algorithm.
 
-A qualifying run must preserve `host-evidence/vscode/spike-result.json` with
+A reproduction run must preserve `host-evidence/vscode/spike-result.json` with
 the public `vscode.notebooks` runtime keys, command result/timeout, exact
 process/extension versions, and cell/renderer progress. Its uploaded VS Code
 logs must preserve the controller-discovery evidence.

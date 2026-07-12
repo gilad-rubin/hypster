@@ -4,7 +4,10 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const vscode = require("vscode");
-const { classifyMissingCreationMarker } = require("../creation-gate.cjs");
+const {
+  classifyCommandResult,
+  classifyMissingCreationMarker,
+} = require("../creation-gate.cjs");
 const pins = require("../pins.cjs");
 
 const decoder = new TextDecoder();
@@ -252,13 +255,7 @@ async function run() {
       const classification = classifyRecordedCreationState(evidence);
       evidence.roundTrip.creationGateClassification = classification;
       evidence.roundTrip.completed = false;
-      if (!classification.accepted) {
-        throw new Error(classification.reason);
-      }
-      evidence.outcome = classification.outcome;
-      evidence.reason = classification.reason;
-      console.log("HYPSTER_VSCODE_KERNEL_SELECTION_GATE_REPRODUCED");
-      return;
+      throw new Error(classification.reason);
     }
 
     const probeExtension = vscode.extensions.getExtension("hypster.hypster-vscode-host-spike");
@@ -275,6 +272,13 @@ async function run() {
       }),
       30_000,
     );
+    evidence.roundTrip.verificationCommandClassification = classifyCommandResult(
+      "verification execution",
+      evidence.roundTrip.verificationCommand,
+    );
+    if (!evidence.roundTrip.verificationCommandClassification.ok) {
+      throw new Error(evidence.roundTrip.verificationCommandClassification.reason);
+    }
     evidence.roundTrip.verificationOutput = await waitForMarker(
       verificationCell,
       "HYPSTER_PARAMS_VERIFIED=",
