@@ -176,6 +176,11 @@ async function run() {
 
   let editor;
   try {
+    const python = vscode.extensions.getExtension("ms-python.python");
+    const jupyter = vscode.extensions.getExtension("ms-toolsai.jupyter");
+    await python.activate();
+    await jupyter.activate();
+
     const commands = await vscode.commands.getCommands(true);
     if (!commands.includes("notebook.selectKernel")) {
       throw new Error("VS Code did not register the documented notebook.selectKernel command");
@@ -189,11 +194,6 @@ async function run() {
         `public controller discovery unexpectedly appeared: ${evidence.selector.publicControllerDiscoveryKeys}`,
       );
     }
-
-    const python = vscode.extensions.getExtension("ms-python.python");
-    const jupyter = vscode.extensions.getExtension("ms-toolsai.jupyter");
-    await python.activate();
-    await jupyter.activate();
 
     const document = await vscode.workspace.openNotebookDocument(vscode.Uri.file(notebookPath));
     const creationCell = cellBySourceMarker(document, "HYPSTER_IMPORT_PATH=");

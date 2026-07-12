@@ -12,7 +12,6 @@ const pins = require("./pins.cjs");
 
 const HOST_ENVIRONMENT_KEYS = [
   "CI",
-  "DBUS_SESSION_BUS_ADDRESS",
   "DISPLAY",
   "HOME",
   "LANG",
