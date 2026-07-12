@@ -6,6 +6,8 @@ import pytest
 ROOT = Path(__file__).parents[1]
 DOCS = ROOT / "docs"
 SUMMARY = DOCS / "SUMMARY.md"
+RELEASE_GUIDE = DOCS / "contributing" / "releasing.md"
+RELEASE_WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
 MIGRATION_PAGES = (
     DOCS / "migration" / "upgrade-0.7-to-0.8.md",
     DOCS / "migration" / "upgrade-0.8-to-0.9.md",
@@ -47,3 +49,14 @@ def test_migration_pages_have_runnable_current_api_examples(page: Path) -> None:
     for index, snippet in enumerate(snippets, start=1):
         namespace = {"__name__": f"docs_example_{page.stem}_{index}"}
         exec(compile(snippet, f"{page}::snippet-{index}", "exec"), namespace)
+
+
+def test_release_guide_tracks_exact_source_and_immutable_recovery_contract() -> None:
+    guide = RELEASE_GUIDE.read_text()
+    workflow = RELEASE_WORKFLOW.read_text()
+
+    assert guide.count('-f expected_sha="$RELEASE_SHA"') == 2
+    assert "expected_sha:" in workflow
+    assert "Source drift:" in workflow
+    assert 'gh release upload "$TAG" "$path"' in workflow
+    assert "--clobber" not in workflow

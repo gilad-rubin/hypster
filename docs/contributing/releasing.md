@@ -49,7 +49,12 @@ uv build
 uvx twine check --strict dist/*
 ```
 
-Merge the pull request and confirm `master` contains the intended version and changelog section. Do not dispatch a release from a feature branch.
+Merge the pull request and confirm `master` contains the intended version and changelog section. Record that exact commit; both the dry run and publication must name it. Do not dispatch a release from a feature branch.
+
+```bash
+git fetch origin master
+RELEASE_SHA=$(git rev-parse origin/master)
+```
 
 ## 2. Run A Dry Run
 
@@ -59,11 +64,12 @@ Dispatch `Release` from `master` with the committed version and `publish_to_pypi
 gh workflow run release.yml \
   --ref master \
   -f version=0.9.0 \
+  -f expected_sha="$RELEASE_SHA" \
   -f publish_to_pypi=false \
   -f create_draft=false
 ```
 
-The dry run validates the branch, stable `X.Y.Z` format, both committed version sources, absence of `vX.Y.Z`, and the changelog section. It then runs lint, type checks, tests, build, manifest checks, wheel and sdist smoke tests, a built-wheel Optuna test, strict Twine validation, and checksum generation. The `dist-X.Y.Z` workflow artifact is retained. No bytes are sent to PyPI.
+The dry run validates the branch, exact source commit, stable `X.Y.Z` format, both committed version sources, tag state, and the changelog section. It then runs lint, type checks, tests, build, manifest checks, wheel and sdist smoke tests, a built-wheel Optuna test, strict Twine validation, and checksum generation. The `dist-X.Y.Z` workflow artifact is retained. No bytes are sent to PyPI.
 
 ## 3. Publish The Same Commit
 
@@ -73,9 +79,12 @@ After the dry run passes, dispatch the workflow again from the same `master` com
 gh workflow run release.yml \
   --ref master \
   -f version=0.9.0 \
+  -f expected_sha="$RELEASE_SHA" \
   -f publish_to_pypi=true \
   -f create_draft=false
 ```
+
+`expected_sha` makes a moving `master` safe: if another pull request merges between the two dispatches, the publish run fails before building or uploading anything. Repeat the dry run against the new commit instead of publishing untested source.
 
 The publication order is fixed:
 
@@ -100,6 +109,8 @@ Confirm the GitHub release contains the wheel, sdist, and `SHA256SUMS`, and that
 
 ## Recover Without Replacing Published Bytes
 
-If PyPI accepts the artifacts but a later job fails, rerun the workflow for the same commit and version. `skip-existing` leaves the PyPI files untouched, and the GitHub release job independently compares their hashes with the run's `SHA256SUMS` before creating the tag.
+If PyPI accepts the artifacts but a later job fails, rerun the workflow with the same version and `expected_sha`. `skip-existing` leaves the PyPI files untouched, and the GitHub release job independently compares their hashes with the run's `SHA256SUMS`.
+
+If a failed GitHub-release attempt already created the tag or attached some assets, recovery remains additive and immutable. The workflow accepts the existing tag only when it still points to `expected_sha`, verifies every existing release asset byte-for-byte, and uploads only missing assets. It never moves the tag or replaces an attached file.
 
 If the hashes differ, the run fails. Do not overwrite, delete and re-upload, or retag. Investigate, yank the bad release if necessary, increment the patch version in a new release-prep pull request, and publish the fix forward.
