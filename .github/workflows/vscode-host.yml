@@ -15,14 +15,17 @@ jobs:
     env:
       HYPSTER_NOTEBOOK: ${{ github.workspace }}/tests/jupyterlab_host/branch_round_trip.ipynb
       HYPSTER_VSCODE_ARTIFACT_DIR: ${{ github.workspace }}/host-evidence/vscode
-      HYPSTER_VSCODE_RUNTIME_DIR: ${{ runner.temp }}/hypster-vscode-runtime
-      HYPSTER_VSCODE_KERNEL_ENV: ${{ runner.temp }}/hypster-vscode-kernel
-      HYPSTER_VSCODE_KERNEL_PREFIX: ${{ runner.temp }}/hypster-vscode-kernels
-      JUPYTER_PATH: ${{ runner.temp }}/hypster-vscode-kernels/share/jupyter
     steps:
       - uses: actions/checkout@v6.0.2
         with:
           persist-credentials: false
+
+      - name: Configure isolated runtime paths
+        run: |
+          echo "HYPSTER_VSCODE_RUNTIME_DIR=$RUNNER_TEMP/hypster-vscode-runtime" >> "$GITHUB_ENV"
+          echo "HYPSTER_VSCODE_KERNEL_ENV=$RUNNER_TEMP/hypster-vscode-kernel" >> "$GITHUB_ENV"
+          echo "HYPSTER_VSCODE_KERNEL_PREFIX=$RUNNER_TEMP/hypster-vscode-kernels" >> "$GITHUB_ENV"
+          echo "JUPYTER_PATH=$RUNNER_TEMP/hypster-vscode-kernels/share/jupyter" >> "$GITHUB_ENV"
 
       - uses: astral-sh/setup-uv@v8.1.0
         with:
