@@ -25,7 +25,8 @@ From the repository root:
 uv sync --project tests/jupyterlab_host --frozen
 uv build --wheel --out-dir dist
 uv run --project tests/jupyterlab_host --frozen playwright install chromium
-HYPSTER_HOST_WHEEL="$PWD/dist/hypster-0.8.0-py3-none-any.whl" \
+WHEEL=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
+HYPSTER_HOST_WHEEL="$WHEEL" \
 HYPSTER_HOST_ARTIFACT_DIR="$PWD/host-evidence" \
 uv run --project tests/jupyterlab_host --frozen \
   pytest tests/jupyterlab_host/test_jupyterlab_host.py -o addopts= -q -s
