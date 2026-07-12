@@ -52,7 +52,41 @@ async function main() {
     assert.equal(extensionHostResponse.status, 200);
     assert.throws(
       () => source.assertUsed(),
-      /Electron webview did not fetch the exact local anywidget bundle/,
+      /VS Code did not consume the exact local anywidget bundle/,
+    );
+    const copiedScriptPath = path.join(
+      temporaryRoot,
+      "extensions",
+      "ms-toolsai.jupyter-2025.9.1",
+      "temp",
+      "scripts",
+      "kernel-hash",
+      "jupyter",
+      "nbextensions",
+      "anywidget",
+      "index.js",
+    );
+    fs.mkdirSync(path.dirname(copiedScriptPath), { recursive: true });
+    const copiedScriptUrl =
+      `https://file+.vscode-resource.vscode-cdn.net${copiedScriptPath}`;
+    const copiedDiagnostics = {
+      amd: {
+        anywidgetDefined: true,
+        relevantFetchedUrls: [copiedScriptUrl],
+      },
+    };
+    fs.writeFileSync(copiedScriptPath, "define('anywidget', [], function () { return null; });\n");
+    assert.throws(
+      () => source.assertUsed(copiedDiagnostics),
+      /copied anywidget bundle did not match the selected kernel bytes/,
+    );
+    fs.writeFileSync(copiedScriptPath, indexSource);
+    source.assertUsed(copiedDiagnostics);
+    assert.equal(source.evidence.consumption.kind, "vscode-local-copy");
+    assert.equal(source.evidence.consumption.copiedScript.path, copiedScriptPath);
+    assert.equal(
+      source.evidence.consumption.copiedScript.sha256,
+      source.evidence.asset.indexSha256,
     );
     const getResponse = await fetch(
       `http://127.0.0.1:${source.evidence.port}${ANYWIDGET_ROUTE}`,

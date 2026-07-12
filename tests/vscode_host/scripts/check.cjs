@@ -52,7 +52,7 @@ for (const fragment of [
   "effectiveBeforeActivation",
   "effectiveAfterActivation",
   "startLocalWidgetSource(pythonExecutable)",
-  "localWidgetSource.assertUsed()",
+  "localWidgetSource.assertUsed(",
   "prepareWidgetViewport(evidence, editor, creationCell)",
   "NotebookEditorRevealType.InCenter",
   "creationCellVisible",
@@ -117,14 +117,18 @@ if (copiedNotebooks.length) {
 
 for (const file of [
   "extension.cjs",
+  "cli-runner.cjs",
   "creation-gate.cjs",
   "renderer.mjs",
+  "renderer-witness.mjs",
   "renderer-gate.cjs",
   "run.cjs",
   "widget-source.cjs",
   "scripts/assert-runtime.cjs",
   "scripts/test-creation-gate.cjs",
+  "scripts/test-cli-runner.cjs",
   "scripts/test-renderer-gate.cjs",
+  "scripts/test-renderer-witness.mjs",
   "scripts/test-widget-source.cjs",
   "test/index.cjs",
 ]) {

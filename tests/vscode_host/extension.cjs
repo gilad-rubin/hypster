@@ -37,11 +37,11 @@ function activate(context) {
       if (message.ok) {
         request.resolve(message.evidence);
       } else {
-        request.reject(
-          new Error(
-            `${message.error}\nRENDERER_DIAGNOSTICS=${JSON.stringify(message.diagnostics ?? null)}`,
-          ),
+        const error = new Error(
+          `${message.error}\nRENDERER_DIAGNOSTICS=${JSON.stringify(message.diagnostics ?? null)}`,
         );
+        error.rendererDiagnostics = message.diagnostics ?? null;
+        request.reject(error);
       }
     }),
     { dispose: () => activationGate.dispose() },

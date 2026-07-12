@@ -2,12 +2,12 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawnSync } = require("node:child_process");
 const {
   downloadAndUnzipVSCode,
   resolveCliArgsFromVSCodeExecutablePath,
   runTests,
 } = require("@vscode/test-electron");
+const { runCLI } = require("./cli-runner.cjs");
 const pins = require("./pins.cjs");
 
 const HOST_ENVIRONMENT_KEYS = [
@@ -76,21 +76,6 @@ async function runWithEnvironment(environment, operation) {
     }
     Object.assign(process.env, original);
   }
-}
-
-function runCLI(cliPath, baseArgs, args, environment) {
-  const completed = spawnSync(cliPath, [...baseArgs, ...args], {
-    encoding: "utf8",
-    env: environment,
-    shell: process.platform === "win32",
-  });
-  if (completed.error || completed.status !== 0) {
-    throw new Error(
-      `VS Code CLI failed (${completed.status}): ${JSON.stringify(args)}\n` +
-        `stdout:\n${completed.stdout}\nstderr:\n${completed.stderr}\n${completed.error ?? ""}`,
-    );
-  }
-  return `${completed.stdout}${completed.stderr}`.trim();
 }
 
 async function main() {

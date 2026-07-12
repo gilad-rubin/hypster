@@ -10,8 +10,9 @@ renderer whose entrypoint extends `jupyter-ipywidget-renderer`, so it runs in
 the shared notebook output webview. Its extension-host half communicates only
 through the probe's own `NotebookRendererMessaging` channel. If execution
 reaches the widget, it emits real branch and numeric DOM events and requires a
-replacement numeric node containing `1.25` before the notebook's Python oracle
-runs.
+connected widget root that either replaced and detached the prior root or
+changed in place. It then requires a replacement numeric node containing
+`1.25` before the notebook's Python oracle runs.
 
 The pinned Ubuntu witness identifies a kernel-selection gate at the public API
 boundary:
@@ -102,9 +103,12 @@ exact dynamic template
 `http://127.0.0.1:<port>/${packageName}/${fileNameWithExt}` globally and verifies
 the effective value again after activation. The artifact records both asset
 paths, byte counts, SHA-256 hashes, and every request. Even if the renderer
-probe otherwise succeeds, the run remains red unless the exact
-`/anywidget/index.js` route received a successful Electron-webview GET; an
-extension-host source check alone cannot satisfy the gate.
+probe otherwise succeeds, the run remains red unless VS Code consumed exact
+bytes: either the Electron webview fetched `/anywidget/index.js` directly, or
+RequireJS defined `anywidget` from VS Code's supported copied file-resource and
+the extension host hashes that actual copied file byte-for-byte against the
+selected kernel bundle. An extension-host availability GET alone cannot
+satisfy the gate.
 
 [Workflow run 29194056537](https://github.com/gilad-rubin/hypster/actions/runs/29194056537)
 proved both sides of that boundary: one GET came from Jupyter's extension-host
@@ -144,6 +148,19 @@ both stages fail before the unchanged 30-second outer budget. A missing base
 renderer now reports an activation-handshake failure instead of a misleading
 response timeout.
 
+[Workflow run 29194823654](https://github.com/gilad-rubin/hypster/actions/runs/29194823654)
+crossed that boundary: the extending renderer activated, RequireJS defined
+`anywidget`, the widget rendered, and the real branch action produced the
+remote numeric control. It exposed two false-negative witnesses. First, the
+probe retained the detached pre-action `.hypster-widget` and compared its stale
+HTML while the global document already contained the replacement root. Second,
+the source gate required an Electron loopback GET even though pinned Jupyter
+had copied the exact bundle to its supported
+`temp/scripts/.../jupyter/nbextensions/anywidget/index.js` file-resource. The
+probe now observes the current connected root and the source gate hashes that
+copied file. The numeric node replacement and Python verification oracle remain
+unchanged.
+
 ## Before / after
 
 Before:
@@ -168,7 +185,14 @@ close panel + maximize editor + collapse inputs + reveal creation cell
 exact selected kernel prefix
   -> validate anywidget extension.js mapping and hash installed index.js
   -> loopback-only custom Jupyter source serves that exact index.js
-  -> artifact proves path + hash + successful GET before green is possible
+  -> artifact proves either direct Electron GET or AMD-defined copied URL
+  -> hash actual copied file against selected-kernel bytes before green
+
+branch action
+  -> capture connected root immediately before click
+  -> accept distinct connected root only after prior root detaches
+  -> otherwise require that same connected root's HTML to change
+  -> require numeric node replacement, value 1.25, then Python oracle
 ```
 
 ## Exact pins
@@ -190,15 +214,20 @@ exact selected kernel prefix
 The job records VS Code, Electron, Chromium, Node, npm, OS, kernel Python,
 every extension/package version, the wheel SHA-256, the explicit Electron
 environment-key allowlist, runtime public notebook API keys, command
-result/timeout, cell outputs, and VS Code/Jupyter logs.
+result/timeout, cell outputs, and VS Code/Jupyter logs. Marketplace CLI calls
+also have a two-minute per-process timeout while retaining status, stdout,
+stderr, and spawn errors.
 
 The local structural check includes pure classifier falsifiers for transient
 empty creation state, rejected and timed-out commands, missing kernelspec
 errors, completed/failed execution summaries, text errors, and non-text
 outputs. It also builds a temporary exact-prefix nbextension, proves the custom
 template's HEAD/GET behavior and SHA-256 evidence, rejects other routes, and
-proves an extension-host GET cannot satisfy the Electron gate or that an
-incompatible `extension.js` fails before server startup.
+proves an extension-host GET alone cannot satisfy the gate. It accepts a VS
+Code copied resource reported by AMD only when the actual file matches the
+selected kernel bytes, rejects a mismatched copy, rejects an incompatible
+`extension.js` before server startup, and verifies root-transition and CLI
+timeout behavior independently.
 
 ## Supported upstream seams read before implementation
 

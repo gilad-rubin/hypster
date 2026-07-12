@@ -1,3 +1,5 @@
+import { detectWidgetRootTransition } from "./renderer-witness.mjs";
+
 const EXERCISE_TIMEOUT_MS = 20_000;
 const DIAGNOSTIC_TEXT_LIMIT = 20_000;
 const BASE_RENDERER_ID = "jupyter-ipywidget-renderer";
@@ -251,7 +253,6 @@ async function exerciseWidget(deadline) {
     throw new Error("dependent numeric control existed before the branch action");
   }
 
-  const beforeBranch = root.innerHTML;
   const trigger = root.querySelector(
     ".hypster-choice[data-path='mode'] .hypster-choice-trigger",
   );
@@ -268,20 +269,32 @@ async function exerciseWidget(deadline) {
       ),
     deadline,
   );
+  const branchRoot = document.querySelector(".hypster-widget");
+  if (!branchRoot?.isConnected) {
+    throw new Error("connected widget root disappeared before the branch action");
+  }
+  const beforeBranch = branchRoot.innerHTML;
   remoteOption.click();
 
+  const rootTransition = await waitFor(
+    "replacement renderer state",
+    () =>
+      detectWidgetRootTransition(
+        branchRoot,
+        beforeBranch,
+        document.querySelector(".hypster-widget"),
+      ),
+    deadline,
+  );
+  const currentRoot = rootTransition.currentRoot;
   const numeric = await waitFor(
     "dependent numeric control",
-    () => document.querySelector("input[data-path='remote.temperature'][data-kind='float']"),
+    () => currentRoot.querySelector("input[data-path='remote.temperature'][data-kind='float']"),
     deadline,
   );
   if (numeric.value !== "0.25") {
     throw new Error(`dependent numeric default was ${numeric.value}, expected 0.25`);
   }
-  if (root.innerHTML === beforeBranch) {
-    throw new Error("branch action did not publish replacement renderer state");
-  }
-
   numeric.value = "1.25";
   numeric.dispatchEvent(new Event("change", { bubbles: true }));
   await waitFor("detached prior numeric control", () => !numeric.isConnected, deadline);
@@ -308,6 +321,9 @@ async function exerciseWidget(deadline) {
 
   return {
     branch: "remote",
+    branchRootTransition: rootTransition.kind,
+    branchRootReplaced: rootTransition.kind === "replaced",
+    priorBranchRootDetached: !branchRoot.isConnected,
     numericBefore: "0.25",
     numericAfter: replacement.value,
     numericNodeReplaced: !numeric.isConnected,

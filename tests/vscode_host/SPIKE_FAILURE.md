@@ -48,6 +48,15 @@ after resolving the real Jupyter base renderer through the supported
 both finish before the unchanged outer deadline. This is downstream of the
 historical selection gate.
 
+Workflow run 29194823654 then crossed the renderer boundary, rendered the real
+widget, and applied the remote branch. Its red result came from two harness
+witness errors, not kernel selection: the probe compared HTML on a detached old
+widget root, and the source gate rejected Jupyter's supported exact-byte copy
+because it expected a direct Electron loopback GET. The probe now verifies the
+current connected root, and hashes the RequireJS-reported copied file against
+the selected kernel bundle. Numeric replacement and the Python oracle remain
+required. This is also downstream of the historical selection gate.
+
 ## Title
 
 Expose or adopt a supported VS Code kernel-controller discovery seam for the

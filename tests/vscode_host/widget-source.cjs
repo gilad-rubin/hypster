@@ -7,6 +7,8 @@ const path = require("node:path");
 const pins = require("./pins.cjs");
 
 const ANYWIDGET_ROUTE = "/anywidget/index.js";
+const ANYWIDGET_COPY_SUFFIX = "/jupyter/nbextensions/anywidget/index.js";
+const VSCODE_RESOURCE_HOST = "file+.vscode-resource.vscode-cdn.net";
 
 function sha256(contents) {
   return crypto.createHash("sha256").update(contents).digest("hex");
@@ -88,6 +90,64 @@ function widgetSourceTemplate(port) {
   return `http://127.0.0.1:${port}${pins.widgetScriptSourcePathTemplate}`;
 }
 
+function vscodeResourceFilePath(scriptUrl) {
+  let parsed;
+  try {
+    parsed = new URL(scriptUrl);
+  } catch {
+    return undefined;
+  }
+  if (parsed.protocol !== "https:" || parsed.hostname.toLowerCase() !== VSCODE_RESOURCE_HOST) {
+    return undefined;
+  }
+  let filePath;
+  try {
+    filePath = decodeURIComponent(parsed.pathname);
+  } catch {
+    return undefined;
+  }
+  if (process.platform === "win32" && /^\/[A-Za-z]:\//.test(filePath)) {
+    filePath = filePath.slice(1);
+  }
+  if (!path.isAbsolute(filePath)) {
+    return undefined;
+  }
+  const portablePath = filePath.replaceAll("\\", "/");
+  return portablePath.endsWith(ANYWIDGET_COPY_SUFFIX) ? filePath : undefined;
+}
+
+function inspectCopiedWidgetSource(diagnostics, expectedContents) {
+  if (diagnostics?.amd?.anywidgetDefined !== true) {
+    return undefined;
+  }
+  const scriptUrls = [
+    ...(diagnostics.amd.relevantFetchedUrls ?? []),
+    ...(diagnostics.document?.scripts ?? []),
+  ];
+  for (const url of new Set(scriptUrls)) {
+    const copiedPath = vscodeResourceFilePath(url);
+    if (!copiedPath) {
+      continue;
+    }
+    const copiedContents = readRegularFile(copiedPath, "VS Code copied anywidget bundle");
+    if (!copiedContents.equals(expectedContents)) {
+      throw new Error(
+        `VS Code copied anywidget bundle did not match the selected kernel bytes: ${copiedPath}`,
+      );
+    }
+    return {
+      kind: "vscode-local-copy",
+      copiedScript: {
+        url,
+        path: copiedPath,
+        bytes: copiedContents.length,
+        sha256: sha256(copiedContents),
+      },
+    };
+  }
+  return undefined;
+}
+
 async function startLocalWidgetSource(pythonExecutable) {
   const assets = inspectAnywidgetAssets(pythonExecutable);
   const requests = [];
@@ -142,8 +202,8 @@ async function startLocalWidgetSource(pythonExecutable) {
   return {
     template: evidence.template,
     evidence,
-    assertUsed() {
-      const used = requests.some(
+    assertUsed(rendererDiagnostics) {
+      const directElectronGet = requests.some(
         (request) =>
           request.method === "GET" &&
           request.path === ANYWIDGET_ROUTE &&
@@ -151,10 +211,14 @@ async function startLocalWidgetSource(pythonExecutable) {
           request.userAgent?.includes("Code/") &&
           request.userAgent?.includes("Electron/"),
       );
-      evidence.successfulIndexGetVerified = used;
-      if (!used) {
+      const consumption = directElectronGet
+        ? { kind: "electron-loopback-get", route: ANYWIDGET_ROUTE }
+        : inspectCopiedWidgetSource(rendererDiagnostics, assets.index);
+      evidence.successfulIndexGetVerified = Boolean(consumption);
+      evidence.consumption = consumption ?? null;
+      if (!consumption) {
         throw new Error(
-          `Electron webview did not fetch the exact local anywidget bundle at ${ANYWIDGET_ROUTE}; ` +
+          `VS Code did not consume the exact local anywidget bundle at ${ANYWIDGET_ROUTE}; ` +
             `requests=${JSON.stringify(requests)}`,
         );
       }
@@ -172,6 +236,8 @@ module.exports = {
   ANYWIDGET_ROUTE,
   anywidgetAssetPaths,
   inspectAnywidgetAssets,
+  inspectCopiedWidgetSource,
   startLocalWidgetSource,
+  vscodeResourceFilePath,
   widgetSourceTemplate,
 };

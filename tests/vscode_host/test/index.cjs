@@ -442,7 +442,9 @@ async function run() {
       rendererError = error;
     }
     try {
-      localWidgetSource.assertUsed();
+      localWidgetSource.assertUsed(
+        evidence.roundTrip.renderer?.diagnostics ?? rendererError?.rendererDiagnostics,
+      );
     } catch (sourceError) {
       if (rendererError && sourceError instanceof Error) {
         sourceError.message += `\nRENDERER_FAILURE=${
