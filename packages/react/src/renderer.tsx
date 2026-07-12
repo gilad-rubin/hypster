@@ -3,6 +3,7 @@ import type { ChangeEvent, ReactNode } from "react";
 import type {
   InteractiveAction,
   InteractiveParameter,
+  InteractiveScalar,
   InteractiveSnapshot,
   InteractiveValue,
 } from "./types.js";
@@ -114,7 +115,7 @@ function ParameterControl({
         onChange={(event) =>
           emit(
             Array.from(event.currentTarget.selectedOptions, (option) => options[Number(option.value)]).filter(
-              (option): option is InteractiveValue => option !== undefined,
+              (option): option is InteractiveScalar => option !== undefined,
             ),
           )
         }
@@ -148,7 +149,7 @@ function ParameterControl({
         max={parameter.maximum ?? undefined}
         step={parameter.kind === "float" ? "any" : 1}
         value={typeof value === "number" ? value : String(value ?? "")}
-        onChange={(event) => emit(event.currentTarget.value === "" ? "" : Number(event.currentTarget.value))}
+        onChange={(event) => emit(event.currentTarget.value === "" ? null : Number(event.currentTarget.value))}
       />
     );
   }

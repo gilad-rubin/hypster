@@ -139,11 +139,13 @@ test("emits exact Protocol V1 set, apply, and reset action payloads", () => {
   render(renderer(current, (action) => actions.push(action)));
 
   fireEvent.change(screen.getByRole("spinbutton", { name: "count" }), { target: { value: "4" } });
+  fireEvent.change(screen.getByRole("spinbutton", { name: "count" }), { target: { value: "" } });
   fireEvent.click(screen.getByRole("button", { name: "Apply" }));
   fireEvent.click(screen.getByRole("button", { name: "Reset" }));
 
   assert.deepEqual(actions, [
     { protocol_version: 1, type: "set_value", path: "count", value: 4 },
+    { protocol_version: 1, type: "set_value", path: "count", value: null },
     { protocol_version: 1, type: "apply" },
     { protocol_version: 1, type: "reset" },
   ]);

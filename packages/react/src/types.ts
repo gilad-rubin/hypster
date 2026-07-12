@@ -59,7 +59,7 @@ type ParameterBase = {
   readonly path: string;
   readonly default_value: InteractiveValue;
   readonly selected_value: InteractiveValue;
-  readonly options: readonly InteractiveValue[] | null;
+  readonly options: readonly InteractiveScalar[] | null;
   readonly minimum: number | null;
   readonly maximum: number | null;
   readonly description: string | null;
