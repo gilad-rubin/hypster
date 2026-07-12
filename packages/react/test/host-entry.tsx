@@ -50,7 +50,10 @@ async function onAction(action: InteractiveAction) {
     body: JSON.stringify({ execution_id: current.bridge_execution_id, action }),
   });
   if (!response.ok) throw new Error(`Action failed: ${response.status}`);
-  render((await response.json()) as BridgeSnapshot);
+  const snapshot = (await response.json()) as BridgeSnapshot;
+  if (snapshot.bridge_sequence > current.bridge_sequence) {
+    render(snapshot);
+  }
 }
 
 const v2 = new URLSearchParams(location.search).has("v2");

@@ -61,3 +61,4 @@ jobs:
         with:
           name: react-host-${{ github.run_id }}
           path: react-host-evidence/
+          if-no-files-found: error
