@@ -303,9 +303,9 @@ def test_real_jupyterlab_round_trip() -> None:
 
                     # 4. The dependent control appears only after replacement snapshot DOM arrives.
                     numeric.wait_for(state="visible", timeout=COMM_TIMEOUT_MS)
-                    assert (
-                        numeric.input_value() == "0.25"
-                    ), "branch round trip did not publish the expected dependent default"
+                    assert numeric.input_value() == "0.25", (
+                        "branch round trip did not publish the expected dependent default"
+                    )
                     after_branch_html = root.inner_html()
                     assert after_branch_html != before_branch_html, "branch action did not publish replacement DOM"
                     assert_widget_has_no_error(page)
@@ -322,9 +322,9 @@ def test_real_jupyterlab_round_trip() -> None:
                     page.wait_for_function("element => !element.isConnected", arg=old_numeric, timeout=COMM_TIMEOUT_MS)
                     replacement_numeric = page.locator("input[data-path='remote.temperature'][data-kind='float']")
                     replacement_numeric.wait_for(state="visible", timeout=COMM_TIMEOUT_MS)
-                    assert (
-                        replacement_numeric.input_value() == "1.25"
-                    ), "numeric comm round trip did not publish the chosen value"
+                    assert replacement_numeric.input_value() == "1.25", (
+                        "numeric comm round trip did not publish the chosen value"
+                    )
                     assert not old_numeric.is_visible(), "numeric action did not detach the prior DOM control"
                     evidence["numeric_dom_after"] = replacement_numeric.input_value()
                     evidence["numeric_dom_replaced"] = True

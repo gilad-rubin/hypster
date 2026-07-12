@@ -31,7 +31,9 @@ jobs:
           mkdir -p host-evidence
           uv --version > host-evidence/setup.txt
           uv run --project tests/jupyterlab_host --frozen python --version >> host-evidence/setup.txt
-          uv pip --version >> host-evidence/setup.txt
+          uv run --project tests/jupyterlab_host --frozen python -c \
+            'import importlib.metadata as m; print("jupyterlab", m.version("jupyterlab")); print("playwright", m.version("playwright"))' \
+            >> host-evidence/setup.txt
 
       - name: Build repository wheel
         run: uv build --wheel --out-dir dist
