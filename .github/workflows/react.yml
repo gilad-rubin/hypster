@@ -47,3 +47,17 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm pack --dry-run
+
+      - name: Install Chromium for the physical React host witness
+        run: |
+          uv sync --project ../../tests/jupyterlab_host --frozen
+          uv run --project ../../tests/jupyterlab_host --frozen playwright install --with-deps chromium
+      - name: Run physical Python-to-React host witness
+        env:
+          HYPSTER_REACT_HOST_ARTIFACT_DIR: ../../react-host-evidence
+        run: uv run --project ../../tests/jupyterlab_host --frozen pytest ../../tests/jupyterlab_host/test_react_renderer_host.py -o addopts= -q -s
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: react-host-${{ github.run_id }}
+          path: react-host-evidence/
