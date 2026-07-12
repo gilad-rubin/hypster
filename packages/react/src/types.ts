@@ -1,99 +1,120 @@
-// ---------------------------------------------------------------------------
-// Config schema types — mirror the JSON returned by hypster's explore().
-// ---------------------------------------------------------------------------
+export type InteractiveScalar = string | number | boolean | null;
 
-export type ConfigNodeKind = "select" | "int" | "float" | "text" | "bool" | "group" | "rules" | "schema";
+export type InteractiveValue =
+  | InteractiveScalar
+  | readonly InteractiveValue[]
+  | { readonly [key: string]: InteractiveValue };
 
-export type ConfigValue = string | number | boolean;
+export type InteractiveValues = Readonly<Record<string, InteractiveValue>>;
 
-export type RuleValue = {
-  when: Record<string, unknown>;
-  then: unknown;
-  name?: string;
-};
-
-export type SchemaFieldValue = {
-  key: string;
-  value_type: "text" | "enum" | "number" | "date";
-  description?: string;
-  label?: string;
-  multi_valued?: boolean;
-  possible_values?: string[];
-  unit?: string;
-  required?: boolean;
-};
-
-export type SchemaMetadata = {
-  schema_fields: SchemaFieldValue[];
-};
-
-export type AnyConfigValue = ConfigValue | RuleValue[] | SchemaFieldValue[];
-
-export type ConfigValues = Record<string, AnyConfigValue>;
-
-export type RulesFieldSpec = {
-  name: string;
-  type: string;
-  options?: string[];
-  operators: string[];
-  description?: string;
-  multiline?: boolean;
+export type FieldSpec = {
+  readonly type: string;
+  readonly name?: string;
+  readonly description?: string;
+  readonly options?: readonly InteractiveValue[];
+  readonly multiline?: boolean;
+  readonly operators: readonly string[];
 };
 
 export type RulesMetadata = {
-  field_specs: RulesFieldSpec[];
-  then_specs: { name?: string; type: string; multiline?: boolean; options?: string[] }[];
-  combinators: string[];
+  readonly field_specs: readonly FieldSpec[];
+  readonly then_specs: readonly FieldSpec[];
+  readonly combinators: readonly string[];
+  readonly [key: string]: InteractiveValue;
 };
 
-export type ConfigNode = {
-  name: string;
-  path: string;
-  kind: ConfigNodeKind;
-  defaultValue: AnyConfigValue | null;
-  selectedValue: AnyConfigValue | null;
-  options: ConfigValue[] | null;
-  minimum: number | null;
-  maximum: number | null;
-  description?: string | null;
-  displayLabel?: string | null;
-  metadata?: RulesMetadata | Record<string, unknown> | null;
-  children: ConfigNode[];
+export type SchemaField = {
+  readonly key: string;
+  readonly value_type: "text" | "enum" | "number" | "date";
+  readonly description?: string;
+  readonly label?: string;
+  readonly multi_valued?: boolean;
+  readonly possible_values?: readonly string[];
+  readonly unit?: string;
+  readonly required?: boolean;
 };
 
-export type ExperimentSchema = {
-  kind: string;
-  parameters: ConfigNode[];
+export type SchemaMetadata = {
+  readonly schema_fields: readonly SchemaField[];
+  readonly [key: string]: InteractiveValue;
 };
 
-// ---------------------------------------------------------------------------
-// Condition / rules types — the nestable condition tree grammar.
-// ---------------------------------------------------------------------------
+export type InteractiveParameterKind =
+  | "select"
+  | "multi_select"
+  | "bool"
+  | "int"
+  | "float"
+  | "text"
+  | "multi_bool"
+  | "multi_int"
+  | "multi_float"
+  | "multi_text"
+  | "group"
+  | "rules"
+  | "schema";
 
-export type FieldType = "enum" | "multi_enum" | "bool" | "number" | "string";
+type ParameterBase = {
+  readonly name: string;
+  readonly path: string;
+  readonly default_value: InteractiveValue;
+  readonly selected_value: InteractiveValue;
+  readonly options: readonly InteractiveScalar[] | null;
+  readonly minimum: number | null;
+  readonly maximum: number | null;
+  readonly description: string | null;
+  readonly display_label: string;
+  readonly children: readonly InteractiveParameter[];
+};
 
-export interface FieldSpec {
-  id: string;
-  label: string;
-  type: FieldType;
-  options?: string[];
-}
+export type InteractiveParameter =
+  | (ParameterBase & {
+      readonly kind: Exclude<InteractiveParameterKind, "group" | "rules" | "schema">;
+      readonly metadata?: Readonly<Record<string, InteractiveValue>>;
+    })
+  | (ParameterBase & {
+      readonly kind: "group";
+      readonly metadata?: Readonly<Record<string, InteractiveValue>>;
+    })
+  | (ParameterBase & {
+      readonly kind: "rules";
+      readonly metadata: RulesMetadata;
+    })
+  | (ParameterBase & {
+      readonly kind: "schema";
+      readonly metadata: SchemaMetadata;
+    });
 
-export interface RuleSchema {
-  fields: FieldSpec[];
-  operators: Record<string, string[]>;
-  combinators?: string[];
-}
+export type InteractiveSchema = {
+  readonly name: string;
+  readonly display_label: string;
+  readonly parameters: readonly InteractiveParameter[];
+};
 
-export interface Leaf {
-  field: string;
-  operator: string;
-  value: unknown;
-}
+export type InteractiveStatus = "applied" | "pending" | "draft_error" | "error";
 
-export interface Group {
-  combinator: "and" | "or" | "not";
-  rules: ConditionNode[];
-}
+export type InteractiveError = {
+  readonly kind: string;
+  readonly message: string;
+};
 
-export type ConditionNode = Leaf | Group;
+export type InteractiveSnapshot = {
+  readonly protocol_version: 1;
+  readonly schema: InteractiveSchema | null;
+  readonly draft_values: InteractiveValues;
+  readonly applied_values: InteractiveValues;
+  readonly selected_params: InteractiveValues | null;
+  readonly mode: { readonly auto_apply: boolean };
+  readonly status: InteractiveStatus;
+  readonly error: InteractiveError | null;
+};
+
+export type InteractiveAction =
+  | {
+      readonly protocol_version: 1;
+      readonly type: "set_value";
+      readonly path: string;
+      readonly value: InteractiveValue;
+    }
+  | { readonly protocol_version: 1; readonly type: "apply" }
+  | { readonly protocol_version: 1; readonly type: "reset" };
