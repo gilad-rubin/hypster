@@ -57,6 +57,12 @@ current connected root, and hashes the RequireJS-reported copied file against
 the selected kernel bundle. Numeric replacement and the Python oracle remain
 required. This is also downstream of the historical selection gate.
 
+Workflow run 29195169905 physically proved that copied-source hash gate, then
+found a narrower renderer-witness race: closing the choice menu changed the old
+root in place before Python published the remote snapshot. The probe now waits
+for `mode=remote` and `remote.temperature` on one connected root before
+classifying its transition. This remains downstream of kernel selection.
+
 ## Title
 
 Expose or adopt a supported VS Code kernel-controller discovery seam for the

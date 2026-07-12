@@ -161,6 +161,17 @@ probe now observes the current connected root and the source gate hashes that
 copied file. The numeric node replacement and Python verification oracle remain
 unchanged.
 
+[Workflow run 29195169905](https://github.com/gilad-rubin/hypster/actions/runs/29195169905)
+physically proved the copied-file gate: the RequireJS-reported file was 33,501
+bytes and its SHA-256 exactly matched the selected kernel's `anywidget` bundle.
+It also exposed a narrower renderer race. Clicking the remote option first
+closed the menu in place, which changed HTML before Python published the new
+Interactive Snapshot; the HTML-only transition therefore captured that stale
+root. The probe now waits for semantic publication—one connected widget root
+containing both `mode=remote` and `remote.temperature`—derives the root from
+that numeric control, and only then classifies replacement or a valid in-place
+update.
+
 ## Before / after
 
 Before:
@@ -190,6 +201,9 @@ exact selected kernel prefix
 
 branch action
   -> capture connected root immediately before click
+  -> ignore menu-close-only HTML change
+  -> wait for connected mode=remote + remote.temperature
+  -> derive current root from the dependent numeric control
   -> accept distinct connected root only after prior root detaches
   -> otherwise require that same connected root's HTML to change
   -> require numeric node replacement, value 1.25, then Python oracle

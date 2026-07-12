@@ -1,4 +1,7 @@
-import { detectWidgetRootTransition } from "./renderer-witness.mjs";
+import {
+  detectWidgetRootTransition,
+  findPublishedRemoteState,
+} from "./renderer-witness.mjs";
 
 const EXERCISE_TIMEOUT_MS = 20_000;
 const DIAGNOSTIC_TEXT_LIMIT = 20_000;
@@ -276,20 +279,15 @@ async function exerciseWidget(deadline) {
   const beforeBranch = branchRoot.innerHTML;
   remoteOption.click();
 
-  const rootTransition = await waitFor(
-    "replacement renderer state",
-    () =>
-      detectWidgetRootTransition(
-        branchRoot,
-        beforeBranch,
-        document.querySelector(".hypster-widget"),
-      ),
+  const publishedState = await waitFor(
+    "published remote branch state",
+    () => findPublishedRemoteState(document),
     deadline,
   );
-  const currentRoot = rootTransition.currentRoot;
-  const numeric = await waitFor(
-    "dependent numeric control",
-    () => currentRoot.querySelector("input[data-path='remote.temperature'][data-kind='float']"),
+  const { currentRoot, numeric } = publishedState;
+  const rootTransition = await waitFor(
+    "replacement renderer state",
+    () => detectWidgetRootTransition(branchRoot, beforeBranch, currentRoot),
     deadline,
   );
   if (numeric.value !== "0.25") {
