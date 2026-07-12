@@ -16,6 +16,7 @@ import time
 import urllib.request
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from playwright.sync_api import Page, sync_playwright
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -24,6 +25,7 @@ HARNESS_ROOT = Path(__file__).resolve().parent
 NOTEBOOK = HARNESS_ROOT / "branch_round_trip.ipynb"
 KERNEL_LOCK = HARNESS_ROOT / "kernel-requirements.lock"
 SERVER_TIMEOUT_SECONDS = 60
+SERVER_PORT_RETRIES = 5
 COMM_TIMEOUT_MS = 30_000
 
 
@@ -63,6 +65,29 @@ def wait_for_server(url: str, token: str, process: subprocess.Popen[str]) -> Non
     raise AssertionError(
         f"JupyterLab did not become ready within {SERVER_TIMEOUT_SECONDS}s; process return code: {process.poll()}"
     )
+
+
+def wait_for_server_info(runtime_dir: Path, token: str, process: subprocess.Popen[str]) -> str:
+    deadline = time.monotonic() + SERVER_TIMEOUT_SECONDS
+    info_file = runtime_dir / f"jpserver-{process.pid}.json"
+    while time.monotonic() < deadline:
+        assert process.poll() is None, f"JupyterLab exited before publishing server info: {process.returncode}"
+        try:
+            info = json.loads(info_file.read_text())
+        except (FileNotFoundError, json.JSONDecodeError):
+            time.sleep(0.25)
+            continue
+
+        assert info["pid"] == process.pid, f"server info PID {info['pid']} does not match launched PID {process.pid}"
+        assert info["token"] == token, "server info token does not match the configured host-test token"
+        url = str(info["url"]).rstrip("/")
+        parsed_url = urlsplit(url)
+        assert parsed_url.scheme in {"http", "https"}, f"server info published an invalid URL: {url}"
+        assert parsed_url.hostname in {"127.0.0.1", "localhost"}, f"server info published a non-local URL: {url}"
+        assert parsed_url.port == info["port"], f"server info URL and port disagree: {info}"
+        return url
+
+    raise AssertionError(f"JupyterLab did not publish {info_file.name} within {SERVER_TIMEOUT_SECONDS}s")
 
 
 def wait_for_kernel(url: str, token: str, process: subprocess.Popen[str]) -> None:
@@ -138,12 +163,20 @@ def wait_for_saved_notebook(url: str, token: str) -> dict[str, Any]:
 
 def terminate_process_group(process: subprocess.Popen[str]) -> None:
     if process.poll() is not None:
+        process.wait()
         return
-    os.killpg(process.pid, signal.SIGTERM)
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        process.wait(timeout=10)
+        return
     try:
         process.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
         process.wait(timeout=5)
 
 
@@ -198,15 +231,15 @@ def test_real_jupyterlab_round_trip() -> None:
 
         token = "hypster-host-test"
         port = available_port()
-        server_url = f"http://127.0.0.1:{port}"
         server_log_path = artifact_dir / "jupyterlab.log"
         server_log = server_log_path.open("w")
+        runtime_dir = temp / "jupyter-runtime"
         server_env = os.environ.copy()
         server_env.pop("PYTHONPATH", None)
         server_env["JUPYTER_PATH"] = str(jupyter_path)
         server_env["JUPYTER_CONFIG_DIR"] = str(temp / "jupyter-config")
         server_env["JUPYTER_DATA_DIR"] = str(temp / "jupyter-data")
-        server_env["JUPYTER_RUNTIME_DIR"] = str(temp / "jupyter-runtime")
+        server_env["JUPYTER_RUNTIME_DIR"] = str(runtime_dir)
         server_env["JUPYTERLAB_SETTINGS_DIR"] = str(temp / "jupyterlab-settings")
         server_env["JUPYTERLAB_WORKSPACES_DIR"] = str(temp / "jupyterlab-workspaces")
         server = subprocess.Popen(
@@ -217,7 +250,7 @@ def test_real_jupyterlab_round_trip() -> None:
                 "--no-browser",
                 f"--ServerApp.root_dir={notebook_root}",
                 f"--ServerApp.port={port}",
-                "--ServerApp.port_retries=0",
+                f"--ServerApp.port_retries={SERVER_PORT_RETRIES}",
                 f"--IdentityProvider.token={token}",
                 "--ServerApp.allow_remote_access=false",
             ],
@@ -262,6 +295,9 @@ def test_real_jupyterlab_round_trip() -> None:
         (artifact_dir / "versions.json").write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
 
         try:
+            server_url = wait_for_server_info(runtime_dir, token, server)
+            evidence["jupyter_server_pid"] = server.pid
+            evidence["jupyter_server_url"] = server_url
             wait_for_server(server_url, token, server)
             with sync_playwright() as playwright:
                 browser = playwright.chromium.launch()
