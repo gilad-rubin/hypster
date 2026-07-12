@@ -7,6 +7,7 @@ import type {
   InteractiveSnapshot,
   InteractiveValue,
 } from "./types.js";
+import { INTERACTIVE_PROTOCOL_VERSION } from "./types.js";
 
 export type HypsterRendererProps = {
   readonly snapshot: InteractiveSnapshot;
@@ -44,7 +45,7 @@ function JsonControl({
     try {
       const parsed = JSON.parse(event.currentTarget.value) as InteractiveValue;
       event.currentTarget.setCustomValidity("");
-      onAction({ protocol_version: 1, type: "set_value", path, value: parsed });
+      onAction({ protocol_version: INTERACTIVE_PROTOCOL_VERSION, type: "set_value", path, value: parsed });
     } catch {
       event.currentTarget.setCustomValidity("Enter valid JSON.");
       event.currentTarget.reportValidity();
@@ -75,7 +76,7 @@ function ParameterControl({
 }) {
   const emit = (nextValue: InteractiveValue) => {
     onAction({
-      protocol_version: 1,
+      protocol_version: INTERACTIVE_PROTOCOL_VERSION,
       type: "set_value",
       path: parameter.path,
       value: nextValue,
@@ -264,6 +265,17 @@ function ParameterField({
 }
 
 export function HypsterRenderer({ snapshot, onAction }: HypsterRendererProps) {
+  if (snapshot.protocol_version !== INTERACTIVE_PROTOCOL_VERSION) {
+    const received = snapshot.protocol_version == null ? "missing" : JSON.stringify(snapshot.protocol_version);
+    return (
+      <section className="hypster-renderer" data-status="protocol_error">
+        <div role="alert">
+          Interactive protocol version mismatch: expected {INTERACTIVE_PROTOCOL_VERSION}, received {received}.
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="hypster-renderer" data-status={snapshot.status}>
       {snapshot.error ? (
@@ -285,11 +297,17 @@ export function HypsterRenderer({ snapshot, onAction }: HypsterRendererProps) {
           ))}
           <div className="hypster-actions">
             {!snapshot.mode.auto_apply ? (
-              <button type="button" onClick={() => onAction({ protocol_version: 1, type: "apply" })}>
+              <button
+                type="button"
+                onClick={() => onAction({ protocol_version: INTERACTIVE_PROTOCOL_VERSION, type: "apply" })}
+              >
                 Apply
               </button>
             ) : null}
-            <button type="button" onClick={() => onAction({ protocol_version: 1, type: "reset" })}>
+            <button
+              type="button"
+              onClick={() => onAction({ protocol_version: INTERACTIVE_PROTOCOL_VERSION, type: "reset" })}
+            >
               Reset
             </button>
           </div>

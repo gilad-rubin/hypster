@@ -1,3 +1,5 @@
+export const INTERACTIVE_PROTOCOL_VERSION = 1 as const;
+
 export type InteractiveScalar = string | number | boolean | null;
 
 export type InteractiveValue =
@@ -99,7 +101,7 @@ export type InteractiveError = {
 };
 
 export type InteractiveSnapshot = {
-  readonly protocol_version: 1;
+  readonly protocol_version: typeof INTERACTIVE_PROTOCOL_VERSION;
   readonly schema: InteractiveSchema | null;
   readonly draft_values: InteractiveValues;
   readonly applied_values: InteractiveValues;
@@ -111,10 +113,10 @@ export type InteractiveSnapshot = {
 
 export type InteractiveAction =
   | {
-      readonly protocol_version: 1;
+      readonly protocol_version: typeof INTERACTIVE_PROTOCOL_VERSION;
       readonly type: "set_value";
       readonly path: string;
       readonly value: InteractiveValue;
     }
-  | { readonly protocol_version: 1; readonly type: "apply" }
-  | { readonly protocol_version: 1; readonly type: "reset" };
+  | { readonly protocol_version: typeof INTERACTIVE_PROTOCOL_VERSION; readonly type: "apply" }
+  | { readonly protocol_version: typeof INTERACTIVE_PROTOCOL_VERSION; readonly type: "reset" };

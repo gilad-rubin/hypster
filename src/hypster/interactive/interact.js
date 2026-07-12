@@ -1,3 +1,5 @@
+const INTERACTIVE_PROTOCOL_VERSION = 1;
+
 function hasOwn(object, key) {
   return Object.prototype.hasOwnProperty.call(object || {}, key);
 }
@@ -167,7 +169,7 @@ function controlValue(input) {
 }
 
 function send(model, action) {
-  model.set("action", { id: actionId(), ...action });
+  model.set("action", { id: actionId(), protocol_version: INTERACTIVE_PROTOCOL_VERSION, ...action });
   model.save_changes();
 }
 
@@ -718,6 +720,20 @@ function render(model, el) {
   const theme = detectHostTheme(el.ownerDocument || document);
   root.className = `hypster-widget hypster-theme-${theme}`;
   root.dataset.hypsterTheme = theme;
+
+  if (snapshot?.protocol_version !== INTERACTIVE_PROTOCOL_VERSION) {
+    const received = snapshot?.protocol_version == null ? "missing" : JSON.stringify(snapshot.protocol_version);
+    root.dataset.status = "protocol_error";
+    const error = document.createElement("div");
+    error.className = "hypster-status hypster-status-protocol_error";
+    error.setAttribute("role", "alert");
+    error.textContent =
+      `Error: Interactive protocol version mismatch: ` +
+      `expected ${INTERACTIVE_PROTOCOL_VERSION}, received ${received}.`;
+    root.append(error);
+    el.append(root);
+    return;
+  }
 
   const header = document.createElement("div");
   header.className = "hypster-header";

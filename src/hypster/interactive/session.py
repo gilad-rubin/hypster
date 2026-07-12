@@ -16,6 +16,8 @@ from .branch_memory import BranchChoiceMemory
 
 T = TypeVar("T")
 
+INTERACTIVE_PROTOCOL_VERSION = 1
+
 _VIZ_EXTRA_ERROR = (
     "Hypster interactive widgets require the visualization extra. "
     'Install it with `uv add "hypster[viz]"` or `pip install "hypster[viz]"`, '
@@ -107,6 +109,7 @@ class InteractiveSession(Generic[T]):
     @property
     def snapshot(self) -> Dict[str, Any]:
         return {
+            "protocol_version": INTERACTIVE_PROTOCOL_VERSION,
             "schema": self._schema.to_dict() if self._schema is not None else None,
             "draft_values": dict(self._draft_values),
             "applied_values": dict(self._applied_values),
@@ -117,6 +120,13 @@ class InteractiveSession(Generic[T]):
         }
 
     def dispatch(self, action: Mapping[str, Any]) -> Dict[str, Any]:
+        protocol_version = action.get("protocol_version")
+        if type(protocol_version) is not int or protocol_version != INTERACTIVE_PROTOCOL_VERSION:
+            raise ValueError(
+                "Interactive protocol version mismatch: "
+                f"expected {INTERACTIVE_PROTOCOL_VERSION}, received {protocol_version!r}"
+            )
+
         action_type = action.get("type")
         if action_type == "set_value":
             self._set_value(str(action["path"]), action.get("value"))

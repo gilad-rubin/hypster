@@ -44,6 +44,42 @@ def test_interact_returns_live_result_matching_instantiate_with_params() -> None
     assert result.params == expected.params
 
 
+def test_interactive_protocol_v1_snapshot_and_action_change_python_state() -> None:
+    def config(hp: HP) -> Dict[str, int]:
+        return {"count": hp.int(1, name="count", min=1, max=5)}
+
+    result = interact(config)
+
+    assert result.snapshot["protocol_version"] == 1
+
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "count", "value": 4})
+
+    assert snapshot["protocol_version"] == 1
+    assert result.params == {"count": 4}
+
+
+@pytest.mark.parametrize("version", [None, True, 0, 2, "1"])
+def test_interactive_protocol_rejects_missing_or_mismatched_action_without_mutation(
+    version: object,
+) -> None:
+    def config(hp: HP) -> Dict[str, int]:
+        return {"count": hp.int(1, name="count", min=1, max=5)}
+
+    result = interact(config)
+    action: Dict[str, object] = {"type": "set_value", "path": "count", "value": 4}
+    if version is not None:
+        action["protocol_version"] = version
+
+    before_snapshot = result.snapshot
+
+    with pytest.raises(ValueError, match="Interactive protocol version mismatch"):
+        result.dispatch(action)
+
+    assert result.snapshot == before_snapshot
+    assert result.value == {"count": 1}
+    assert result.params == {"count": 1}
+
+
 def test_interact_forwards_execution_kwargs_to_exploration_and_instantiation() -> None:
     def config(hp: HP, multiplier: int) -> Dict[str, int]:
         base = hp.int(2, name="base")
@@ -88,7 +124,7 @@ def test_interact_action_updates_value_and_params() -> None:
 
     result = interact(config)
 
-    snapshot = result.dispatch({"type": "set_value", "path": "provider", "value": "openai"})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "provider", "value": "openai"})
 
     assert result.value == {
         "provider": "openai",
@@ -113,10 +149,10 @@ def test_interact_remembers_latest_compatible_branch_choice() -> None:
 
     result = interact(config)
 
-    result.dispatch({"type": "set_value", "path": "provider", "value": "gemini"})
-    result.dispatch({"type": "set_value", "path": "model", "value": "pro"})
-    result.dispatch({"type": "set_value", "path": "provider", "value": "openai"})
-    result.dispatch({"type": "set_value", "path": "provider", "value": "gemini"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "provider", "value": "gemini"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "model", "value": "pro"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "provider", "value": "openai"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "provider", "value": "gemini"})
 
     assert result.value == {"provider": "gemini", "model": "pro"}
     assert result.params == {"provider": "gemini", "model": "pro"}
@@ -133,17 +169,17 @@ def test_interact_separates_same_path_values_by_branch_context() -> None:
 
     result = interact(config)
 
-    result.dispatch({"type": "set_value", "path": "n", "value": 7})
-    result.dispatch({"type": "set_value", "path": "mode", "value": "b"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "n", "value": 7})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "mode", "value": "b"})
 
     assert result.params == {"mode": "b", "n": 0}
 
-    result.dispatch({"type": "set_value", "path": "n", "value": 3})
-    result.dispatch({"type": "set_value", "path": "mode", "value": "a"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "n", "value": 3})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "mode", "value": "a"})
 
     assert result.params == {"mode": "a", "n": 7}
 
-    result.dispatch({"type": "set_value", "path": "mode", "value": "b"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "mode", "value": "b"})
 
     assert result.params == {"mode": "b", "n": 3}
 
@@ -159,8 +195,8 @@ def test_interact_updates_same_path_numeric_bounds_by_branch_context() -> None:
 
     result = interact(config)
 
-    result.dispatch({"type": "set_value", "path": "n", "value": 8})
-    snapshot = result.dispatch({"type": "set_value", "path": "a", "value": 2})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "n", "value": 8})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "a", "value": 2})
     n_parameter = snapshot["schema"]["parameters"][1]
 
     assert snapshot["status"] == "applied"
@@ -168,12 +204,12 @@ def test_interact_updates_same_path_numeric_bounds_by_branch_context() -> None:
     assert n_parameter["maximum"] == 3
     assert result.params == {"a": 2, "n": 0}
 
-    result.dispatch({"type": "set_value", "path": "n", "value": 2})
-    result.dispatch({"type": "set_value", "path": "a", "value": 3})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "n", "value": 2})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "a", "value": 3})
 
     assert result.params == {"a": 3, "n": 8}
 
-    result.dispatch({"type": "set_value", "path": "a", "value": 2})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "a", "value": 2})
 
     assert result.params == {"a": 2, "n": 2}
 
@@ -189,16 +225,16 @@ def test_interact_reset_restores_baseline_and_clears_later_branch_memory() -> No
 
     result = interact(config)
 
-    result.dispatch({"type": "set_value", "path": "provider", "value": "gemini"})
-    result.dispatch({"type": "set_value", "path": "model", "value": "pro"})
-    result.dispatch({"type": "set_value", "path": "provider", "value": "openai"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "provider", "value": "gemini"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "model", "value": "pro"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "provider", "value": "openai"})
 
-    snapshot = result.dispatch({"type": "reset"})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "reset"})
 
     assert result.value == {"provider": "openai", "model": "gpt-4o-mini"}
     assert snapshot["selected_params"] == {"provider": "openai", "model": "gpt-4o-mini"}
 
-    result.dispatch({"type": "set_value", "path": "provider", "value": "gemini"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "provider", "value": "gemini"})
 
     assert result.value == {"provider": "gemini", "model": "flash-lite"}
 
@@ -209,7 +245,7 @@ def test_interact_manual_apply_keeps_value_on_last_applied_state_until_apply() -
 
     result = interact(config, auto_apply=False)
 
-    snapshot = result.dispatch({"type": "set_value", "path": "count", "value": 3})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "count", "value": 3})
 
     assert result.value == {"count": 1}
     assert result.params == {"count": 1}
@@ -217,7 +253,7 @@ def test_interact_manual_apply_keeps_value_on_last_applied_state_until_apply() -
     assert snapshot["applied_values"] == {"count": 1}
     assert snapshot["status"] == "pending"
 
-    snapshot = result.dispatch({"type": "apply"})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "apply"})
 
     assert result.value == {"count": 3}
     assert result.params == {"count": 3}
@@ -233,8 +269,8 @@ def test_interact_manual_apply_preserves_sibling_drafts_after_exploration_error(
 
     result = interact(config, auto_apply=False)
 
-    result.dispatch({"type": "set_value", "path": "width", "value": 4})
-    snapshot = result.dispatch({"type": "set_value", "path": "count", "value": 9})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "width", "value": 4})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "count", "value": 9})
 
     assert snapshot["status"] == "draft_error"
     assert snapshot["draft_values"] == {"count": 9, "width": 4}
@@ -247,7 +283,7 @@ def test_interact_immediate_apply_exposes_errors_until_fixed() -> None:
 
     result = interact(config)
 
-    snapshot = result.dispatch({"type": "set_value", "path": "count", "value": 9})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "count", "value": 9})
 
     assert snapshot["status"] == "error"
     assert snapshot["error"]["kind"] == "exploration"
@@ -260,7 +296,7 @@ def test_interact_immediate_apply_exposes_errors_until_fixed() -> None:
     with pytest.raises(RuntimeError, match="exceeds maximum bound"):
         result.params
 
-    snapshot = result.dispatch({"type": "set_value", "path": "count", "value": 4})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "count", "value": 4})
 
     assert snapshot["status"] == "applied"
     assert snapshot["error"] is None
@@ -278,10 +314,10 @@ def test_interact_reset_reports_errors_without_stale_value() -> None:
         return {"count": count}
 
     result = interact(config)
-    result.dispatch({"type": "set_value", "path": "count", "value": 3})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "count", "value": 3})
 
     state["fail"] = True
-    snapshot = result.dispatch({"type": "reset"})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "reset"})
 
     assert snapshot["status"] == "error"
     assert snapshot["error"] == {"kind": "exploration", "message": "reset failed"}
@@ -300,12 +336,12 @@ def test_interact_branch_memory_rejects_incompatible_multi_value_history() -> No
 
     result = interact(config)
 
-    snapshot = result.dispatch({"type": "set_value", "path": "values", "value": [99]})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "values", "value": [99]})
 
     assert snapshot["status"] == "error"
 
-    result.dispatch({"type": "set_value", "path": "mode", "value": "b"})
-    snapshot = result.dispatch({"type": "set_value", "path": "mode", "value": "a"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "mode", "value": "b"})
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "mode", "value": "a"})
 
     assert snapshot["status"] == "applied"
     assert result.value == {"mode": "a", "values": [1]}
@@ -319,7 +355,7 @@ def test_interact_widget_view_dispatches_actions_to_same_session() -> None:
     result = interact(config)
     widget = result.interact()
 
-    widget.action = {"id": "test-action", "type": "set_value", "path": "count", "value": 2}
+    widget.action = {"protocol_version": 1, "id": "test-action", "type": "set_value", "path": "count", "value": 2}
 
     assert widget.snapshot["selected_params"] == {"count": 2}
     assert result.value == {"count": 2}
@@ -336,6 +372,7 @@ def test_interact_widget_decodes_numeric_transport_values() -> None:
     widget = result.interact()
 
     widget.action = {
+        "protocol_version": 1,
         "id": "test-action",
         "type": "set_value",
         "path": "child.temperature",
@@ -354,6 +391,7 @@ def test_interact_widget_decodes_empty_multi_value_transport_as_empty_list() -> 
     widget = result.interact()
 
     widget.action = {
+        "protocol_version": 1,
         "id": "test-action",
         "type": "set_value",
         "path": "values",
@@ -432,7 +470,13 @@ def test_interact_widget_round_trips_rules_action_values() -> None:
         }
     ]
 
-    widget.action = {"id": "rules-action", "type": "set_value", "path": "prompt_rules", "value": new_rules}
+    widget.action = {
+        "protocol_version": 1,
+        "id": "rules-action",
+        "type": "set_value",
+        "path": "prompt_rules",
+        "value": new_rules,
+    }
 
     assert isinstance(result.value["rules"][0], Rule)
     assert result.value["rules"][0].then == "Use runbook language."
@@ -447,7 +491,7 @@ def test_interact_multiple_widget_views_share_session_updates() -> None:
     first = result.interact()
     second = result.interact()
 
-    first.action = {"id": "test-action", "type": "set_value", "path": "count", "value": 4}
+    first.action = {"protocol_version": 1, "id": "test-action", "type": "set_value", "path": "count", "value": 4}
 
     assert first.snapshot["selected_params"] == {"count": 4}
     assert second.snapshot["selected_params"] == {"count": 4}
@@ -482,4 +526,4 @@ def test_set_value_unreachable_path_surfaces_backend_error() -> None:
     result = interact(config)
 
     with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
-        result.dispatch({"type": "set_value", "path": "nope", "value": 3})
+        result.dispatch({"protocol_version": 1, "type": "set_value", "path": "nope", "value": 3})

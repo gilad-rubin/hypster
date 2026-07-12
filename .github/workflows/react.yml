@@ -4,11 +4,17 @@ on:
   pull_request:
     paths:
       - "packages/react/**"
+      - "src/hypster/interactive/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - ".github/workflows/react.yml"
   push:
     branches: [master]
     paths:
       - "packages/react/**"
+      - "src/hypster/interactive/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - ".github/workflows/react.yml"
 
 jobs:
@@ -26,7 +32,16 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: packages/react/package-lock.json
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.8"
+          enable-cache: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
 
+      - run: uv sync --frozen --project ../..
+      - run: uv run --project ../.. python test/python_protocol.py --check
       - run: npm ci
       - run: npm run typecheck
       - run: npm test

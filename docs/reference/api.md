@@ -242,8 +242,8 @@ result.interact()
 | --- | --- |
 | `value` | The currently applied config return value. Raises `RuntimeError` while the applied state is invalid. |
 | `params` | Replayable selected params for the currently applied state. Raises `RuntimeError` while the applied state is invalid. |
-| `snapshot` | Widget-facing state with schema, draft values, applied values, selected params, mode, status, and error. |
-| `dispatch(action)` | Applies one interactive action headlessly and returns the new snapshot. Actions: `{"type": "set_value", "path": ..., "value": ...}`, `{"type": "reset"}`, `{"type": "apply"}`. Setting an unreachable path raises the backend's unknown-parameter `ValueError`. |
+| `snapshot` | Widget-facing state with `protocol_version`, schema, draft values, applied values, selected params, mode, status, and error. |
+| `dispatch(action)` | Applies one interactive action headlessly and returns the new snapshot. Every action must include `"protocol_version": 1`: `{"protocol_version": 1, "type": "set_value", "path": ..., "value": ...}`, `{"protocol_version": 1, "type": "reset"}`, or `{"protocol_version": 1, "type": "apply"}`. A missing or mismatched version raises `ValueError` before state changes. Setting an unreachable path raises the backend's unknown-parameter `ValueError`. |
 | `interact()` | Renders another live widget view backed by the same session. |
 
 Replay an interactive selection the same way you replay any Hypster run:
