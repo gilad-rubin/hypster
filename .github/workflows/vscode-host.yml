@@ -1,0 +1,165 @@
+name: VS Code host spike
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  kernel-selection-spike:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      HYPSTER_NOTEBOOK: ${{ github.workspace }}/tests/jupyterlab_host/branch_round_trip.ipynb
+      HYPSTER_VSCODE_ARTIFACT_DIR: ${{ github.workspace }}/host-evidence/vscode
+    steps:
+      - uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Configure isolated runtime paths
+        run: |
+          echo "HYPSTER_VSCODE_RUNTIME_DIR=$RUNNER_TEMP/hypster-vscode-runtime" >> "$GITHUB_ENV"
+          echo "HYPSTER_VSCODE_KERNEL_ENV=$RUNNER_TEMP/hypster-vscode-kernel" >> "$GITHUB_ENV"
+          echo "HYPSTER_VSCODE_PYTHON=$RUNNER_TEMP/hypster-vscode-kernel/bin/python" >> "$GITHUB_ENV"
+          echo "HYPSTER_VSCODE_KERNEL_PREFIX=$RUNNER_TEMP/hypster-vscode-kernels" >> "$GITHUB_ENV"
+          echo "JUPYTER_PATH=$RUNNER_TEMP/hypster-vscode-kernels/share/jupyter" >> "$GITHUB_ENV"
+
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: "0.11.8"
+          enable-cache: true
+          python-version: "3.13.13"
+
+      - uses: actions/setup-node@v6.4.0
+        with:
+          node-version: "24.18.0"
+          cache: npm
+          cache-dependency-path: tests/vscode_host/package-lock.json
+
+      - name: Select exact Node.js and npm runtime
+        run: |
+          test "$(node --version)" = "v24.18.0"
+          npm install --global npm@11.16.0
+          node tests/vscode_host/scripts/assert-runtime.cjs
+
+      - name: Install Electron host libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2t64 libgbm1 libgtk-3-0 libnss3 xvfb
+
+      - name: Install locked harness
+        working-directory: tests/vscode_host
+        run: |
+          node scripts/assert-runtime.cjs
+          npm ci --ignore-scripts
+          npm run check
+
+      - name: Build repository wheel
+        run: uv build --wheel --out-dir dist
+
+      - name: Create isolated installed-wheel kernel
+        run: |
+          set -euo pipefail
+          WHEEL=$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -name '*.whl' -print -quit)
+          test -n "$WHEEL"
+          uv venv --python 3.13.13 "$HYPSTER_VSCODE_KERNEL_ENV"
+          uv pip install \
+            --python "$HYPSTER_VSCODE_KERNEL_ENV/bin/python" \
+            --requirement tests/jupyterlab_host/kernel-requirements.lock \
+            "${WHEEL}[viz]"
+          uv pip check --python "$HYPSTER_VSCODE_KERNEL_ENV/bin/python"
+          "$HYPSTER_VSCODE_KERNEL_ENV/bin/python" -m ipykernel install \
+            --prefix "$HYPSTER_VSCODE_KERNEL_PREFIX" \
+            --name hypster-host \
+            --display-name "Hypster host test"
+          mkdir -p host-evidence/vscode
+          WHEEL_SHA256=$(sha256sum "$WHEEL" | cut -d ' ' -f 1)
+          WHEEL_SHA256="$WHEEL_SHA256" "$HYPSTER_VSCODE_KERNEL_ENV/bin/python" - <<'PY'
+          import importlib.metadata
+          import json
+          import os
+          import platform
+          import sys
+          from pathlib import Path
+
+          import hypster
+
+          hypster_path = Path(hypster.__file__).resolve()
+          assert "site-packages" in hypster_path.parts, hypster_path
+          evidence = {
+              "python": sys.version,
+              "executable": sys.executable,
+              "platform": platform.platform(),
+              "hypster_import_path": str(hypster_path),
+              "wheel_sha256": os.environ["WHEEL_SHA256"],
+              "packages": {
+                  name: importlib.metadata.version(name)
+                  for name in [
+                      "hypster",
+                      "anywidget",
+                      "ipykernel",
+                      "ipywidgets",
+                      "jupyterlab-widgets",
+                  ]
+              },
+          }
+          Path("host-evidence/vscode/kernel-environment.json").write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n"
+          )
+          PY
+
+      - name: Capture setup versions
+        run: |
+          {
+            uname -a
+            cat /etc/os-release
+            node --version
+            npm --version
+            uv --version
+            dpkg-query -W xvfb
+          } > host-evidence/vscode/setup.txt
+
+      - name: Reproduce kernel-selection spike in real VS Code Desktop
+        working-directory: tests/vscode_host
+        run: |
+          unset PYTHONPATH
+          node scripts/assert-runtime.cjs
+          timeout --signal=TERM --kill-after=30s 8m xvfb-run -a npm test
+
+      - name: Capture VS Code and Jupyter logs
+        if: always()
+        run: |
+          mkdir -p host-evidence/vscode/vscode-logs
+          if [ -d "$HYPSTER_VSCODE_RUNTIME_DIR/user-data/logs" ]; then
+            cp -R "$HYPSTER_VSCODE_RUNTIME_DIR/user-data/logs/." host-evidence/vscode/vscode-logs/
+          fi
+
+      - name: Terminate and verify host processes
+        if: always()
+        run: |
+          set +e
+          pkill -TERM -f "$HYPSTER_VSCODE_RUNTIME_DIR"
+          pkill -TERM -f "$HYPSTER_VSCODE_KERNEL_ENV"
+          sleep 2
+          pkill -KILL -f "$HYPSTER_VSCODE_RUNTIME_DIR"
+          pkill -KILL -f "$HYPSTER_VSCODE_KERNEL_ENV"
+          set -e
+          if pgrep -af "$HYPSTER_VSCODE_RUNTIME_DIR|$HYPSTER_VSCODE_KERNEL_ENV" \
+            > host-evidence/vscode/process-cleanup.txt; then
+            cat host-evidence/vscode/process-cleanup.txt
+            exit 1
+          fi
+          echo "No VS Code, Electron, Chromium, or kernel process remains" \
+            > host-evidence/vscode/process-cleanup.txt
+
+      - name: Upload VS Code spike evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: vscode-host-spike-${{ github.run_id }}
+          path: host-evidence/vscode/
+          if-no-files-found: error

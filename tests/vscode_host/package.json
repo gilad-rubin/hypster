@@ -1,0 +1,42 @@
+{
+  "name": "hypster-vscode-host-spike",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "npm@11.16.0",
+  "displayName": "Hypster VS Code host spike",
+  "publisher": "hypster",
+  "engines": {
+    "node": "24.18.0",
+    "vscode": "^1.128.0"
+  },
+  "main": "./extension.cjs",
+  "activationEvents": [
+    "onRenderer:hypster-vscode-host-probe"
+  ],
+  "extensionDependencies": [
+    "ms-python.python",
+    "ms-toolsai.jupyter"
+  ],
+  "contributes": {
+    "notebookRenderer": [
+      {
+        "id": "hypster-vscode-host-probe",
+        "displayName": "Hypster host-test probe",
+        "entrypoint": {
+          "extends": "jupyter-ipywidget-renderer",
+          "path": "./renderer.mjs"
+        },
+        "requiresMessaging": "always"
+      }
+    ]
+  },
+  "scripts": {
+    "assert-runtime": "node scripts/assert-runtime.cjs",
+    "check": "node scripts/check.cjs && node scripts/test-creation-gate.cjs && node scripts/test-widget-source.cjs && node scripts/test-renderer-gate.cjs && node scripts/test-renderer-witness.mjs && node scripts/test-cli-runner.cjs",
+    "test": "node run.cjs"
+  },
+  "devDependencies": {
+    "@vscode/python-extension": "1.0.6",
+    "@vscode/test-electron": "3.0.0"
+  }
+}
