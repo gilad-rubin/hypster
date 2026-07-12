@@ -63,6 +63,7 @@ known-first-party = ["hypster"]
 [tool.pytest.ini_options]
 addopts = "-ra --cov=hypster --cov-report=term-missing:skip-covered --cov-report=xml"
 testpaths = ["tests"]
+norecursedirs = ["tests/jupyterlab_host"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hypster"]
