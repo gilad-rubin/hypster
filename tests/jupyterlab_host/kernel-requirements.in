@@ -1,0 +1,4 @@
+anywidget>=0.9,<0.12
+ipykernel>=6,<8
+ipywidgets>=8,<9
+jupyterlab-widgets>=3,<4
