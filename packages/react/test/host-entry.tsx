@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 
 import {
@@ -23,6 +23,13 @@ if (!rootElement) throw new Error("Missing #root host element");
 const root = createRoot(rootElement);
 let current: BridgeSnapshot;
 
+function HostRenderer({ snapshot }: { snapshot: BridgeSnapshot }) {
+  useLayoutEffect(() => {
+    rootElement.dataset.renderedSequence = String(snapshot.bridge_sequence);
+  }, [snapshot.bridge_sequence]);
+  return <HypsterRenderer snapshot={snapshot} onAction={onAction} />;
+}
+
 function render(snapshot: BridgeSnapshot) {
   current = snapshot;
   window.__hypsterHost = {
@@ -33,13 +40,7 @@ function render(snapshot: BridgeSnapshot) {
   rootElement.dataset.renderer = "@hypster/react";
   rootElement.dataset.executionId = snapshot.bridge_execution_id;
   rootElement.dataset.sequence = String(snapshot.bridge_sequence);
-  root.render(
-    <HypsterRenderer
-      key={snapshot.bridge_sequence}
-      snapshot={snapshot}
-      onAction={onAction}
-    />,
-  );
+  root.render(<HostRenderer snapshot={snapshot} />);
 }
 
 async function onAction(action: InteractiveAction) {
