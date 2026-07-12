@@ -27,6 +27,9 @@ boundary:
 
 The Ubuntu witness determines the outcome rather than assuming it in advance:
 
+- if the pinned Jupyter extension activates but VS Code does not register the
+  documented `notebook.selectKernel` command, the artifact reports
+  `kernel_selection_gate_failure`;
 - if both supported commands fulfill but the creation marker is absent while
   the cell has no execution summary and zero outputs, the cell never executed;
   the artifact reports `kernel_selection_gate_failure` and the job may complete

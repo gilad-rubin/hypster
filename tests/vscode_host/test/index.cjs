@@ -182,8 +182,13 @@ async function run() {
     await jupyter.activate();
 
     const commands = await vscode.commands.getCommands(true);
-    if (!commands.includes("notebook.selectKernel")) {
-      throw new Error("VS Code did not register the documented notebook.selectKernel command");
+    evidence.selector.commandRegistered = commands.includes("notebook.selectKernel");
+    if (!evidence.selector.commandRegistered) {
+      evidence.outcome = "kernel_selection_gate_failure";
+      evidence.reason =
+        "VS Code did not register the documented notebook.selectKernel command after Jupyter activation.";
+      console.log("HYPSTER_VSCODE_KERNEL_SELECTION_GATE_REPRODUCED");
+      return;
     }
     const forbiddenDiscoveryKeys = ["controllers", "getControllers", "getNotebookControllers"];
     evidence.selector.publicControllerDiscoveryKeys = forbiddenDiscoveryKeys.filter((key) =>
