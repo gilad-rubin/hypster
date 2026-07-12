@@ -127,20 +127,46 @@ async function configureWidgetScriptSources(evidence) {
     expected,
     vscode.ConfigurationTarget.Global,
   );
-  const inspected = configuration.inspect("widgetScriptSources");
-  const effective = configuration.get("widgetScriptSources");
+  const persistedConfiguration = vscode.workspace.getConfiguration("jupyter");
+  const inspected = persistedConfiguration.inspect("widgetScriptSources");
+  const effective = persistedConfiguration.get("widgetScriptSources");
   evidence.rendererBoundary.widgetScriptSources = {
     target: "global",
     expected,
+    globalLocalValue: inspected?.globalLocalValue ?? null,
     globalValue: inspected?.globalValue ?? null,
-    effectiveValue: effective ?? null,
+    effectiveBeforeActivation: effective ?? null,
   };
   if (
+    (inspected?.globalLocalValue !== undefined &&
+      JSON.stringify(inspected.globalLocalValue) !== JSON.stringify(expected)) ||
     JSON.stringify(inspected?.globalValue) !== JSON.stringify(expected) ||
     JSON.stringify(effective) !== JSON.stringify(expected)
   ) {
     throw new Error(
       `jupyter.widgetScriptSources did not persist globally: ${JSON.stringify(inspected)}`,
+    );
+  }
+}
+
+function verifyWidgetScriptSourcesAfterActivation(evidence) {
+  const configuration = vscode.workspace.getConfiguration("jupyter");
+  const expected = [...pins.widgetScriptSources];
+  const inspected = configuration.inspect("widgetScriptSources");
+  const effective = configuration.get("widgetScriptSources");
+  evidence.rendererBoundary.widgetScriptSources.globalLocalValueAfterActivation =
+    inspected?.globalLocalValue ?? null;
+  evidence.rendererBoundary.widgetScriptSources.globalValueAfterActivation =
+    inspected?.globalValue ?? null;
+  evidence.rendererBoundary.widgetScriptSources.effectiveAfterActivation = effective ?? null;
+  if (
+    (inspected?.globalLocalValue !== undefined &&
+      JSON.stringify(inspected.globalLocalValue) !== JSON.stringify(expected)) ||
+    JSON.stringify(inspected?.globalValue) !== JSON.stringify(expected) ||
+    JSON.stringify(effective) !== JSON.stringify(expected)
+  ) {
+    throw new Error(
+      `Jupyter did not consume the global widget script sources: ${JSON.stringify(inspected)}`,
     );
   }
 }
@@ -232,6 +258,7 @@ async function run() {
     const jupyter = vscode.extensions.getExtension("ms-toolsai.jupyter");
     const pythonApi = await PythonExtension.api();
     const jupyterApi = await jupyter.activate();
+    verifyWidgetScriptSourcesAfterActivation(evidence);
     evidence.selector.pythonFacade = {
       package: "@vscode/python-extension",
       version: pythonFacadePackage.version,

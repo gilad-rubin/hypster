@@ -78,6 +78,14 @@ the widget, records its global and effective values, and fails if either value
 differs. A new Ubuntu witness is still required to prove the full
 renderer-to-Python round trip.
 
+[Workflow run 29193526092](https://github.com/gilad-rubin/hypster/actions/runs/29193526092)
+confirmed that both inspected global values persisted exactly, but exposed a
+harness-verifier bug: `configuration.get()` was called on the configuration
+object created before the update and returned its cached default. The harness
+now reacquires configuration after writing the setting and verifies the
+effective value again after Jupyter activation, at the point the widget
+consumer reads it.
+
 ## Before / after
 
 Before:

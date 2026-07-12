@@ -43,10 +43,23 @@ for (const fragment of [
   '"widgetScriptSources"',
   "vscode.ConfigurationTarget.Global",
   'inspect("widgetScriptSources")',
+  "effectiveBeforeActivation",
+  "effectiveAfterActivation",
 ]) {
   if (!hostTestSource.includes(fragment)) {
     throw new Error(`host test must configure and verify the global widget allowlist: ${fragment}`);
   }
+}
+const configurationReads = hostTestSource.match(/getConfiguration\("jupyter"\)/g) ?? [];
+if (configurationReads.length < 3) {
+  throw new Error("widget settings must be reacquired after update and after Jupyter activation");
+}
+const activationIndex = hostTestSource.indexOf("const jupyterApi = await jupyter.activate();");
+const consumerVerificationIndex = hostTestSource.indexOf(
+  "verifyWidgetScriptSourcesAfterActivation(evidence);",
+);
+if (activationIndex < 0 || consumerVerificationIndex < activationIndex) {
+  throw new Error("effective widget settings must be verified after Jupyter activation");
 }
 
 const notebookPath = path.join(repository, "tests", "jupyterlab_host", "branch_round_trip.ipynb");
