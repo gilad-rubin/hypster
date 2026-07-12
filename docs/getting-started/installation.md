@@ -1,6 +1,6 @@
 # Installation
 
-Hypster's core package has no runtime dependencies and supports Python 3.10, 3.11, 3.12, and 3.13.
+Hypster's core package has no runtime dependencies and requires Python 3.10 or newer. The current CI matrix tests Python 3.10, 3.11, 3.12, and 3.13; see [Currently Tested Environments](../reference/currently-tested-environments.md) for the operating-system and notebook-host combinations exercised for the 0.9 line.
 
 ## Install With uv
 
@@ -38,7 +38,7 @@ uv add "hypster[viz]" jupyterlab
 
 ## Install With pip
 
-Check that `python` points at a supported interpreter first:
+Check that `python` points at an interpreter that satisfies the package requirement first:
 
 {% code overflow="wrap" %}
 ```bash
@@ -46,7 +46,7 @@ python --version
 ```
 {% endcode %}
 
-Hypster supports Python 3.10, 3.11, 3.12, and 3.13.
+Hypster requires Python 3.10 or newer. CI currently tests Python 3.10, 3.11, 3.12, and 3.13.
 
 {% code overflow="wrap" %}
 ```bash

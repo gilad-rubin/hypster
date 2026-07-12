@@ -309,6 +309,8 @@ assert snapshot["status"] == "applied"
 ```
 {% endcode %}
 
-Every action must include `"protocol_version": 1`. Supported actions are `{"protocol_version": 1, "type": "set_value", "path": ..., "value": ...}`, `{"protocol_version": 1, "type": "reset"}`, and `{"protocol_version": 1, "type": "apply"}` (manual mode). A missing or mismatched version raises `ValueError` without changing session state. Setting an unreachable path raises the backend's `Unknown or unreachable parameters` error.
+Every action must include `"protocol_version": 1`. Supported actions are `{"protocol_version": 1, "type": "set_value", "path": ..., "value": ...}`, `{"protocol_version": 1, "type": "reset"}`, and `{"protocol_version": 1, "type": "apply"}` (manual mode). A missing or mismatched version raises `ValueError` without changing session state. The version detects incompatible peers during 0.x development; it is not a stability promise for 1.x. Setting an unreachable path raises the backend's `Unknown or unreachable parameters` error.
+
+Repository consumers that use React can render the same contract with the experimental `@hypster/react` package. It is a thin snapshot/action renderer, remains unpublished to npm, and leaves all configuration semantics in Python. See [Upgrade From 0.8 To 0.9](../migration/upgrade-0.8-to-0.9.md) for the ownership boundary and migration shape.
 
 See also: [Interactive UI From Schema](../examples/interactive-ui.md) for building a custom (non-widget) UI from `explore()` schemas.
