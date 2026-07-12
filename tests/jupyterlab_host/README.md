@@ -12,10 +12,16 @@ outside the source checkout. It then crosses the real boundary:
 Chromium DOM event -> anywidget comm -> Python controller -> replacement DOM
 ```
 
-The notebook's second cell is the independent oracle for the final exact
-`result.params` value. Browser errors, cell errors, visible widget errors,
-missing comm-driven replacement DOM, and timeouts fail the run. The browser,
-Jupyter server, kernel, and their process group are terminated on every exit.
+Notebook verification cells are independent Python oracles for auto-applied,
+staged, invalid, applied, and reset `result.params` values. The canonical
+scenario also switches the real JupyterLab theme, verifies Branch Choice
+Memory, drives Apply and Reset in manual mode, and sends a mismatched Protocol
+V1 snapshot through the live widget comm before recovering with a valid
+snapshot. Reused Python oracle cells must publish a new execution count and
+unique output identity. Browser errors, cell errors, unexpected visible widget
+errors, missing comm-driven replacement DOM, and timeouts fail the run. The
+browser, Jupyter server, kernel, and their process group are terminated on
+every exit.
 
 ## Local run
 
