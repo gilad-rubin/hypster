@@ -119,6 +119,32 @@ function pythonEnvironmentEvidence(environment, requestedExecutable) {
   };
 }
 
+async function configureWidgetScriptSources(evidence) {
+  const configuration = vscode.workspace.getConfiguration("jupyter");
+  const expected = [...pins.widgetScriptSources];
+  await configuration.update(
+    "widgetScriptSources",
+    expected,
+    vscode.ConfigurationTarget.Global,
+  );
+  const inspected = configuration.inspect("widgetScriptSources");
+  const effective = configuration.get("widgetScriptSources");
+  evidence.rendererBoundary.widgetScriptSources = {
+    target: "global",
+    expected,
+    globalValue: inspected?.globalValue ?? null,
+    effectiveValue: effective ?? null,
+  };
+  if (
+    JSON.stringify(inspected?.globalValue) !== JSON.stringify(expected) ||
+    JSON.stringify(effective) !== JSON.stringify(expected)
+  ) {
+    throw new Error(
+      `jupyter.widgetScriptSources did not persist globally: ${JSON.stringify(inspected)}`,
+    );
+  }
+}
+
 function recordCreationState(roundTrip, cell) {
   roundTrip.creationExecutionSummary = executionSummary(cell);
   roundTrip.creationOutputCount = cell.outputs.length;
@@ -202,6 +228,7 @@ async function run() {
 
   let editor;
   try {
+    await configureWidgetScriptSources(evidence);
     const jupyter = vscode.extensions.getExtension("ms-toolsai.jupyter");
     const pythonApi = await PythonExtension.api();
     const jupyterApi = await jupyter.activate();

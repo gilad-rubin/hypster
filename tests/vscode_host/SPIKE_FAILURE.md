@@ -1,9 +1,9 @@
 # Follow-up issue payload: supported VS Code kernel selection seam
 
-> Historical observation verified by the pinned Ubuntu witness in
+> Superseded historical observation verified by the pinned Ubuntu witness in
 > [workflow run 29192874852](https://github.com/gilad-rubin/hypster/actions/runs/29192874852).
-> Do not file this as an unavoidable gate while the supported exported
-> `openNotebook` seam is under physical verification.
+> Do not file this as an unavoidable gate: the supported exported
+> `openNotebook` seam was physically proven in workflow run 29193331802.
 
 The uploaded `spike-result.json` records VS Code Desktop `1.128.0`, Microsoft
 Jupyter `2025.9.1`, and `selector.commandRegistered: false` after explicit
@@ -16,9 +16,9 @@ Pinned Jupyter `2025.9.1` also publicly exports
 `openNotebook(uri, pythonEnvironment)`, which selects its internal controller
 without exposing or copying the private ID. The harness now exercises the same
 Python-environment resolution and `openNotebook` sequence as Jupyter's own
-smoke test. This payload is relevant only if the corrected physical witness
-shows that supported export is unavailable; an export invocation or round-trip
-failure is a red runtime failure, not this accepted gate.
+smoke test. Workflow run 29193331802 proved that export against the exact clean
+Python environment and reached the widget. Its later widget-CDN prompt failure
+is a red harness-configuration failure, not this accepted gate.
 
 ## Title
 

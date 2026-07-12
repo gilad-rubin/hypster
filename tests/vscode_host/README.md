@@ -58,12 +58,25 @@ Jupyter `2025.9.1`, the extension's public, non-breaking API exports
 exact executable with `PythonExtension.api().environments.resolveEnvironment()`
 and passes the resolved environment to that export.
 
-The harness now follows that same path first. It pins
+The harness follows that same path first. It pins
 `@vscode/python-extension==1.0.6`, records both facade/export keys, requires the
 resolved executable to equal the isolated installed-wheel Python, and calls
 `jupyterApi.openNotebook()` before cell execution. The command-based route is
-only a fallback when the public export is absent. A new Ubuntu witness is still
-required to prove the full renderer-to-Python round trip.
+only a fallback when the public export is absent.
+
+The second exact witness in
+[workflow run 29193331802](https://github.com/gilad-rubin/hypster/actions/runs/29193331802)
+proved that path through the clean kernel: the Python facade resolved the exact
+isolated executable, `openNotebook` fulfilled, and the creation cell imported
+Hypster from `site-packages`. The run then stayed correctly red because Jupyter
+refused an interactive widget-CDN prompt in its test host.
+
+Jupyter's own standard and widget tests avoid that prompt by globally setting
+`jupyter.widgetScriptSources` to exactly `['jsdelivr.com', 'unpkg.com']`. The
+harness now writes that supported setting before activating Jupyter or creating
+the widget, records its global and effective values, and fails if either value
+differs. A new Ubuntu witness is still required to prove the full
+renderer-to-Python round trip.
 
 ## Before / after
 
@@ -129,6 +142,9 @@ outputs.
 - [Jupyter 2025.9.1 smoke test](https://github.com/microsoft/vscode-jupyter/blob/v2025.9.1/src/test/smoke/datascience.smoke.test.ts)
   resolves an exact Python environment through the official Python-extension
   facade before calling `jupyterExt.exports.openNotebook`.
+- [Jupyter 2025.9.1 standard widget test](https://github.com/microsoft/vscode-jupyter/blob/v2025.9.1/src/test/datascience/widgets/standardWidgets.vscode.common.test.ts)
+  sets `widgetScriptSources` globally to `jsdelivr.com` and `unpkg.com` before
+  initializing widgets in CI.
 
 ## Local structural proof
 

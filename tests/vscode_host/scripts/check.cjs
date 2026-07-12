@@ -33,6 +33,21 @@ if (manifest.packageManager !== `npm@${pins.npm}` || manifest.engines.node !== p
 if (pins.vscode !== "1.128.0") {
   throw new Error("VS Code Desktop must remain exactly pinned");
 }
+if (JSON.stringify(pins.widgetScriptSources) !== JSON.stringify(["jsdelivr.com", "unpkg.com"])) {
+  throw new Error("Jupyter's exact standard-test widget script sources must remain pinned");
+}
+
+const hostTestSource = fs.readFileSync(path.join(root, "test", "index.cjs"), "utf8");
+for (const fragment of [
+  'getConfiguration("jupyter")',
+  '"widgetScriptSources"',
+  "vscode.ConfigurationTarget.Global",
+  'inspect("widgetScriptSources")',
+]) {
+  if (!hostTestSource.includes(fragment)) {
+    throw new Error(`host test must configure and verify the global widget allowlist: ${fragment}`);
+  }
+}
 
 const notebookPath = path.join(repository, "tests", "jupyterlab_host", "branch_round_trip.ipynb");
 const notebook = JSON.parse(fs.readFileSync(notebookPath, "utf8"));
@@ -71,4 +86,4 @@ for (const file of [
   }
 }
 
-console.log("VS Code host spike structure is valid");
+console.log("VS Code host structure and global widget allowlist are valid");
