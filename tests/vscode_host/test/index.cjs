@@ -172,6 +172,47 @@ function verifyWidgetScriptSourcesAfterActivation(evidence, sourceTemplate) {
   }
 }
 
+async function prepareWidgetViewport(evidence, editor, creationCell) {
+  const commands = [
+    "workbench.action.problems.focus",
+    "workbench.action.togglePanel",
+    "workbench.action.maximizeEditorHideSidebar",
+    "notebook.cell.collapseAllCellInputs",
+  ];
+  const commandResults = [];
+  for (const command of commands) {
+    const result = await settleWithin(vscode.commands.executeCommand(command), 5_000);
+    commandResults.push({ command, status: result.status, error: result.error ?? null });
+    if (result.status !== "fulfilled") {
+      throw new Error(`widget viewport command ${command} ${result.status}: ${result.error ?? ""}`);
+    }
+  }
+  const range = new vscode.NotebookRange(creationCell.index, creationCell.index + 1);
+  editor.revealRange(range, vscode.NotebookEditorRevealType.InCenter);
+  await delay(500);
+  const visibleRanges = editor.visibleRanges.map((visibleRange) => ({
+    start: visibleRange.start,
+    end: visibleRange.end,
+  }));
+  const creationCellVisible = visibleRanges.some(
+    (visibleRange) =>
+      visibleRange.start <= creationCell.index && visibleRange.end > creationCell.index,
+  );
+  evidence.rendererBoundary.viewport = {
+    commands: commandResults,
+    creationCellIndex: creationCell.index,
+    revealRange: { start: range.start, end: range.end, type: "InCenter" },
+    visibleRanges,
+    creationCellVisible,
+  };
+  if (!creationCellVisible) {
+    throw new Error(
+      `creation cell ${creationCell.index} is outside visible notebook ranges ` +
+        JSON.stringify(visibleRanges),
+    );
+  }
+}
+
 function recordCreationState(roundTrip, cell) {
   roundTrip.creationExecutionSummary = executionSummary(cell);
   roundTrip.creationOutputCount = cell.outputs.length;
@@ -294,6 +335,7 @@ async function run() {
       verificationCellIndex: verificationCell.index,
     };
     editor = await vscode.window.showNotebookDocument(document);
+    await prepareWidgetViewport(evidence, editor, creationCell);
     await delay(2_000);
 
     if (evidence.selector.strategy === "ms-toolsai.jupyter.exports.openNotebook") {
@@ -390,8 +432,28 @@ async function run() {
       throw new Error("test renderer extension is not registered");
     }
     const probe = await probeExtension.activate();
-    evidence.roundTrip.renderer = await probe.exercise(editor);
-    localWidgetSource.assertUsed();
+    let rendererError;
+    try {
+      evidence.roundTrip.renderer = await probe.exercise(editor, {
+        creationCellIndex: creationCell.index,
+        creationCellVisible: evidence.rendererBoundary.viewport.creationCellVisible,
+      });
+    } catch (error) {
+      rendererError = error;
+    }
+    try {
+      localWidgetSource.assertUsed();
+    } catch (sourceError) {
+      if (rendererError && sourceError instanceof Error) {
+        sourceError.message += `\nRENDERER_FAILURE=${
+          rendererError instanceof Error ? rendererError.message : String(rendererError)
+        }`;
+      }
+      throw sourceError;
+    }
+    if (rendererError) {
+      throw rendererError;
+    }
 
     evidence.roundTrip.verificationCommand = await settleWithin(
       vscode.commands.executeCommand("notebook.cell.execute", {

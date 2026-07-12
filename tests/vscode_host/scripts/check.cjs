@@ -47,6 +47,9 @@ for (const fragment of [
   "effectiveAfterActivation",
   "startLocalWidgetSource(pythonExecutable)",
   "localWidgetSource.assertUsed()",
+  "prepareWidgetViewport(evidence, editor, creationCell)",
+  "NotebookEditorRevealType.InCenter",
+  "creationCellVisible",
 ]) {
   if (!hostTestSource.includes(fragment)) {
     throw new Error(`host test must configure and verify the global widget allowlist: ${fragment}`);
@@ -62,6 +65,26 @@ const consumerVerificationIndex = hostTestSource.indexOf(
 );
 if (activationIndex < 0 || consumerVerificationIndex < activationIndex) {
   throw new Error("effective widget settings must be verified after Jupyter activation");
+}
+
+const rendererSource = fs.readFileSync(path.join(root, "renderer.mjs"), "utf8");
+const extensionSource = fs.readFileSync(path.join(root, "extension.cjs"), "utf8");
+for (const fragment of [
+  "const EXERCISE_TIMEOUT_MS = 25_000;",
+  'window.addEventListener(\n  "error"',
+  'window.addEventListener("unhandledrejection"',
+  "RENDERER_DIAGNOSTICS",
+  "baseRendererContextPresent",
+  "blobModuleImport",
+  "bodyHtml",
+]) {
+  if (
+    !rendererSource.includes(fragment) &&
+    !extensionSource.includes(fragment) &&
+    !hostTestSource.includes(fragment)
+  ) {
+    throw new Error(`renderer diagnostics must remain fail-loud: ${fragment}`);
+  }
 }
 
 const notebookPath = path.join(repository, "tests", "jupyterlab_host", "branch_round_trip.ipynb");

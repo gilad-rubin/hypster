@@ -147,12 +147,14 @@ async function startLocalWidgetSource(pythonExecutable) {
         (request) =>
           request.method === "GET" &&
           request.path === ANYWIDGET_ROUTE &&
-          request.status === 200,
+          request.status === 200 &&
+          request.userAgent?.includes("Code/") &&
+          request.userAgent?.includes("Electron/"),
       );
       evidence.successfulIndexGetVerified = used;
       if (!used) {
         throw new Error(
-          `renderer did not fetch the exact local anywidget bundle at ${ANYWIDGET_ROUTE}; ` +
+          `Electron webview did not fetch the exact local anywidget bundle at ${ANYWIDGET_ROUTE}; ` +
             `requests=${JSON.stringify(requests)}`,
         );
       }

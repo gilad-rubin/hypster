@@ -103,22 +103,47 @@ exact dynamic template
 the effective value again after activation. The artifact records both asset
 paths, byte counts, SHA-256 hashes, and every request. Even if the renderer
 probe otherwise succeeds, the run remains red unless the exact
-`/anywidget/index.js` route received a successful GET.
+`/anywidget/index.js` route received a successful Electron-webview GET; an
+extension-host source check alone cannot satisfy the gate.
+
+[Workflow run 29194056537](https://github.com/gilad-rubin/hypster/actions/runs/29194056537)
+proved both sides of that boundary: one GET came from Jupyter's extension-host
+source check and a second came from the exact Electron/Chromium webview. The
+creation cell completed successfully, but `.hypster-widget` never appeared and
+the outer 30-second renderer deadline won the race against an identical
+renderer-side wait. The older generic `unpkg.com` reachability log remained,
+but the request evidence proves it was not the source used for `anywidget`.
+
+Pinned Jupyter's own third-party widget tests document another necessary host
+condition: VS Code does not render a virtualized notebook output that is
+outside the visible viewport. Before exercising the renderer, this harness now
+uses the same supported workbench commands to close the panel, maximize the
+editor, collapse cell inputs, and explicitly reveal the creation cell in the
+center. A 25-second renderer-side envelope returns before the unchanged
+30-second extension-host deadline. Failure evidence includes body/output DOM,
+RequireJS `anywidget` registration state, a bounded blob-module import probe,
+the inherited Jupyter renderer/kernel globals, CSP, and browser errors or
+unhandled rejections captured from renderer module load.
 
 ## Before / after
 
 Before:
 
 ```text
-configured CDN source
-  -> Jupyter tries unpkg before its installed local provider
-  -> Electron webview cannot fetch unpkg
-  -> widget never renders and the strict execution deadline stays red
+exact local anywidget source reaches the webview
+  -> notebook output may remain virtualized outside the viewport
+  -> renderer-side 30s wait loses to outer 30s deadline
+  -> useful DOM/module failure evidence is lost
 ```
 
 After:
 
 ```text
+close panel + maximize editor + collapse inputs + reveal creation cell
+  -> one 25s renderer envelope inside unchanged 30s host deadline
+  -> success proves the real branch/numeric flow
+  -> failure returns DOM + AMD + blob import + inheritance + early errors
+
 exact selected kernel prefix
   -> validate anywidget extension.js mapping and hash installed index.js
   -> loopback-only custom Jupyter source serves that exact index.js
@@ -151,7 +176,8 @@ empty creation state, rejected and timed-out commands, missing kernelspec
 errors, completed/failed execution summaries, text errors, and non-text
 outputs. It also builds a temporary exact-prefix nbextension, proves the custom
 template's HEAD/GET behavior and SHA-256 evidence, rejects other routes, and
-proves an incompatible `extension.js` fails before server startup.
+proves an extension-host GET cannot satisfy the Electron gate or that an
+incompatible `extension.js` fails before server startup.
 
 ## Supported upstream seams read before implementation
 
@@ -181,6 +207,9 @@ proves an incompatible `extension.js` fails before server startup.
 - [Jupyter 2025.9.1 local widget manager](https://github.com/microsoft/vscode-jupyter/blob/v2025.9.1/src/notebooks/controllers/ipywidgets/scriptSourceProvider/localIPyWidgetScriptManager.node.ts)
   discovers `extension.js` below the interpreter's Jupyter data directories and
   parses its RequireJS mapping.
+- [Jupyter 2025.9.1 third-party widget tests](https://github.com/microsoft/vscode-jupyter/blob/v2025.9.1/src/test/datascience/widgets/thirdpartyWidgets.vscode.common.test.ts)
+  state that outputs outside the viewport are not rendered and prepare the
+  workbench by hiding the panel and maximizing the editor.
 
 ## Local structural proof
 

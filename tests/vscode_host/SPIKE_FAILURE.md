@@ -30,6 +30,15 @@ the exact selected kernel prefix's installed `anywidget/index.js` on loopback,
 and requires path/hash/request evidence before green. This does not change the
 historical kernel-selection gate recorded by this payload.
 
+Workflow run 29194056537 then proved that both Jupyter's extension host and the
+Electron webview fetched the exact installed anywidget bundle. The remaining
+renderer timeout is downstream of kernel selection and widget-source delivery.
+Pinned Jupyter's own third-party tests warn that offscreen notebook outputs are
+virtualized and not rendered, so the harness now explicitly prepares and
+reveals the creation-cell viewport and returns renderer diagnostics inside the
+unchanged outer deadline. This remains unrelated to the superseded selection
+gate described here.
+
 ## Title
 
 Expose or adopt a supported VS Code kernel-controller discovery seam for the

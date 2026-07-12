@@ -24,13 +24,17 @@ function activate(context) {
       if (message.ok) {
         request.resolve(message.evidence);
       } else {
-        request.reject(new Error(message.error));
+        request.reject(
+          new Error(
+            `${message.error}\nRENDERER_DIAGNOSTICS=${JSON.stringify(message.diagnostics ?? null)}`,
+          ),
+        );
       }
     }),
   );
 
   return Object.freeze({
-    async exercise(editor, timeoutMilliseconds = 30_000) {
+    async exercise(editor, options = {}, timeoutMilliseconds = 30_000) {
       const requestId = crypto.randomUUID();
       const deadline = Date.now() + timeoutMilliseconds;
       let phase = "delivery";
@@ -48,7 +52,15 @@ function activate(context) {
         while (!delivered && Date.now() < deadline) {
           const attempt = await Promise.race([
             channel
-              .postMessage({ kind: "hypster-probe-exercise", requestId }, editor)
+              .postMessage(
+                {
+                  kind: "hypster-probe-exercise",
+                  requestId,
+                  creationCellIndex: options.creationCellIndex ?? null,
+                  creationCellVisible: options.creationCellVisible ?? null,
+                },
+                editor,
+              )
               .then((value) => ({ kind: "delivery", delivered: value })),
             response.then((evidence) => ({ kind: "response", evidence })),
           ]);

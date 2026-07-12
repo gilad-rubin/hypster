@@ -46,7 +46,18 @@ async function main() {
       method: "HEAD",
     });
     assert.equal(headResponse.status, 200);
-    const getResponse = await fetch(`http://127.0.0.1:${source.evidence.port}${ANYWIDGET_ROUTE}`);
+    const extensionHostResponse = await fetch(
+      `http://127.0.0.1:${source.evidence.port}${ANYWIDGET_ROUTE}`,
+    );
+    assert.equal(extensionHostResponse.status, 200);
+    assert.throws(
+      () => source.assertUsed(),
+      /Electron webview did not fetch the exact local anywidget bundle/,
+    );
+    const getResponse = await fetch(
+      `http://127.0.0.1:${source.evidence.port}${ANYWIDGET_ROUTE}`,
+      { headers: { "User-Agent": "Code/1.128.0 Electron/42.5.0" } },
+    );
     assert.equal(getResponse.status, 200);
     assert.equal(await getResponse.text(), indexSource);
     const rejectedResponse = await fetch(
