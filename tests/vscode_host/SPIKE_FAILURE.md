@@ -39,6 +39,15 @@ reveals the creation-cell viewport and returns renderer diagnostics inside the
 unchanged outer deadline. This remains unrelated to the superseded selection
 gate described here.
 
+Workflow run 29194503005 proved viewport visibility but exposed a separate
+renderer-messaging race: VS Code reported host-to-webview delivery even though
+the extending renderer had not installed its listener, so its inner diagnostic
+never started. The probe now waits for a renderer-originated ready handshake
+after resolving the real Jupyter base renderer through the supported
+`RendererContext.getRenderer()` API. Its bounded activation and response stages
+both finish before the unchanged outer deadline. This is downstream of the
+historical selection gate.
+
 ## Title
 
 Expose or adopt a supported VS Code kernel-controller discovery seam for the

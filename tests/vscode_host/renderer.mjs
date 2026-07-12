@@ -1,5 +1,6 @@
-const EXERCISE_TIMEOUT_MS = 25_000;
+const EXERCISE_TIMEOUT_MS = 20_000;
 const DIAGNOSTIC_TEXT_LIMIT = 20_000;
+const BASE_RENDERER_ID = "jupyter-ipywidget-renderer";
 const browserEvents = [];
 const moduleLoadedAt = new Date().toISOString();
 const moduleLoadedPerformance = performance.now();
@@ -313,10 +314,22 @@ async function exerciseWidget(deadline) {
   };
 }
 
-export function activate(context) {
+export async function activate(context) {
   if (!context.onDidReceiveMessage || !context.postMessage) {
     throw new Error("NotebookRendererMessaging is unavailable");
   }
+  const baseRenderer = await context.getRenderer(BASE_RENDERER_ID);
+  if (!baseRenderer || typeof baseRenderer.renderOutputItem !== "function") {
+    throw new Error(`extended renderer could not resolve ${BASE_RENDERER_ID}`);
+  }
+  context.postMessage({
+    kind: "hypster-probe-ready",
+    evidence: safeRendererDiagnostics({
+      phase: "activate",
+      baseRendererId: BASE_RENDERER_ID,
+      baseRendererApiKeys: objectKeys(baseRenderer),
+    }),
+  });
   context.onDidReceiveMessage(async (message) => {
     if (!message || message.kind !== "hypster-probe-exercise") {
       return;

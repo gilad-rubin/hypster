@@ -27,6 +27,12 @@ if (
 ) {
   throw new Error("the host probe must activate the exact Python and Jupyter extension APIs");
 }
+if (
+  JSON.stringify(manifest.activationEvents) !==
+  JSON.stringify(["onRenderer:hypster-vscode-host-probe"])
+) {
+  throw new Error("the extension host must activate from its renderer-originated ready message");
+}
 if (manifest.packageManager !== `npm@${pins.npm}` || manifest.engines.node !== pins.node) {
   throw new Error("Node.js and npm must remain exactly pinned");
 }
@@ -70,7 +76,9 @@ if (activationIndex < 0 || consumerVerificationIndex < activationIndex) {
 const rendererSource = fs.readFileSync(path.join(root, "renderer.mjs"), "utf8");
 const extensionSource = fs.readFileSync(path.join(root, "extension.cjs"), "utf8");
 for (const fragment of [
-  "const EXERCISE_TIMEOUT_MS = 25_000;",
+  "const EXERCISE_TIMEOUT_MS = 20_000;",
+  "context.getRenderer(BASE_RENDERER_ID)",
+  'kind: "hypster-probe-ready"',
   'window.addEventListener(\n  "error"',
   'window.addEventListener("unhandledrejection"',
   "RENDERER_DIAGNOSTICS",
@@ -111,10 +119,12 @@ for (const file of [
   "extension.cjs",
   "creation-gate.cjs",
   "renderer.mjs",
+  "renderer-gate.cjs",
   "run.cjs",
   "widget-source.cjs",
   "scripts/assert-runtime.cjs",
   "scripts/test-creation-gate.cjs",
+  "scripts/test-renderer-gate.cjs",
   "scripts/test-widget-source.cjs",
   "test/index.cjs",
 ]) {

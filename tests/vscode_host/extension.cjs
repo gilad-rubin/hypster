@@ -2,19 +2,32 @@
 
 const crypto = require("node:crypto");
 const vscode = require("vscode");
+const {
+  ACTIVATION_TIMEOUT_MS,
+  RESPONSE_TIMEOUT_MS,
+  RendererActivationGate,
+} = require("./renderer-gate.cjs");
 
 const RENDERER_ID = "hypster-vscode-host-probe";
 const pending = new Map();
+const activationGate = new RendererActivationGate();
 
-function delay(milliseconds) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+function editorKey(editor) {
+  return editor.notebook.uri.toString();
 }
 
 function activate(context) {
   const channel = vscode.notebooks.createRendererMessaging(RENDERER_ID);
   context.subscriptions.push(
-    channel.onDidReceiveMessage(({ message }) => {
-      if (!message || message.kind !== "hypster-probe-result") {
+    channel.onDidReceiveMessage(({ editor, message }) => {
+      if (!message) {
+        return;
+      }
+      if (message.kind === "hypster-probe-ready") {
+        activationGate.markReady(editorKey(editor), message.evidence ?? null);
+        return;
+      }
+      if (message.kind !== "hypster-probe-result") {
         return;
       }
       const request = pending.get(message.requestId);
@@ -31,52 +44,44 @@ function activate(context) {
         );
       }
     }),
+    { dispose: () => activationGate.dispose() },
   );
 
   return Object.freeze({
-    async exercise(editor, options = {}, timeoutMilliseconds = 30_000) {
+    async exercise(editor, options = {}) {
+      const activationEvidence = await activationGate.wait(
+        editorKey(editor),
+        ACTIVATION_TIMEOUT_MS,
+      );
       const requestId = crypto.randomUUID();
-      const deadline = Date.now() + timeoutMilliseconds;
-      let phase = "delivery";
       let timer;
       const response = new Promise((resolve, reject) => {
         timer = setTimeout(() => {
-          reject(new Error(`renderer ${phase} timed out after ${timeoutMilliseconds}ms`));
-        }, timeoutMilliseconds);
+          reject(
+            new Error(
+              `renderer response timed out after ${RESPONSE_TIMEOUT_MS}ms following ready handshake`,
+            ),
+          );
+        }, RESPONSE_TIMEOUT_MS);
         pending.set(requestId, { resolve, reject });
       });
       response.catch(() => {});
 
       try {
-        let delivered = false;
-        while (!delivered && Date.now() < deadline) {
-          const attempt = await Promise.race([
-            channel
-              .postMessage(
-                {
-                  kind: "hypster-probe-exercise",
-                  requestId,
-                  creationCellIndex: options.creationCellIndex ?? null,
-                  creationCellVisible: options.creationCellVisible ?? null,
-                },
-                editor,
-              )
-              .then((value) => ({ kind: "delivery", delivered: value })),
-            response.then((evidence) => ({ kind: "response", evidence })),
-          ]);
-          if (attempt.kind === "response") {
-            return attempt.evidence;
-          }
-          delivered = attempt.delivered;
-          if (!delivered) {
-            await delay(Math.min(250, Math.max(0, deadline - Date.now())));
-          }
-        }
+        const delivered = await channel.postMessage(
+          {
+            kind: "hypster-probe-exercise",
+            requestId,
+            creationCellIndex: options.creationCellIndex ?? null,
+            creationCellVisible: options.creationCellVisible ?? null,
+          },
+          editor,
+        );
         if (!delivered) {
-          return await response;
+          throw new Error("renderer exercise was not delivered after ready handshake");
         }
-        phase = "response";
-        return await response;
+        const evidence = await response;
+        return { ...evidence, activation: activationEvidence };
       } finally {
         pending.delete(requestId);
         clearTimeout(timer);

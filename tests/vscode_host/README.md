@@ -125,22 +125,43 @@ RequireJS `anywidget` registration state, a bounded blob-module import probe,
 the inherited Jupyter renderer/kernel globals, CSP, and browser errors or
 unhandled rejections captured from renderer module load.
 
+[Workflow run 29194503005](https://github.com/gilad-rubin/hypster/actions/runs/29194503005)
+proved the creation cell was inside VS Code's reported visible range and
+executed the clean installed wheel, but only Jupyter's Node-side source check
+fetched `anywidget`. The renderer probe again hit the host's generic 30-second
+timeout without returning its 20-second diagnostic. Pinned VS Code source
+explains why: `NotebookRendererMessaging.postMessage()` returns `true` when the
+notebook webview accepts the envelope, even when the target extending renderer
+has not loaded. Its message event then has no listener and the message is lost.
+
+The probe now follows the documented renderer-originated messaging pattern.
+Its extending renderer first resolves `jupyter-ipywidget-renderer` through
+`RendererContext.getRenderer()`, then posts a ready handshake containing base
+API and activation diagnostics. The extension host waits at most five seconds
+for that ready message before sending the exercise request. The renderer has a
+20-second exercise deadline and the host has a 22-second response deadline, so
+both stages fail before the unchanged 30-second outer budget. A missing base
+renderer now reports an activation-handshake failure instead of a misleading
+response timeout.
+
 ## Before / after
 
 Before:
 
 ```text
 exact local anywidget source reaches the webview
-  -> notebook output may remain virtualized outside the viewport
-  -> renderer-side 30s wait loses to outer 30s deadline
-  -> useful DOM/module failure evidence is lost
+  -> host sends before extending renderer installs its listener
+  -> VS Code accepts then drops the message
+  -> generic outer timeout hides the activation boundary
 ```
 
 After:
 
 ```text
 close panel + maximize editor + collapse inputs + reveal creation cell
-  -> one 25s renderer envelope inside unchanged 30s host deadline
+  -> extending renderer resolves the real Jupyter base and posts ready
+  -> host sends only after ready: 5s activation + 22s response < 30s outer
+  -> renderer returns its own diagnostic by 20s
   -> success proves the real branch/numeric flow
   -> failure returns DOM + AMD + blob import + inheritance + early errors
 
@@ -190,7 +211,14 @@ incompatible `extension.js` fails before server startup.
   documents `notebook.selectKernel`, `notebook.cell.execute`, and the selector's
   void return.
 - [Notebook API](https://code.visualstudio.com/api/extension-guides/notebook)
-  documents renderer extension points and `NotebookRendererMessaging`.
+  documents renderer extension points, renderer-originated messaging, and the
+  `onRenderer:<id>` activation event needed before messages are delivered.
+- [VS Code 1.128 renderer implementation](https://github.com/microsoft/vscode/blob/1.128.0/src/vs/workbench/contrib/notebook/browser/view/renderers/webviewPreloads.ts)
+  loads dependent renderers after their base and exposes that base through
+  `RendererContext.getRenderer()`.
+- [VS Code 1.128 notebook webview implementation](https://github.com/microsoft/vscode/blob/1.128.0/src/vs/workbench/contrib/notebook/browser/view/renderers/backLayerWebView.ts)
+  reports successful host delivery when the webview accepts a message; that
+  result does not prove the target renderer installed a listener.
 - [VS Code API](https://code.visualstudio.com/api/references/vscode-api)
   documents that an extension may create messaging only for a renderer it
   contributes; it exposes no foreign-controller discovery API.
