@@ -314,9 +314,9 @@ def widget_appearance(widget: Locator) -> WidgetAppearance:
     assert isinstance(theme, str), f"widget theme must be text, got {theme!r}"
     assert isinstance(color, str), f"widget color must be text, got {color!r}"
     assert isinstance(background, str), f"widget background must be text, got {background!r}"
-    assert isinstance(contrast, (int, float)) and not isinstance(
-        contrast, bool
-    ), f"widget contrast must be numeric, got {contrast!r}"
+    assert isinstance(contrast, (int, float)) and not isinstance(contrast, bool), (
+        f"widget contrast must be numeric, got {contrast!r}"
+    )
     return WidgetAppearance(
         theme=theme,
         color=color,

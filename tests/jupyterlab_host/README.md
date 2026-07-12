@@ -44,12 +44,14 @@ uv run --project tests/jupyterlab_host --frozen \
 The wheel path and artifact directory are mandatory; the harness has no source
 checkout or evidence-path fallback.
 
-## Current Notebook 7 blocker
+## Notebook 7.6.0 regression
 
-Issue #108 records a Notebook `7.6.0` page exception observed in Firefox before
-any Hypster cell executes. The Notebook node intentionally remains red on that
-exception: the harness records errors before widget execution, after the basic
-round trip, and at shutdown, then fails without filtering host errors.
+Issue #108 records a Notebook `7.6.0` / JupyterLab `4.6.1` page exception
+observed in Firefox before any Hypster cell executes. The currently-tested host
+pair is pinned to Notebook `7.5.7` / JupyterLab `4.5.9`, the newest prior
+coherent pair proven to load with zero page errors and complete the physical
+round trip. The harness still records errors before widget execution, after the
+basic round trip, and at shutdown, then fails without filtering host errors.
 
 The required fault injections were also exercised against the physical host:
 
