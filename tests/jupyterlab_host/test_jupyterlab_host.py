@@ -16,7 +16,7 @@ import time
 import urllib.request
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
 from playwright.sync_api import Locator, Page, sync_playwright
@@ -28,9 +28,11 @@ KERNEL_LOCK = HARNESS_ROOT / "kernel-requirements.lock"
 SERVER_TIMEOUT_SECONDS = 60
 SERVER_PORT_RETRIES = 5
 COMM_TIMEOUT_MS = 30_000
-REQUIRED_CELL_MARKERS = (
+BASIC_CELL_MARKERS = (
     "create-auto",
     "verify-auto",
+)
+JUPYTERLAB_CELL_MARKERS = BASIC_CELL_MARKERS + (
     "create-manual",
     "verify-manual-staged",
     "verify-manual-applied",
@@ -39,6 +41,34 @@ REQUIRED_CELL_MARKERS = (
     "inject-protocol-mismatch",
     "verify-protocol-unchanged",
     "recover-protocol",
+)
+
+
+@dataclass(frozen=True)
+class HostConfig:
+    name: str
+    server_module: str
+    route: str
+    browser: Literal["chromium", "firefox"]
+    required_cell_markers: tuple[str, ...]
+    extended: bool
+
+
+JUPYTERLAB = HostConfig(
+    name="jupyterlab",
+    server_module="jupyterlab",
+    route="lab/tree",
+    browser="chromium",
+    required_cell_markers=JUPYTERLAB_CELL_MARKERS,
+    extended=True,
+)
+NOTEBOOK7 = HostConfig(
+    name="notebook7",
+    server_module="notebook",
+    route="tree",
+    browser="firefox",
+    required_cell_markers=BASIC_CELL_MARKERS,
+    extended=False,
 )
 
 
@@ -70,10 +100,16 @@ class ThemeEvidence:
 
 
 @dataclass(frozen=True)
-class AutoEvidence:
+class BasicAutoEvidence:
     numeric_dom_before: str
     numeric_dom_after: str
     numeric_dom_replaced: bool
+    oracle: OracleEvidence
+    transcript: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class BranchMemoryEvidence:
     branch_memory_dom_restored: str
     branch_memory_python: str
     oracle: OracleEvidence
@@ -126,10 +162,10 @@ def available_port() -> int:
         return int(listener.getsockname()[1])
 
 
-def wait_for_server(url: str, token: str, process: subprocess.Popen[str]) -> None:
+def wait_for_server(url: str, token: str, process: subprocess.Popen[str], host_name: str) -> None:
     deadline = time.monotonic() + SERVER_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
-        assert process.poll() is None, f"JupyterLab exited before readiness with code {process.returncode}"
+        assert process.poll() is None, f"{host_name} exited before readiness with code {process.returncode}"
         try:
             with urllib.request.urlopen(f"{url}/api/status?token={token}", timeout=1) as response:
                 if response.status == 200:
@@ -137,15 +173,20 @@ def wait_for_server(url: str, token: str, process: subprocess.Popen[str]) -> Non
         except OSError:
             time.sleep(0.25)
     raise AssertionError(
-        f"JupyterLab did not become ready within {SERVER_TIMEOUT_SECONDS}s; process return code: {process.poll()}"
+        f"{host_name} did not become ready within {SERVER_TIMEOUT_SECONDS}s; process return code: {process.poll()}"
     )
 
 
-def wait_for_server_info(runtime_dir: Path, token: str, process: subprocess.Popen[str]) -> str:
+def wait_for_server_info(
+    runtime_dir: Path,
+    token: str,
+    process: subprocess.Popen[str],
+    host_name: str,
+) -> str:
     deadline = time.monotonic() + SERVER_TIMEOUT_SECONDS
     info_file = runtime_dir / f"jpserver-{process.pid}.json"
     while time.monotonic() < deadline:
-        assert process.poll() is None, f"JupyterLab exited before publishing server info: {process.returncode}"
+        assert process.poll() is None, f"{host_name} exited before publishing server info: {process.returncode}"
         try:
             info = json.loads(info_file.read_text())
         except (FileNotFoundError, json.JSONDecodeError):
@@ -161,17 +202,17 @@ def wait_for_server_info(runtime_dir: Path, token: str, process: subprocess.Pope
         assert parsed_url.port == info["port"], f"server info URL and port disagree: {info}"
         return url
 
-    raise AssertionError(f"JupyterLab did not publish {info_file.name} within {SERVER_TIMEOUT_SECONDS}s")
+    raise AssertionError(f"{host_name} did not publish {info_file.name} within {SERVER_TIMEOUT_SECONDS}s")
 
 
-def wait_for_kernel(url: str, token: str, process: subprocess.Popen[str]) -> None:
+def wait_for_kernel(url: str, token: str, process: subprocess.Popen[str], host_name: str) -> None:
     deadline = time.monotonic() + SERVER_TIMEOUT_SECONDS
     request = urllib.request.Request(
         f"{url}/api/sessions",
         headers={"Authorization": f"token {token}"},
     )
     while time.monotonic() < deadline:
-        assert process.poll() is None, f"JupyterLab exited while the kernel was connecting: {process.returncode}"
+        assert process.poll() is None, f"{host_name} exited while the kernel was connecting: {process.returncode}"
         try:
             with urllib.request.urlopen(request, timeout=1) as response:
                 sessions = json.load(response)
@@ -299,9 +340,9 @@ def notebook_model(url: str, token: str) -> dict[str, Any]:
         return json.load(response)["content"]
 
 
-def assert_saved_cells_succeeded(model: dict[str, Any]) -> None:
+def assert_saved_cells_succeeded(model: dict[str, Any], required_markers: tuple[str, ...]) -> None:
     cells = model["cells"]
-    for marker in REQUIRED_CELL_MARKERS:
+    for marker in required_markers:
         matching = [cell for cell in cells if f"HYPSTER_HOST_CELL:{marker}" in "".join(cell["source"])]
         assert len(matching) == 1, f"expected one saved cell marked {marker!r}, got {len(matching)}"
         cell = matching[0]
@@ -310,7 +351,7 @@ def assert_saved_cells_succeeded(model: dict[str, Any]) -> None:
         assert not errors, f"cell {marker!r} saved kernel errors: {errors}"
 
 
-def wait_for_saved_notebook(url: str, token: str) -> dict[str, Any]:
+def wait_for_saved_notebook(url: str, token: str, required_markers: tuple[str, ...]) -> dict[str, Any]:
     deadline = time.monotonic() + 10
     last_model: dict[str, Any] | None = None
     while time.monotonic() < deadline:
@@ -318,13 +359,13 @@ def wait_for_saved_notebook(url: str, token: str) -> dict[str, Any]:
         cells = last_model["cells"]
         executed_markers = {
             marker
-            for marker in REQUIRED_CELL_MARKERS
+            for marker in required_markers
             if any(
                 f"HYPSTER_HOST_CELL:{marker}" in "".join(cell["source"]) and cell["execution_count"] is not None
                 for cell in cells
             )
         }
-        if executed_markers == set(REQUIRED_CELL_MARKERS):
+        if executed_markers == set(required_markers):
             return last_model
         time.sleep(0.1)
     raise AssertionError(f"executed notebook was not saved within 10s: {last_model}")
@@ -374,10 +415,10 @@ def exercise_theme(page: Page, widget: Locator) -> ThemeEvidence:
     return ThemeEvidence(dark=dark, light=light)
 
 
-def exercise_auto_mode(
+def exercise_basic_auto_mode(
     page: Page,
     widget: Locator,
-) -> AutoEvidence:
+) -> BasicAutoEvidence:
     numeric = widget.locator("input[data-path='remote.temperature'][data-kind='float']")
     assert numeric.count() == 0, "dependent numeric control was reachable before the branch action"
     before_branch_html = widget.inner_html()
@@ -402,9 +443,25 @@ def exercise_auto_mode(
     numeric_dom_after = replacement_numeric.input_value()
     assert_widget_has_no_error(page)
 
+    verification = execute_cell(page, "verify-auto", "HYPSTER_PARAMS_VERIFIED=")
+    assert "'remote.temperature': 1.25" in verification.output, verification.output
+    return BasicAutoEvidence(
+        numeric_dom_before=numeric_dom_before,
+        numeric_dom_after=numeric_dom_after,
+        numeric_dom_replaced=True,
+        oracle=OracleEvidence(count=verification.count, identity=verification.identity),
+        transcript=(verification.output,),
+    )
+
+
+def exercise_branch_memory(page: Page, widget: Locator) -> BranchMemoryEvidence:
+    numeric = widget.locator("input[data-path='remote.temperature'][data-kind='float']")
+    numeric.wait_for(state="visible", timeout=COMM_TIMEOUT_MS)
+    assert numeric.input_value() == "1.25", "Branch Choice Memory did not start from the chosen value"
+
     widget.locator(".hypster-choice[data-path='mode'] .hypster-choice-trigger").click()
     widget.locator("[data-hypster-choice-option][data-path='mode']", has_text="local").click()
-    replacement_numeric.wait_for(state="detached", timeout=COMM_TIMEOUT_MS)
+    numeric.wait_for(state="detached", timeout=COMM_TIMEOUT_MS)
     widget.locator(".hypster-choice[data-path='mode'] .hypster-choice-trigger").click()
     widget.locator("[data-hypster-choice-option][data-path='mode']", has_text="remote").click()
     restored_numeric = widget.locator("input[data-path='remote.temperature'][data-kind='float']")
@@ -414,10 +471,7 @@ def exercise_auto_mode(
 
     verification = execute_cell(page, "verify-auto", "HYPSTER_PARAMS_VERIFIED=")
     assert "'remote.temperature': 1.25" in verification.output, verification.output
-    return AutoEvidence(
-        numeric_dom_before=numeric_dom_before,
-        numeric_dom_after=numeric_dom_after,
-        numeric_dom_replaced=True,
+    return BranchMemoryEvidence(
         branch_memory_dom_restored=branch_memory_dom_restored,
         branch_memory_python=verification.output,
         oracle=OracleEvidence(count=verification.count, identity=verification.identity),
@@ -544,13 +598,13 @@ def exercise_protocol_guard(page: Page) -> ProtocolEvidence:
     )
 
 
-def test_real_jupyterlab_round_trip() -> None:
+def run_real_host_round_trip(host: HostConfig) -> None:
     wheel = required_path("HYPSTER_HOST_WHEEL").resolve(strict=True)
     artifact_dir = required_path("HYPSTER_HOST_ARTIFACT_DIR")
     artifact_dir.mkdir(parents=True, exist_ok=True)
     assert wheel.suffix == ".whl", f"expected a built wheel, got {wheel}"
 
-    with tempfile.TemporaryDirectory(prefix="hypster-jupyterlab-host-") as temp_raw:
+    with tempfile.TemporaryDirectory(prefix=f"hypster-{host.name}-host-") as temp_raw:
         temp = Path(temp_raw)
         notebook_root = temp / "notebooks"
         notebook_root.mkdir()
@@ -595,7 +649,7 @@ def test_real_jupyterlab_round_trip() -> None:
 
         token = "hypster-host-test"
         port = available_port()
-        server_log_path = artifact_dir / "jupyterlab.log"
+        server_log_path = artifact_dir / f"{host.name}.log"
         server_log = server_log_path.open("w")
         runtime_dir = temp / "jupyter-runtime"
         server_env = os.environ.copy()
@@ -610,7 +664,7 @@ def test_real_jupyterlab_round_trip() -> None:
             [
                 sys.executable,
                 "-m",
-                "jupyterlab",
+                host.server_module,
                 "--no-browser",
                 f"--ServerApp.root_dir={notebook_root}",
                 f"--ServerApp.port={port}",
@@ -649,9 +703,18 @@ def test_real_jupyterlab_round_trip() -> None:
             "uv": run_checked(["uv", "--version"], cwd=temp),
             "wheel": wheel.name,
             "wheel_sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
+            "host": asdict(host),
             "host_packages": {
                 name: importlib.metadata.version(name)
-                for name in ["anywidget", "jupyterlab", "jupyterlab-widgets", "playwright", "pytest"]
+                for name in [
+                    "anywidget",
+                    "jupyter-server",
+                    "jupyterlab",
+                    "jupyterlab-widgets",
+                    "notebook",
+                    "playwright",
+                    "pytest",
+                ]
             },
             "kernel": kernel_packages,
             "kernel_lock": KERNEL_LOCK.name,
@@ -659,13 +722,14 @@ def test_real_jupyterlab_round_trip() -> None:
         (artifact_dir / "versions.json").write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
 
         try:
-            server_url = wait_for_server_info(runtime_dir, token, server)
+            server_url = wait_for_server_info(runtime_dir, token, server, host.name)
             evidence["jupyter_server_pid"] = server.pid
             evidence["jupyter_server_url"] = server_url
-            wait_for_server(server_url, token, server)
+            wait_for_server(server_url, token, server, host.name)
             with sync_playwright() as playwright:
-                browser = playwright.chromium.launch()
-                evidence["chromium"] = browser.version
+                browser_type = playwright.chromium if host.browser == "chromium" else playwright.firefox
+                browser = browser_type.launch()
+                evidence["browser"] = {"engine": host.browser, "version": browser.version}
                 context = browser.new_context()
                 page = context.new_page()
                 page.on(
@@ -675,12 +739,14 @@ def test_real_jupyterlab_round_trip() -> None:
 
                 try:
                     page.goto(
-                        f"{server_url}/lab/tree/{NOTEBOOK.name}?token={token}",
+                        f"{server_url}/{host.route}/{NOTEBOOK.name}?token={token}",
                         wait_until="domcontentloaded",
                         timeout=COMM_TIMEOUT_MS,
                     )
                     page.locator(".jp-NotebookPanel").wait_for(state="visible", timeout=COMM_TIMEOUT_MS)
-                    wait_for_kernel(server_url, token, server)
+                    wait_for_kernel(server_url, token, server, host.name)
+                    page.wait_for_timeout(1_000)
+                    evidence["page_errors_before_widget_execution"] = list(page_errors)
 
                     creation = execute_cell(page, "create-auto", "HYPSTER_IMPORT_PATH=")
                     import_match = re.search(r"HYPSTER_IMPORT_PATH=([^;]+)", creation.output)
@@ -694,41 +760,50 @@ def test_real_jupyterlab_round_trip() -> None:
                     assert auto_widget.count() == 1, f"expected one rendered widget, got {auto_widget.count()}"
                     assert_widget_has_no_error(page)
 
-                    theme_evidence = exercise_theme(page, auto_widget)
-                    auto_evidence = exercise_auto_mode(page, auto_widget)
-                    manual_evidence = exercise_manual_mode(page)
-                    protocol_evidence = exercise_protocol_guard(page)
+                    basic_evidence = exercise_basic_auto_mode(page, auto_widget)
+                    evidence["numeric_dom_before"] = basic_evidence.numeric_dom_before
+                    evidence["numeric_dom_after"] = basic_evidence.numeric_dom_after
+                    evidence["numeric_dom_replaced"] = basic_evidence.numeric_dom_replaced
+                    evidence["auto_oracle"] = asdict(basic_evidence.oracle)
+                    evidence["page_errors_after_basic_round_trip"] = list(page_errors)
+                    transcript.extend(basic_evidence.transcript)
 
-                    evidence["theme_dark"] = asdict(theme_evidence.dark)
-                    evidence["theme_light"] = asdict(theme_evidence.light)
-                    evidence["numeric_dom_before"] = auto_evidence.numeric_dom_before
-                    evidence["numeric_dom_after"] = auto_evidence.numeric_dom_after
-                    evidence["numeric_dom_replaced"] = auto_evidence.numeric_dom_replaced
-                    evidence["branch_memory_dom_restored"] = auto_evidence.branch_memory_dom_restored
-                    evidence["branch_memory_python"] = auto_evidence.branch_memory_python
-                    evidence["auto_oracle"] = asdict(auto_evidence.oracle)
-                    evidence["manual_staged_dom"] = manual_evidence.staged_dom
-                    evidence["manual_staged_python"] = manual_evidence.staged_python
-                    evidence["manual_applied_python"] = manual_evidence.applied_python
-                    evidence["invalid_dom_error"] = manual_evidence.invalid_dom_error
-                    evidence["invalid_python_unchanged"] = manual_evidence.invalid_python_unchanged
-                    evidence["manual_reset_dom"] = manual_evidence.reset_dom
-                    evidence["manual_reset_python"] = manual_evidence.reset_python
-                    evidence["manual_applied_oracles"] = [asdict(oracle) for oracle in manual_evidence.applied_oracles]
-                    evidence["protocol_error_dom"] = protocol_evidence.error_dom
-                    evidence["protocol_action_emitted"] = protocol_evidence.action_emitted
-                    evidence["protocol_python_unchanged"] = protocol_evidence.python_unchanged
-                    evidence["protocol_recovered_dom"] = protocol_evidence.recovered_dom
-                    evidence["protocol_oracles"] = [asdict(oracle) for oracle in protocol_evidence.oracles]
+                    if host.extended:
+                        theme_evidence = exercise_theme(page, auto_widget)
+                        branch_memory_evidence = exercise_branch_memory(page, auto_widget)
+                        manual_evidence = exercise_manual_mode(page)
+                        protocol_evidence = exercise_protocol_guard(page)
 
-                    transcript.extend(auto_evidence.transcript)
-                    transcript.extend(manual_evidence.transcript)
-                    transcript.extend(protocol_evidence.transcript)
+                        evidence["theme_dark"] = asdict(theme_evidence.dark)
+                        evidence["theme_light"] = asdict(theme_evidence.light)
+                        evidence["branch_memory_dom_restored"] = branch_memory_evidence.branch_memory_dom_restored
+                        evidence["branch_memory_python"] = branch_memory_evidence.branch_memory_python
+                        evidence["branch_memory_oracle"] = asdict(branch_memory_evidence.oracle)
+                        evidence["manual_staged_dom"] = manual_evidence.staged_dom
+                        evidence["manual_staged_python"] = manual_evidence.staged_python
+                        evidence["manual_applied_python"] = manual_evidence.applied_python
+                        evidence["invalid_dom_error"] = manual_evidence.invalid_dom_error
+                        evidence["invalid_python_unchanged"] = manual_evidence.invalid_python_unchanged
+                        evidence["manual_reset_dom"] = manual_evidence.reset_dom
+                        evidence["manual_reset_python"] = manual_evidence.reset_python
+                        evidence["manual_applied_oracles"] = [
+                            asdict(oracle) for oracle in manual_evidence.applied_oracles
+                        ]
+                        evidence["protocol_error_dom"] = protocol_evidence.error_dom
+                        evidence["protocol_action_emitted"] = protocol_evidence.action_emitted
+                        evidence["protocol_python_unchanged"] = protocol_evidence.python_unchanged
+                        evidence["protocol_recovered_dom"] = protocol_evidence.recovered_dom
+                        evidence["protocol_oracles"] = [asdict(oracle) for oracle in protocol_evidence.oracles]
+
+                        transcript.extend(branch_memory_evidence.transcript)
+                        transcript.extend(manual_evidence.transcript)
+                        transcript.extend(protocol_evidence.transcript)
 
                     (artifact_dir / "notebook-output.txt").write_text("\n\n".join(transcript) + "\n")
 
                     page.keyboard.press("ControlOrMeta+S")
-                    assert_saved_cells_succeeded(wait_for_saved_notebook(server_url, token))
+                    saved_notebook = wait_for_saved_notebook(server_url, token, host.required_cell_markers)
+                    assert_saved_cells_succeeded(saved_notebook, host.required_cell_markers)
 
                     assert not browser_errors, f"error-level browser console entries: {browser_errors}"
                     assert not page_errors, f"browser page errors: {page_errors}"
@@ -746,3 +821,11 @@ def test_real_jupyterlab_round_trip() -> None:
             (artifact_dir / "versions.json").write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
             terminate_process_group(server)
             server_log.close()
+
+
+def test_real_jupyterlab_round_trip() -> None:
+    run_real_host_round_trip(JUPYTERLAB)
+
+
+def test_real_notebook7_round_trip() -> None:
+    run_real_host_round_trip(NOTEBOOK7)
