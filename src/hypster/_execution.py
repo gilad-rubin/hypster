@@ -39,8 +39,19 @@ def reject_reserved_execution_arguments(
     raise TypeError(f"{api_name} reserves {names} for Hypster execution controls. {guidance}")
 
 
-def handle_unknown_parameters(provided_values: Dict[str, Any], called_params: set[str], on_unknown: str) -> None:
-    """Handle unknown or unreachable parameters based on on_unknown setting."""
+def handle_unknown_parameters(
+    provided_values: Dict[str, Any],
+    called_params: set[str],
+    on_unknown: str,
+    *,
+    stacklevel: int = 3,
+) -> None:
+    """Handle unknown or unreachable parameters based on on_unknown setting.
+
+    ``stacklevel`` must make the warning point at USER code: pass the number of
+    frames between ``warnings.warn`` and the user's call site (this function
+    counts as 1).
+    """
     if on_unknown == "ignore":
         return
 
@@ -68,4 +79,4 @@ def handle_unknown_parameters(provided_values: Dict[str, Any], called_params: se
     if on_unknown == "raise":
         raise ValueError(error_message)
     elif on_unknown == "warn":
-        warnings.warn(error_message, UserWarning, stacklevel=3)
+        warnings.warn(error_message, UserWarning, stacklevel=stacklevel)

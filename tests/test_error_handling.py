@@ -145,3 +145,41 @@ def test_nested_values_unknown_keys_participate_in_on_unknown() -> None:
     assert "model.lerning_rate" in error
     assert "model.learning_rate" in error
     assert "Nested dict values are interpreted as parameter paths" in error
+
+
+def test_nest_with_none_name_raises_friendly_error() -> None:
+    """name=None must hit HPCallError validation, not a raw TypeError from path joining."""
+
+    def child(hp: HP) -> Dict[str, float]:
+        return {"lr": hp.float(0.1, name="lr")}
+
+    def config(hp: HP) -> Dict[str, float]:
+        return hp.nest(child, name=None)
+
+    with pytest.raises(ValueError, match="requires 'name' for nesting"):
+        instantiate(config)
+
+
+def test_nested_param_with_none_name_raises_friendly_error() -> None:
+    """Inside a nested scope, name=None used to crash joining the namespace stack."""
+
+    def child(hp: HP) -> float:
+        return hp.float(0.1, name=None)
+
+    def config(hp: HP) -> float:
+        return hp.nest(child, name="inner")
+
+    with pytest.raises(ValueError, match="requires 'name' for overrides"):
+        instantiate(config)
+
+
+def test_unknown_parameter_warning_points_at_user_code() -> None:
+    """The UserWarning must be attributed to the caller of instantiate(), not hypster internals."""
+
+    def config(hp: HP) -> Dict[str, float]:
+        return {"lr": hp.float(0.1, name="learning_rate")}
+
+    with pytest.warns(UserWarning) as records:
+        instantiate(config, values={"lerning_rate": 0.05}, on_unknown="warn")
+
+    assert records[0].filename == __file__
