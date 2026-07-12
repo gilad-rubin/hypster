@@ -84,6 +84,24 @@ class FieldSpec:
         return Leaf(self._require_name(), operator, value)
 
 
+def resolve_then_spec(then: Any) -> FieldSpec | list[FieldSpec]:
+    """Validate the ``then`` payload spec(s) for hp.rules()."""
+    if isinstance(then, FieldSpec):
+        if then.name is None:
+            raise ValueError("then FieldSpec must have a name, e.g. field.text(name='prompt', multiline=True)")
+        return then
+    if isinstance(then, list):
+        for i, item in enumerate(then):
+            if not isinstance(item, FieldSpec):
+                raise TypeError(f"then[{i}]: expected a FieldSpec, got {type(item).__name__}")
+            if item.name is None:
+                raise ValueError(f"then[{i}]: FieldSpec must have a name")
+        return then
+    raise TypeError(
+        f"then must be a FieldSpec (e.g. field.text(name='prompt', multiline=True)), got {type(then).__name__}"
+    )
+
+
 def _make_spec(
     type_name: str, *, name: str | None, description: str | None, options: tuple | None = None, multiline: bool = False
 ) -> FieldSpec:

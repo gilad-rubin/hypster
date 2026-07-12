@@ -6,7 +6,7 @@ Use `hp.text()` for one string and `hp.multi_text()` for a list of strings.
 
 {% code overflow="wrap" %}
 ```python
-hp.text(default, *, name, allow_none=False)
+hp.text(default, *, name, multiline=False, allow_none=False)
 hp.multi_text(default, *, name, allow_none=False)
 ```
 {% endcode %}
@@ -29,6 +29,22 @@ cfg = instantiate(
 )
 
 assert cfg["system_prompt"] == "Answer with citations."
+```
+{% endcode %}
+
+## Multiline Text
+
+`multiline=True` records `{"multiline": True}` in the parameter's metadata, so schema consumers (such as the interactive UI) render a textarea instead of a single-line input. The value itself is an ordinary string either way:
+
+{% code overflow="wrap" %}
+```python
+from hypster import HP, explore
+
+def prompt_config(hp: HP):
+    return hp.text("You are a helpful assistant.", name="system_prompt", multiline=True)
+
+schema = explore(prompt_config, return_schema=True)
+assert schema.parameters[0].metadata == {"multiline": True}
 ```
 {% endcode %}
 

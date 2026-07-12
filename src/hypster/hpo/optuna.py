@@ -1,18 +1,20 @@
+"""Optuna adapter: runs a config with trial-suggested values via HP's value-provider seam.
+
+Any trial-like object with Optuna's ``suggest_int``/``suggest_float``/
+``suggest_categorical`` methods works; optuna itself is not imported.
+"""
+
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from typing import Any, Dict
+from typing import Any, Dict, List
 
-try:  # optional dependency
-    import optuna as _optuna
-except Exception:  # pragma: no cover
-    _optuna = None
-
-from .._sentinels import NO_DEFAULT as _NO_DEFAULT
-from ..core import _handle_unknown_parameters, _reject_removed_execution_argument_containers
-from ..hp_calls import FloatValidator, IntValidator
-from ..utils import normalize_values, validate_identifier_name, validate_metadata, validate_select_choice
+from .._sentinels import NOT_PROVIDED
+from ..core import ConfigFunc, _run_config
 from .types import HpoCategorical, HpoFloat, HpoInt
+
+#: Parameter kinds the Optuna adapter can tune. Other kinds (bool, text,
+#: multi_*, rules, schema) fall back to their defaults during suggestion.
+TUNABLE_KINDS = frozenset({"int", "float", "select"})
 
 
 def _exclusive_high_for_int(low: int, high: int, step: int | None) -> int:
@@ -70,203 +72,109 @@ def _validate_categorical_spec(full: str, hpo_spec: HpoCategorical | None) -> No
         )
 
 
-class _HPProxy:
-    def __init__(
-        self,
-        trial: Any,
-        collector: Dict[str, Any],
-        ns: list[str] | None = None,
-        overrides: Dict[str, Any] | None = None,
-    ):
+def _reject_nullable_numeric(full: str, allow_none: bool, default: Any) -> None:
+    if allow_none:
+        raise ValueError(
+            f"Parameter '{full}': allow_none=True is not supported for HPO numeric suggestions yet.\n\n"
+            "How to fix: remove allow_none=True from HPO numeric parameters, or make this choice categorical."
+        )
+    if default is None:
+        raise ValueError(
+            f"Parameter '{full}': default=None requires allow_none=True, "
+            "but nullable numeric HPO suggestions are not supported yet."
+        )
+
+
+class TrialValueProvider:
+    """Asks an Optuna-style trial for values of tunable parameter kinds.
+
+    Declines every other kind, so those parameters keep their defaults and
+    still pass through HP's regular validation.
+    """
+
+    def __init__(self, trial: Any):
         self.trial = trial
-        self.collector = collector
-        self.ns = ns or []
-        self.overrides = overrides or {}
 
-    def _full(self, name: str) -> str:
-        validate_identifier_name(name, kind="parameter name")
-        return ".".join(self.ns + [name]) if self.ns else name
-
-    # integers
-    def int(
+    def provide_value(
         self,
-        default: int,
         *,
-        name: str,
-        min: int | None = None,
-        max: int | None = None,
+        path: str,
+        kind: str,
+        default: Any,
+        allow_none: bool = False,
         strict: bool = False,
-        allow_none: bool = False,
-        hpo_spec: HpoInt | None = None,
-        description: str | None = None,
-        metadata: Dict[str, Any] | None = None,
-    ) -> int:
-        full = self._full(name)
-        _validate_int_spec(full, hpo_spec)
-        if allow_none:
-            raise ValueError(
-                f"Parameter '{full}': allow_none=True is not supported for HPO numeric suggestions yet.\n\n"
-                "How to fix: remove allow_none=True from HPO numeric parameters, or make this choice categorical."
-            )
-        if default is None:
-            raise ValueError(
-                f"Parameter '{full}': default=None requires allow_none=True, "
-                "but nullable numeric HPO suggestions are not supported yet."
-            )
-        if full in self.overrides:
-            if self.overrides[full] is None:
-                raise ValueError(
-                    f"Parameter '{full}': None overrides are not supported for HPO numeric suggestions yet."
-                )
-            validator = IntValidator()
-            val = validator.validate_value(self.overrides[full], full, strict=strict)
-            validator.validate_bounds(val, min, max, full)
-            metadata = validate_metadata(metadata, param_path=full)
-            self.collector[full] = val
-            return val
-        metadata = validate_metadata(metadata, param_path=full)
-        low = default if min is None else min
-        high = default if max is None else max
-        step = hpo_spec.step if hpo_spec else None
-        log = (hpo_spec.scale == "log") if hpo_spec else False
-        if hpo_spec and not hpo_spec.include_max and high is not None:
-            high = _exclusive_high_for_int(low, high, step)
-        val = self.trial.suggest_int(full, low, high, step=step, log=log)
-        self.collector[full] = val
-        return val
-
-    # floats
-    def float(
-        self,
-        default: float,
-        *,
-        name: str,
-        min: float | None = None,
-        max: float | None = None,
-        strict: bool = False,
-        allow_none: bool = False,
-        hpo_spec: HpoFloat | None = None,
-        description: str | None = None,
-        metadata: Dict[str, Any] | None = None,
-    ) -> float:
-        full = self._full(name)
-        log = _float_log_flag(full, hpo_spec)
-        if allow_none:
-            raise ValueError(
-                f"Parameter '{full}': allow_none=True is not supported for HPO numeric suggestions yet.\n\n"
-                "How to fix: remove allow_none=True from HPO numeric parameters, or make this choice categorical."
-            )
-        if default is None:
-            raise ValueError(
-                f"Parameter '{full}': default=None requires allow_none=True, "
-                "but nullable numeric HPO suggestions are not supported yet."
-            )
-        if full in self.overrides:
-            if self.overrides[full] is None:
-                raise ValueError(
-                    f"Parameter '{full}': None overrides are not supported for HPO numeric suggestions yet."
-                )
-            validator = FloatValidator()
-            val = validator.validate_value(self.overrides[full], full, strict=strict)
-            validator.validate_bounds(val, min, max, full)
-            metadata = validate_metadata(metadata, param_path=full)
-            self.collector[full] = val
-            return val
-        metadata = validate_metadata(metadata, param_path=full)
-        low = default if min is None else min
-        high = default if max is None else max
-        step = hpo_spec.step if hpo_spec else None
-        val = self.trial.suggest_float(full, low, high, step=step, log=log)
-        self.collector[full] = val
-        return val
-
-    # categorical
-    def select(
-        self,
-        options: Sequence[Any] | Mapping[Any, Any],
-        *,
-        name: str,
-        default: Any = _NO_DEFAULT,
-        options_only: bool = False,
-        allow_none: bool = False,
-        hpo_spec: HpoCategorical | None = None,
-        description: str | None = None,
-        metadata: Dict[str, Any] | None = None,
+        options: List[Any] | None = None,
+        min: Any = None,
+        max: Any = None,
+        hpo_spec: Any = None,
     ) -> Any:
-        full = self._full(name)
-        _validate_categorical_spec(full, hpo_spec)
-        if isinstance(options, Mapping):
-            keys = list(options.keys())
-        else:
-            keys = list(options)
-        for index, option in enumerate(keys):
-            validate_select_choice(option, param_path=f"{full} option #{index}", allow_none=allow_none)
-        if default is not _NO_DEFAULT:
-            validate_select_choice(default, param_path=full, allow_none=allow_none)
+        if kind == "int":
+            _validate_int_spec(path, hpo_spec)
+            _reject_nullable_numeric(path, allow_none, default)
+            low = default if min is None else min
+            high = default if max is None else max
+            step = hpo_spec.step if hpo_spec else None
+            log = (hpo_spec.scale == "log") if hpo_spec else False
+            if log:
+                # Optuna only accepts step=1 when log=True.
+                if step not in (None, 1):
+                    raise ValueError(
+                        f"Parameter '{path}': HpoInt(step={step}) cannot be combined with scale='log' "
+                        "(Optuna only supports step=1 for log-scale integers). "
+                        "How to fix: remove step=, or use scale='linear'."
+                    )
+                step = 1
+            elif step is None:
+                step = 1
+            if hpo_spec and not hpo_spec.include_max and high is not None:
+                high = _exclusive_high_for_int(low, high, step)
+            return self.trial.suggest_int(path, low, high, step=step, log=log)
 
-        if full in self.overrides:
-            key_or_val = self.overrides[full]
-            validate_select_choice(key_or_val, param_path=full, allow_none=allow_none)
-            if options_only and key_or_val not in keys:
-                options_str = ", ".join(repr(o) for o in keys[:5])
-                if len(keys) > 5:
-                    options_str += f", ... ({len(keys) - 5} more)"
+        if kind == "float":
+            log = _float_log_flag(path, hpo_spec)
+            _reject_nullable_numeric(path, allow_none, default)
+            low = default if min is None else min
+            high = default if max is None else max
+            step = hpo_spec.step if hpo_spec else None
+            if log and step is not None:
+                # Optuna rejects step together with log=True for floats.
                 raise ValueError(
-                    f"Parameter '{full}': '{key_or_val}' not in allowed options. Available: [{options_str}]"
+                    f"Parameter '{path}': HpoFloat(step={step}) cannot be combined with a log scale "
+                    "(Optuna does not support step for log-scale floats). "
+                    "How to fix: remove step=, or use scale='linear'."
                 )
-            metadata = validate_metadata(metadata, param_path=full)
-            if isinstance(options, Mapping) and key_or_val in options:
-                self.collector[full] = key_or_val
-                return options[key_or_val]
-            self.collector[full] = key_or_val
-            return key_or_val
+            return self.trial.suggest_float(path, low, high, step=step, log=log)
 
-        metadata = validate_metadata(metadata, param_path=full)
-        if isinstance(options, Mapping):
-            key = self.trial.suggest_categorical(full, keys)
-            self.collector[full] = key
-            return options[key]
-        else:
-            choice = self.trial.suggest_categorical(full, keys)
-            self.collector[full] = choice
-            return choice
+        if kind == "select":
+            _validate_categorical_spec(path, hpo_spec)
+            return self.trial.suggest_categorical(path, options)
 
-    # nesting
-    def nest(
-        self,
-        child,
-        *,
-        name: str,
-        values: Dict[str, Any] | None = None,
-        description: str | None = None,
-        **kwargs: Any,
-    ) -> Any:
-        validate_identifier_name(name, kind="nest name")
-        overrides = dict(self.overrides)
-        prefixed_values = {}
-        if values:
-            flat = normalize_values(values)
-            for k, v in flat.items():
-                prefixed_key = f"{self._full(name)}.{k}"
-                overrides[prefixed_key] = v
-                prefixed_values[prefixed_key] = v
-        nested = _HPProxy(self.trial, self.collector, ns=self.ns + [name], overrides=overrides)
-        _reject_removed_execution_argument_containers(kwargs)
-        result = child(nested, **kwargs)
-        _handle_unknown_parameters(prefixed_values, set(self.collector), "raise")
-        return result
+        return NOT_PROVIDED
 
 
-def suggest_values(trial: Any, config, /, **kwargs: Any) -> Dict[str, Any]:
+class _TunedParamsCollector:
+    """Collect the values of tunable params — suggested or overridden — for replay."""
+
+    def __init__(self) -> None:
+        self.params: Dict[str, Any] = {}
+
+    def record_parameter(self, *, path: str, kind: str, selected_value: Any, **event: Any) -> None:
+        if kind in TUNABLE_KINDS:
+            self.params[path] = selected_value
+
+    def record_nest(self, **event: Any) -> None:
+        pass
+
+
+def suggest_values(trial: Any, config: ConfigFunc[Any], /, **kwargs: Any) -> Dict[str, Any]:
     """Run the config with a trial-backed HP to produce a values dict.
 
     This respects conditionals: only parameters touched in the executed path
-    are suggested and returned.
+    are suggested and returned. Parameter kinds without an Optuna mapping
+    (bool, text, multi_*, rules, schema) fall back to their defaults and are
+    not part of the returned dict.
     """
-    # Optuna is optional; any trial-like object with suggest_* methods works.
-    # We intentionally do not import or require optuna here for testability.
-    collector: Dict[str, Any] = {}
-    hp = _HPProxy(trial, collector)
-    _reject_removed_execution_argument_containers(kwargs)
-    config(hp, **kwargs)
-    return collector
+    provider = TrialValueProvider(trial)
+    collector = _TunedParamsCollector()
+    _run_config(config, kwargs=kwargs, parameter_tracker=collector, value_provider=provider)
+    return collector.params

@@ -59,7 +59,7 @@ def test_on_unknown_invalid_policy_has_guidance() -> None:
         return {"lr": hp.float(0.1, name="learning_rate")}
 
     with pytest.raises(ValueError, match="on_unknown must be one of"):
-        instantiate(config, values={"learning_rate": 0.2}, on_unknown="silent")  # type: ignore[arg-type]
+        instantiate(config, values={"learning_rate": 0.2}, on_unknown="silent")
 
     assert calls == []
 
@@ -69,7 +69,7 @@ def test_values_must_be_a_mapping() -> None:
         return {"lr": hp.float(0.1, name="learning_rate")}
 
     with pytest.raises(ValueError, match="expected a dictionary"):
-        instantiate(config, values=["learning_rate"])  # type: ignore[arg-type]
+        instantiate(config, values=["learning_rate"])
 
 
 def test_on_unknown_with_suggestions() -> None:
@@ -82,7 +82,7 @@ def test_on_unknown_with_suggestions() -> None:
 
     # Typo should suggest similar parameter in warn mode
     with pytest.warns(UserWarning) as w:
-        result = instantiate(config, values={"lerning_rate": 0.05}, on_unknown="warn")
+        instantiate(config, values={"lerning_rate": 0.05}, on_unknown="warn")
 
         warning_msg = str(w[0].message)
         assert "lerning_rate" in warning_msg

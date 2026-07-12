@@ -6,12 +6,14 @@ from .core import ConfigFunc, InstantiationOutput, instantiate, instantiate_with
 from .explore import explore
 from .field_spec import FieldSpec
 from .hp import HP
+from .hp_calls import HPCallError
 from .interactive import InteractiveResult, interact
 from .rules import And, Group, Leaf, Not, Or, Rule
 from .schema_field import SchemaField
 
 __all__ = [
     "HP",
+    "HPCallError",
     "instantiate",
     "instantiate_with_params",
     "InstantiationOutput",

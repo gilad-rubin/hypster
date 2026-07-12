@@ -10,6 +10,7 @@ from hypster import (
     ConfigFunc,
     FieldSpec,
     Group,
+    HPCallError,
     InstantiationOutput,
     InteractiveResult,
     Leaf,
@@ -73,7 +74,7 @@ assert run.params == {"batch_size": 64, "epochs": 10}
 
 `dataset_size` is bound by `partial`, not selected through `hp.*`, so it is passed through to the return value but does not appear in `run.params`.
 
-Config functions may accept extra keyword-only execution arguments. Pass those directly; Hypster-owned names such as `values`, `on_unknown`, `return_schema`, `auto_apply`, `name`, and `description` are reserved at their API boundaries.
+Config functions may accept extra keyword-only execution arguments. Pass those directly — but do not name an execution argument after a Hypster-owned keyword. `return_schema` and the removed `return_info` are actively guarded (`explore()`/`interact()` raise a `TypeError` if you pass them as execution arguments). Names that are ordinary parameters of the calling API — `values`, `on_unknown`, `tracker` on `instantiate_with_params()`, `auto_apply` on `interact()`, and `name`/`description` on `hp.nest()` — are silently bound to the API itself and never reach your config, so a config that needs one of these as an execution argument must rename it.
 
 ## instantiate
 
@@ -109,12 +110,13 @@ instantiate_with_params(
     *,
     values=None,
     on_unknown="raise",
+    tracker=None,
     **kwargs,
 )
 ```
 {% endcode %}
 
-Executes a config function and returns an `InstantiationOutput`.
+Executes a config function and returns an `InstantiationOutput`. Pass `tracker=` to observe the run's parameter events: for every `hp.*` call the tracker's `record_parameter(path=..., name=..., kind=..., default_value=..., selected_value=..., options=..., minimum=..., maximum=..., description=..., metadata=...)` method is invoked, and `record_nest(path=..., name=..., description=..., metadata=...)` fires for each `hp.nest`. A tracker may implement either or both methods; selected-params collection is unaffected.
 
 {% code overflow="wrap" %}
 ```python
@@ -231,6 +233,7 @@ current_params = result.params
 result.value
 result.params
 result.snapshot
+result.dispatch(action)
 result.interact()
 ```
 {% endcode %}
@@ -240,6 +243,7 @@ result.interact()
 | `value` | The currently applied config return value. Raises `RuntimeError` while the applied state is invalid. |
 | `params` | Replayable selected params for the currently applied state. Raises `RuntimeError` while the applied state is invalid. |
 | `snapshot` | Widget-facing state with schema, draft values, applied values, selected params, mode, status, and error. |
+| `dispatch(action)` | Applies one interactive action headlessly and returns the new snapshot. Actions: `{"type": "set_value", "path": ..., "value": ...}`, `{"type": "reset"}`, `{"type": "apply"}`. Setting an unreachable path raises the backend's unknown-parameter `ValueError`. |
 | `interact()` | Renders another live widget view backed by the same session. |
 
 Replay an interactive selection the same way you replay any Hypster run:
@@ -281,7 +285,7 @@ All parameter names must be valid Python identifier-style strings: use letters, 
 ```python
 hp.int(default, *, name, min=None, max=None, strict=False, allow_none=False, hpo_spec=None, description=None, metadata=None)
 hp.float(default, *, name, min=None, max=None, strict=False, allow_none=False, hpo_spec=None, description=None, metadata=None)
-hp.text(default, *, name, allow_none=False, description=None, metadata=None)
+hp.text(default, *, name, multiline=False, allow_none=False, description=None, metadata=None)
 hp.bool(default, *, name, allow_none=False, description=None, metadata=None)
 ```
 {% endcode %}
@@ -401,6 +405,7 @@ hp.rules(
     combinators=None,
     default=None,
     description=None,
+    metadata=None,
 )
 ```
 {% endcode %}
@@ -460,7 +465,7 @@ def config(hp: HP) -> list[SchemaField]:
 ```
 {% endcode %}
 
-`SchemaField(key, value_type, description="", label="", multi_valued=False, possible_values=None, unit=None)` with `value_type` one of `"text" | "enum" | "number" | "date"`. Each field converts to a JSON Schema property via `.to_json_schema()` (for structured-LLM output requests) and round-trips with `.to_dict()`/`.from_dict()`. `explore(..., return_schema=True)` records schema values as `kind="schema"` with `metadata["field_specs"]` for form renderers. See [Schema](../in-depth/hp-call-types/schema.md).
+`SchemaField(key, value_type, description="", label="", multi_valued=False, possible_values=None, unit=None, required=False)` with `value_type` one of `"text" | "enum" | "number" | "date"`. `required` marks the field as mandatory for consumers that gate on it; it round-trips through `.to_dict()`/`.from_dict()` but is not emitted by `.to_json_schema()` — JSON Schema expresses requiredness as a `required` array on the parent object, so schema assemblers read the flag and build that array themselves. Each field converts to a JSON Schema property via `.to_json_schema()` (for structured-LLM output requests) and round-trips with `.to_dict()`/`.from_dict()`. `explore(..., return_schema=True)` records schema values as `kind="schema"` with `metadata["schema_fields"]` for form renderers. See [Schema](../in-depth/hp-call-types/schema.md).
 
 ## HP.collect
 

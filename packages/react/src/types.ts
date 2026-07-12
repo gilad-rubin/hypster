@@ -20,10 +20,11 @@ export type SchemaFieldValue = {
   multi_valued?: boolean;
   possible_values?: string[];
   unit?: string;
+  required?: boolean;
 };
 
 export type SchemaMetadata = {
-  field_specs: SchemaFieldValue[];
+  schema_fields: SchemaFieldValue[];
 };
 
 export type AnyConfigValue = ConfigValue | RuleValue[] | SchemaFieldValue[];

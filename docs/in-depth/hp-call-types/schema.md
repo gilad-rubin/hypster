@@ -38,10 +38,13 @@ class SchemaField:
     multi_valued: bool = False            # list of value_type instead of a scalar
     possible_values: list[str] | None = None   # only for value_type="enum"
     unit: str | None = None               # e.g. "USD", "days"
+    required: bool = False                # mandatory for consumers that gate on it
 ```
 {% endcode %}
 
 Round-trip with `.to_dict()` / `SchemaField.from_dict(data)`.
+
+`required` lives on the field itself so renaming a field can never orphan its requiredness in a parallel key list. It is deliberately **not** emitted by `.to_json_schema()`: JSON Schema expresses requiredness as a `required` array on the parent object, so the code assembling the full schema reads the flag and builds that array.
 
 ## Feeding a structured-output LLM call
 
@@ -64,7 +67,7 @@ SchemaField(key="tags", value_type="text", multi_valued=True).to_json_schema()
 
 ## Rendering a schema editor in a UI
 
-`explore(..., return_schema=True)` records the parameter with `kind="schema"` and `metadata` carrying `field_specs` — the `to_dict()` form of every field — which is exactly what a "define what to extract" form needs to render controls and round-trip user edits back through `values=`:
+`explore(..., return_schema=True)` records the parameter with `kind="schema"` and `metadata` carrying `schema_fields` — the `to_dict()` form of every field — which is exactly what a "define what to extract" form needs to render controls and round-trip user edits back through `values=`:
 
 {% code overflow="wrap" %}
 ```python
@@ -72,7 +75,7 @@ from hypster import explore
 
 schema = explore(extraction_config, return_schema=True)
 schema.parameters[0].kind                              # "schema"
-schema.parameters[0].metadata["field_specs"][0]["key"]  # "invoice_number"
+schema.parameters[0].metadata["schema_fields"][0]["key"]  # "invoice_number"
 ```
 {% endcode %}
 

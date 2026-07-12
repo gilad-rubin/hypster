@@ -70,3 +70,5 @@ def log_to_tracker(tracker, run):
 {% endcode %}
 
 The important detail is that `run.params` contains defaulted values as well as user overrides. That makes it suitable for exact replay.
+
+For run-record structure, versioning metadata, and replay-recovery guidance, see [Experiment Tracking (Reproducibility)](../reproducibility/experiment-tracking.md).

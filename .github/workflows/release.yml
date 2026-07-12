@@ -1,275 +1,161 @@
 name: Release
 
+# Source-read-only release: the workflow never edits version files, never
+# rewrites tags, and publishes the GitHub release only after PyPI succeeds.
+# Version bumps land through a reviewed release-prep PR before dispatching.
+#
+# Recovery rule: published bytes, filenames, and tags are never replaced.
+# A bad release is yanked on PyPI and fixed forward with a new patch version.
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (e.g., 0.3.4)"
+        description: "Version to release — must equal the committed version (e.g., 0.8.0)"
         required: true
         type: string
       publish_to_pypi:
-        description: "Publish to PyPI"
+        description: "Publish to PyPI (false = dry run: build, test, and retain artifacts only)"
         required: true
         default: true
         type: boolean
       create_draft:
-        description: "Create as draft release"
+        description: "Create the GitHub release as a draft"
         required: false
         default: false
         type: boolean
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  validate-inputs:
+  validate:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.validate.outputs.version }}
     steps:
-      - name: Validate version format
-        id: validate
+      - name: Require master
+        if: github.ref != 'refs/heads/master'
         run: |
-          VERSION="${{ inputs.version }}"
-          echo "Validating version: $VERSION"
+          echo "::error::Releases are dispatched from master only (got ${{ github.ref }})."
+          exit 1
 
-          # Strict semantic version validation
-          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$ ]]; then
-            echo "❌ Invalid version format: $VERSION"
-            echo "Expected semantic version (e.g., 1.2.3, 1.2.3-alpha.1, 1.2.3+build.1)"
+      - uses: actions/checkout@v6.0.2
+
+      - name: Validate version format
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$ ]]; then
+            echo "::error::Invalid version format: $VERSION"
             exit 1
           fi
 
-          echo "✅ Version format is valid"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Assert committed version matches input (no source mutation)
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          PYPROJECT=$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)
+          MODULE=$(grep -m1 '^__version__ = ' src/hypster/_version.py | cut -d'"' -f2)
+          if [ "$PYPROJECT" != "$VERSION" ] || [ "$MODULE" != "$VERSION" ]; then
+            echo "::error::Version mismatch: input=$VERSION pyproject=$PYPROJECT _version.py=$MODULE."
+            echo "Land a release-prep PR that sets both to $VERSION, then dispatch again."
+            exit 1
+          fi
 
-  release:
-    needs: validate-inputs
+      - name: Assert tag does not already exist (tags are never rewritten)
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git fetch --tags --quiet
+          if git tag -l | grep -qx "v$VERSION"; then
+            echo "::error::Tag v$VERSION already exists. Released bytes and tags are immutable — bump to a new patch version instead."
+            exit 1
+          fi
+
+      - name: Assert changelog section exists
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! grep -q "^## \[$VERSION\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$VERSION]' section. Releases without release notes are not published."
+            exit 1
+          fi
+
+  test-and-build:
+    needs: validate
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version_update.outputs.version }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6.0.2
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v6.0.2
 
-      - name: Setup UV
-        uses: astral-sh/setup-uv@v8.1.0
+      - uses: astral-sh/setup-uv@v8.1.0
         with:
+          version: "0.11.8"
           enable-cache: true
           python-version: "3.12"
 
-      - name: Update version and create commit
-        id: version_update
-        env:
-          VERSION: ${{ needs.validate-inputs.outputs.version }}
+      - name: Install project and dev deps
+        run: uv sync --frozen --extra optuna --dev
+
+      - name: Lint, type-check, test
         run: |
-          echo "🔄 Updating version to $VERSION"
+          uv run ruff format --check .
+          uv run ruff check .
+          uv run mypy src/hypster
+          uv run pytest --no-cov -q
 
-          # Backup original files
-          cp pyproject.toml pyproject.toml.backup
-          cp src/hypster/_version.py src/hypster/_version.py.backup
-
-          # Update version in pyproject.toml
-          sed -i -E "0,/^version = \".*\"/s//version = \"$VERSION\"/" pyproject.toml
-          sed -i -E "s/^__version__ = \".*\"/__version__ = \"$VERSION\"/" src/hypster/_version.py
-
-          # Verify the change was made
-          if ! grep -q "version = \"$VERSION\"" pyproject.toml; then
-            echo "❌ Failed to update version in pyproject.toml"
-            echo "Current content around version line:"
-            grep -n -A2 -B2 "version = " pyproject.toml || echo "No version line found"
-            exit 1
-          fi
-
-          if ! grep -q "__version__ = \"$VERSION\"" src/hypster/_version.py; then
-            echo "❌ Failed to update version in src/hypster/_version.py"
-            echo "Current content around version line:"
-            grep -n -A2 -B2 "__version__ = " src/hypster/_version.py || echo "No version line found"
-            exit 1
-          fi
-
-          echo "✅ Version updated successfully"
-          echo "Updated version line:"
-          grep "version = " pyproject.toml
-          grep "__version__ = " src/hypster/_version.py
-
-          # Configure git
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Check if there are changes to commit
-          if git diff --quiet pyproject.toml src/hypster/_version.py; then
-            echo "⚠️ No version changes detected"
-          else
-            git add pyproject.toml src/hypster/_version.py
-            git commit -m "chore: bump version to v$VERSION"
-
-            # Push changes
-            CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-            git push origin "$CURRENT_BRANCH"
-            echo "✅ Version commit pushed to $CURRENT_BRANCH"
-          fi
-
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Create and push tag
-        env:
-          VERSION: ${{ steps.version_update.outputs.version }}
+      - name: Build distributions
         run: |
-          TAG="v$VERSION"
-
-          # Check if tag already exists
-          if git tag -l | grep -q "^$TAG$"; then
-            echo "⚠️ Tag $TAG already exists"
-            git tag -d "$TAG" || true
-            git push origin ":refs/tags/$TAG" || true
-            echo "🗑️ Removed existing tag"
-          fi
-
-          # Create new tag
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
-          echo "✅ Created and pushed tag $TAG"
-
-      - name: Build package
-        run: |
-          echo "🔨 Building package..."
-
-          # Clean any existing build artifacts
-          rm -rf dist/ build/ *.egg-info/
-
-          # Build the package
+          rm -rf dist/ build/
           uv build
 
-          # Verify build artifacts exist
-          if [ ! -f "dist/"*.whl ] || [ ! -f "dist/"*.tar.gz ]; then
-            echo "❌ Build artifacts not found"
-            exit 1
-          fi
-
-          echo "✅ Package built successfully"
-          ls -la dist/
-
-      - name: Verify package
+      - name: Gate the artifacts
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          echo "🔍 Verifying package..."
+          test -f "dist/hypster-$VERSION-py3-none-any.whl" || { echo "::error::Wheel for $VERSION not found in dist/"; ls dist/; exit 1; }
+          test -f "dist/hypster-$VERSION.tar.gz" || { echo "::error::Sdist for $VERSION not found in dist/"; ls dist/; exit 1; }
 
-          echo "Built artifacts:"
-          ls -la dist/
+          uvx twine check --strict dist/*
 
-          echo "Checking wheel contents:"
-          uv run python -m zipfile -l dist/*.whl | head -20
+          echo "Checking artifact manifests for files that must never ship..."
+          WHEEL_LIST=$(python3 -m zipfile -l "dist/hypster-$VERSION-py3-none-any.whl")
+          SDIST_LIST=$(tar -tzf "dist/hypster-$VERSION.tar.gz")
+          for pattern in '\.backup' '__pycache__' '\.pyc' '^tests/' '/tests/' '^dev/' '/dev/' '\.env'; do
+            if echo "$WHEEL_LIST" | grep -qE "$pattern"; then
+              echo "::error::Wheel contains forbidden entry matching '$pattern'"; echo "$WHEEL_LIST"; exit 1
+            fi
+            if echo "$SDIST_LIST" | grep -qE "$pattern"; then
+              echo "::error::Sdist contains forbidden entry matching '$pattern'"; echo "$SDIST_LIST"; exit 1
+            fi
+          done
 
-          echo "Smoke testing wheel..."
-          uv run --isolated --no-project --with dist/*.whl python -c "import hypster; print(hypster.__version__)"
+          echo "Smoke testing wheel (isolated, asserting exact version)..."
+          uv run --isolated --no-project --with "dist/hypster-$VERSION-py3-none-any.whl" \
+            python -c "import hypster, os; v=os.environ['VERSION']; assert hypster.__version__ == v, f'wheel reports {hypster.__version__}, expected {v}'; import hypster.hpo"
 
-          echo "Smoke testing source distribution..."
-          uv run --isolated --no-project --with dist/*.tar.gz python -c "import hypster; print(hypster.__version__)"
+          echo "Smoke testing sdist (isolated, asserting exact version)..."
+          uv run --isolated --no-project --with "dist/hypster-$VERSION.tar.gz" \
+            python -c "import hypster, os; v=os.environ['VERSION']; assert hypster.__version__ == v, f'sdist reports {hypster.__version__}, expected {v}'"
 
-          echo "✅ Package verification completed"
+          echo "Running the real-Optuna suite against the built wheel (not the source checkout)..."
+          uv run --isolated --no-project \
+            --with "dist/hypster-$VERSION-py3-none-any.whl" --with pytest --with optuna \
+            python -m pytest tests/test_hpo_optuna_real.py -q -p no:cacheprovider -o addopts=""
 
-      - name: Upload distribution artifacts
-        uses: actions/upload-artifact@v7
+          (cd dist && shasum -a 256 ./* > SHA256SUMS)
+          cat dist/SHA256SUMS
+
+      - uses: actions/upload-artifact@v7
         with:
-          name: dist-${{ steps.version_update.outputs.version }}
+          name: dist-${{ inputs.version }}
           path: dist/*
           if-no-files-found: error
 
-      - name: Extract changelog for release
-        id: changelog
-        env:
-          VERSION: ${{ steps.version_update.outputs.version }}
-        run: |
-          echo "📝 Extracting changelog for version $VERSION"
-
-          # Extract changelog section using awk
-          CHANGELOG_SECTION=$(awk -v version="$VERSION" '
-            BEGIN { in_section = 0; found = 0 }
-            /^## \['"'"'version'"'"'\]/ || /^## \['"'"'$version'"'"'\]/ {
-              in_section = 1; found = 1; print; next
-            }
-            /^## \[/ && in_section { in_section = 0; exit }
-            in_section { print }
-          ' CHANGELOG.md)
-
-                    # Fallback if no changelog section found
-          if [ -z "$CHANGELOG_SECTION" ]; then
-            echo "⚠️ No changelog section found for version $VERSION"
-            CHANGELOG_SECTION="## [$VERSION] - $(date +%Y-%m-%d)
-
-          Release $VERSION
-
-          See [CHANGELOG.md](CHANGELOG.md) for detailed changes."
-          else
-            echo "✅ Found changelog section for version $VERSION"
-          fi
-
-          # Escape for GitHub Actions multiline output
-          {
-            echo "content<<EOF"
-            echo "$CHANGELOG_SECTION"
-            echo "EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ steps.version_update.outputs.version }}
-          name: "hypster v${{ steps.version_update.outputs.version }}"
-          body: |
-            ${{ steps.changelog.outputs.content }}
-
-            ---
-
-            ## 📦 Installation
-
-            **Standard installation:**
-            ```bash
-            pip install hypster==${{ steps.version_update.outputs.version }}
-            ```
-
-            **With HPO support:**
-            ```bash
-            pip install 'hypster[optuna]==${{ steps.version_update.outputs.version }}'
-            ```
-
-            **With notebook visualization UI:**
-            ```bash
-            pip install 'hypster[viz]==${{ steps.version_update.outputs.version }}'
-            ```
-
-            ## 📚 Documentation
-
-            - [Getting Started](https://github.com/gilad-rubin/hypster#getting-started)
-            - [Documentation](https://github.com/gilad-rubin/hypster/tree/master/docs)
-            - [Examples](https://github.com/gilad-rubin/hypster/tree/master/playground)
-
-            Full changelog: [CHANGELOG.md](https://github.com/gilad-rubin/hypster/blob/master/CHANGELOG.md)
-          draft: ${{ inputs.create_draft }}
-          prerelease: false
-          generate_release_notes: false
-
-      - name: Summary
-        run: |
-          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** v${{ steps.version_update.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **PyPI Published:** ${{ inputs.publish_to_pypi }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Draft Release:** ${{ inputs.create_draft }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag:** [v${{ steps.version_update.outputs.version }}](https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version_update.outputs.version }})" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📦 Installation Commands" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "pip install hypster==${{ steps.version_update.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "pip install 'hypster[optuna]==${{ steps.version_update.outputs.version }}'" >> $GITHUB_STEP_SUMMARY
-          echo "pip install 'hypster[viz]==${{ steps.version_update.outputs.version }}'" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
   publish-pypi:
-    needs: release
+    needs: [validate, test-and-build]
     if: ${{ inputs.publish_to_pypi }}
     runs-on: ubuntu-latest
     environment:
@@ -278,23 +164,85 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6.0.2
-
-      - name: Setup UV
-        uses: astral-sh/setup-uv@v8.1.0
+      - uses: actions/download-artifact@v4
         with:
-          enable-cache: true
-          python-version: "3.12"
-
-      - name: Download distribution artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-${{ needs.release.outputs.version }}
+          name: dist-${{ inputs.version }}
           path: dist
 
+      - name: Remove checksum manifest from upload set
+        run: rm -f dist/SHA256SUMS
+
+      # pypa's action performs Trusted Publishing via OIDC and generates
+      # PEP 740 attestations for the uploaded files by default.
       - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+
+  github-release:
+    # Tag + public release happen only after PyPI accepted the same bytes.
+    # Dry runs (publish_to_pypi=false) therefore never create tags or releases.
+    needs: [validate, test-and-build, publish-pypi]
+    if: ${{ !cancelled() && needs.publish-pypi.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ inputs.version }}
+          path: dist
+
+      - name: Extract changelog section
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
-          echo "📦 Publishing to PyPI with Trusted Publishing..."
-          ls -la dist/
-          uv publish
+          awk -v ver="$VERSION" '
+            BEGIN { insec = 0; found = 0 }
+            index($0, "## [" ver "]") == 1 { insec = 1; found = 1; print; next }
+            /^## \[/ && insec { exit }
+            insec { print }
+            END { exit !found }
+          ' CHANGELOG.md > release_notes.md
+          {
+            echo ""
+            echo "---"
+            echo ""
+            echo "## Installation"
+            echo ""
+            echo '```bash'
+            echo "pip install hypster==$VERSION"
+            echo "pip install 'hypster[optuna]==$VERSION'"
+            echo "pip install 'hypster[viz]==$VERSION'"
+            echo '```'
+            echo ""
+            echo "SHA-256 checksums of the published files are attached as SHA256SUMS."
+          } >> release_notes.md
+
+      - name: Create tag and GitHub release with artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          DRAFT_FLAG=""
+          if [ "${{ inputs.create_draft }}" = "true" ]; then DRAFT_FLAG="--draft"; fi
+          gh release create "v$VERSION" \
+            --target "$GITHUB_SHA" \
+            --title "hypster v$VERSION" \
+            --notes-file release_notes.md \
+            $DRAFT_FLAG \
+            dist/*
+
+      - name: Summary
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          {
+            echo "## Release v$VERSION"
+            echo ""
+            echo "- Source SHA: \`$GITHUB_SHA\`"
+            echo "- PyPI: published with Trusted Publishing + PEP 740 attestations"
+            echo "- GitHub release: created after PyPI, with wheel, sdist, and SHA256SUMS attached"
+          } >> "$GITHUB_STEP_SUMMARY"

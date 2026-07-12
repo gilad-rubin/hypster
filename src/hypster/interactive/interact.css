@@ -1,3 +1,17 @@
+/* Host output containers paint an opaque background behind widgets; make it
+   transparent only for cells that actually contain a Hypster widget (ADR-0002:
+   anywidget CSS loads globally, so every rule must be Hypster-scoped). */
+.cell-output-ipywidget-background:has(.hypster-widget),
+.jp-OutputArea:has(.hypster-widget),
+.jp-OutputArea-output:has(.hypster-widget),
+.cell-output:has(.hypster-widget),
+.output:has(.hypster-widget),
+.output_area:has(.hypster-widget),
+.vscode-cell-output:has(.hypster-widget),
+.widget-subarea:has(.hypster-widget) {
+  background-color: transparent !important;
+}
+
 .hypster-widget {
   --hypster-border: color-mix(in srgb, currentColor 14%, transparent);
   --hypster-error: color-mix(in srgb, #d93025 76%, CanvasText 24%);

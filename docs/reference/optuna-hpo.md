@@ -25,7 +25,7 @@ suggest_values(trial, config, **kwargs) -> dict
 ```
 {% endcode %}
 
-Runs `config` with a trial-backed `HP` proxy and returns a `values` dictionary that can be passed to `instantiate()`.
+Runs `config` with the regular `HP` backed by a trial value provider (`hypster.hpo.TrialValueProvider`) and returns a `values` dictionary that can be passed to `instantiate()`. Both `suggest_values` and `TrialValueProvider` are importable from `hypster.hpo` directly. Suggested values pass the same validation as explicit values. The provider mechanism (`ValueProvider` in `hypster.hp`) is internal API; `TrialValueProvider` is its public Optuna implementation.
 
 {% code overflow="wrap" %}
 ```python
@@ -102,7 +102,7 @@ The current Optuna adapter uses `trial.suggest_categorical()` for `hp.select`. `
 | `hp.select` | `trial.suggest_categorical(path, keys)` |
 | `hp.nest` | Prefixes child parameter paths. |
 
-`multi_int`, `multi_float`, `multi_text`, `multi_bool`, and `multi_select` are not expanded by the Optuna adapter.
+Parameter kinds without an Optuna mapping — `hp.bool`, `hp.text`, `multi_int`, `multi_float`, `multi_text`, `multi_bool`, `multi_select`, `hp.rules`, and `hp.schema` — are not tuned: during `suggest_values()` they keep their defaults (validated as usual) and are not part of the returned values dict.
 
 Explicit child-local overrides passed with `hp.nest(child, name="child", values=...)` are validated before `suggest_values()` returns. Unknown or unreachable child keys raise instead of being silently ignored.
 
@@ -140,10 +140,13 @@ def weighted_choice_config(hp: HP):
 ```
 {% endcode %}
 
-Both fail during `suggest_values(trial, ...)` before a values dictionary is returned. Show the error as configuration feedback:
+Both fail during `suggest_values(trial, ...)` before a values dictionary is returned, with messages naming the exact unsupported field:
 
 {% code overflow="wrap" %}
 ```text
-This HPO spec cannot be represented by the Optuna adapter. Use uniform/loguniform float sampling, remove categorical weights or ordering, or implement custom sampling inside the objective.
+Parameter 'dropout': HpoFloat(center=..., spread=...) is only meaningful for normal/lognormal distributions, which are not supported by the Optuna suggest_float adapter.
+Parameter 'model': HpoCategorical(weights=...) is not supported by the Optuna suggest_categorical adapter.
 ```
 {% endcode %}
+
+Optuna itself also constrains log-scale steps: `HpoInt(scale="log")` only supports `step=1` (the adapter applies that automatically and rejects any other step), and `HpoFloat(scale="log")` cannot be combined with `step=` at all.

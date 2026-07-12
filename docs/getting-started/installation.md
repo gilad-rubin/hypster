@@ -1,6 +1,6 @@
 # Installation
 
-Hypster's core package has no runtime dependencies and supports Python 3.10, 3.11, and 3.12.
+Hypster's core package has no runtime dependencies and supports Python 3.10, 3.11, 3.12, and 3.13.
 
 ## Install With uv
 
@@ -46,7 +46,7 @@ python --version
 ```
 {% endcode %}
 
-Hypster supports Python 3.10, 3.11, and 3.12.
+Hypster supports Python 3.10, 3.11, 3.12, and 3.13.
 
 {% code overflow="wrap" %}
 ```bash
@@ -99,8 +99,8 @@ Expected tree:
 {% code overflow="wrap" %}
 ```text
 config
-├── data_dir: text = 'data'
-└── split: select = 'train'  (options: ['train', 'validation'])
+├── data_dir: text = "data"
+└── split: select = "train"  (options: ["train", "validation"])
 ```
 {% endcode %}
 

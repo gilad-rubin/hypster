@@ -104,3 +104,5 @@ def render_field(st, field):
 {% endcode %}
 
 For conditional UIs, rerun `explore(config, values=current_ui_values, return_schema=True)` whenever a branch-selecting value changes. That keeps the rendered fields aligned with the active branch.
+
+For the full task recipe — branch refresh, error handling, and submit guardrails — see [Build an Interactive UI](../how-to/build-an-interactive-ui.md).

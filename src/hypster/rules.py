@@ -29,6 +29,9 @@ class Leaf:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Leaf:
+        for key in ("field", "operator", "value"):
+            if key not in data:
+                raise ValueError(f"condition node is missing a {key!r} key")
         return cls(field=data["field"], operator=data["operator"], value=data["value"])
 
 
@@ -111,3 +114,20 @@ def _node_from_dict(data: dict[str, Any]) -> Condition:
     if "combinator" in data:
         return Group.from_dict(data)
     return Leaf.from_dict(data)
+
+
+def coerce_rules(raw: list) -> list[Rule]:
+    """Coerce a list of Rule objects or rule dicts into Rule objects."""
+    result = []
+    for i, item in enumerate(raw):
+        if isinstance(item, Rule):
+            result.append(item)
+        elif isinstance(item, dict):
+            result.append(Rule.from_dict(item))
+        else:
+            raise ValueError(f"rules[{i}]: expected a Rule or dict, got {type(item).__name__}")
+    return result
+
+
+def rules_to_jsonable(rules: list) -> list:
+    return [r.to_dict() if isinstance(r, Rule) else r for r in rules]

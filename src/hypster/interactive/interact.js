@@ -102,14 +102,9 @@ function conditionValueForOperator(spec, operator, currentValue) {
 }
 
 function specValueFromControl(input, spec) {
-  if (input instanceof HTMLSelectElement && input.multiple) {
-    return Array.from(input.selectedOptions, optionValue);
+  if (input instanceof HTMLSelectElement || input.type === "checkbox") {
+    return controlValue(input);
   }
-  if (input instanceof HTMLSelectElement) {
-    const option = input.selectedOptions[0];
-    return option ? optionValue(option) : null;
-  }
-  if (input.type === "checkbox") return input.checked;
   if (spec?.type === "int" || spec?.type === "float") {
     const value = spec.type === "int" ? Number.parseInt(input.value, 10) : Number.parseFloat(input.value);
     return Number.isFinite(value) ? value : defaultSpecValue(spec);
@@ -141,14 +136,12 @@ function valueFor(snapshot, parameter) {
   return parameter.selected_value;
 }
 
+// Kinds whose raw input string is decoded Python-side (widget._decode_value).
+const PYTHON_DECODED_KINDS = new Set(["int", "float", "multi_int", "multi_float", "multi_text", "multi_bool"]);
+
 function encodedControlValue(input) {
-  const kind = input.dataset.kind;
-  if (
-    kind === "int" ||
-    kind === "float" ||
-    ["multi_int", "multi_float", "multi_text", "multi_bool"].includes(kind)
-  ) {
-    return { encoded_value: { kind, value: input.value } };
+  if (PYTHON_DECODED_KINDS.has(input.dataset.kind)) {
+    return { encoded_value: { kind: input.dataset.kind, value: input.value } };
   }
   return { value: controlValue(input) };
 }
@@ -158,6 +151,8 @@ function actionId() {
 }
 
 function controlValue(input) {
+  // int/float/multi_* inputs never reach here: encodedControlValue routes
+  // them through the Python-side decoder as raw strings.
   if (input instanceof HTMLSelectElement && input.multiple) {
     return Array.from(input.selectedOptions, optionValue);
   }
@@ -167,12 +162,6 @@ function controlValue(input) {
   }
   if (input.type === "checkbox") {
     return input.checked;
-  }
-  if (input.dataset.kind === "int") {
-    return Number.parseInt(input.value, 10);
-  }
-  if (input.dataset.kind === "float") {
-    return Number.parseFloat(input.value);
   }
   return input.value;
 }

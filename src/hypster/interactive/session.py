@@ -4,13 +4,11 @@ import importlib.util
 from dataclasses import dataclass
 from typing import Any, Dict, Generic, Mapping, Optional, TypeVar
 
-from hypster.core import (
-    ConfigFunc,
-    UnknownPolicy,
-    _reject_removed_execution_argument_containers,
-    _reject_reserved_execution_arguments,
-    instantiate_with_params,
+from hypster._execution import (
+    reject_removed_execution_argument_containers,
+    reject_reserved_execution_arguments,
 )
+from hypster.core import ConfigFunc, UnknownPolicy, instantiate_with_params
 from hypster.explore import ConfigSchema, ParameterInfo, explore
 from hypster.utils import normalize_values
 
@@ -76,8 +74,8 @@ class InteractiveSession(Generic[T]):
 
     def __post_init__(self) -> None:
         self._kwargs = dict(self.execution_kwargs or {})
-        _reject_removed_execution_argument_containers(self._kwargs)
-        _reject_reserved_execution_arguments(
+        reject_removed_execution_argument_containers(self._kwargs)
+        reject_reserved_execution_arguments(
             "interact()",
             self._kwargs,
             {"return_schema", "return_info"},
@@ -155,9 +153,12 @@ class InteractiveSession(Generic[T]):
             raise RuntimeError("Interactive session has not been initialized")
 
         current_parameters = _parameters(self._schema)
-        current_paths = [parameter.path for parameter in current_parameters]
-        if path not in current_paths:
-            raise ValueError(f"Cannot set unreachable parameter: {path}")
+        current_parameter = next((parameter for parameter in current_parameters if parameter.path == path), None)
+        if current_parameter is None:
+            # Unreachable path: surface the backend's own unknown-parameter error
+            # (CONTEXT.md: the controller must not duplicate backend validation).
+            self._explore({**self._draft_values, path: value})
+            return  # on_unknown is warn/ignore: nothing reachable to set
 
         self._memory.remember_many(current_parameters, self._draft_values)
 
@@ -168,8 +169,6 @@ class InteractiveSession(Generic[T]):
                 break
             if parameter.path in self._draft_values:
                 prefix_values[parameter.path] = self._draft_values[parameter.path]
-
-        current_parameter = next(parameter for parameter in current_parameters if parameter.path == path)
         self._memory.remember(current_parameter, value, _context_for(current_parameters, prefix_values, path))
 
         try:

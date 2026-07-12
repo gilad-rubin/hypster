@@ -454,22 +454,32 @@ def test_interact_multiple_widget_views_share_session_updates() -> None:
     assert result.value == {"count": 4}
 
 
-def test_interact_widget_display_includes_vscode_background_shim(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[Any, Dict[str, Any]]] = []
+def test_interact_css_background_shim_is_hypster_scoped() -> None:
+    """ADR-0002: anywidget CSS loads globally, so the host-background shim must
+    only affect output cells that actually contain a Hypster widget."""
+    from pathlib import Path
 
-    def fake_display(obj: Any = None, **kwargs: Any) -> None:
-        calls.append((obj, kwargs))
+    import hypster.interactive.widget as widget_module
+
+    css = (Path(widget_module.__file__).parent / "interact.css").read_text()
+
+    assert ".cell-output-ipywidget-background:has(.hypster-widget)" in css
+    assert ".vscode-cell-output:has(.hypster-widget)" in css
+    # No unscoped host-container rule may remain.
+    for line in css.splitlines():
+        selector = line.strip().rstrip(",{").strip()
+        if selector.startswith((".jp-", ".cell-output", ".output", ".vscode-", ".widget-subarea")):
+            assert ":has(.hypster-widget)" in selector, f"unscoped host selector: {selector}"
+
+
+def test_set_value_unreachable_path_surfaces_backend_error() -> None:
+    """CONTEXT.md: the controller must not duplicate backend validation —
+    unreachable paths get the backend's unknown-parameter error."""
 
     def config(hp: HP) -> Dict[str, int]:
         return {"count": hp.int(1, name="count", min=1, max=5)}
 
-    monkeypatch.setattr("IPython.display.display", fake_display)
+    result = interact(config)
 
-    widget = interact(config).interact()
-    widget._ipython_display_()
-
-    assert len(calls) == 2
-    assert "cell-output-ipywidget-background" in calls[0][0].data
-    assert "vscode-cell-output" in calls[0][0].data
-    assert calls[1][1]["raw"] is True
-    assert "application/vnd.jupyter.widget-view+json" in calls[1][0]
+    with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
+        result.dispatch({"type": "set_value", "path": "nope", "value": 3})

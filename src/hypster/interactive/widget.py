@@ -9,19 +9,6 @@ import traitlets
 
 from .session import InteractiveResult
 
-_BACKGROUND_SHIM = """<style>
-.cell-output-ipywidget-background,
-.jp-OutputArea,
-.jp-OutputArea-output,
-.cell-output,
-.output,
-.output_area,
-.vscode-cell-output,
-.widget-subarea {
-  background-color: transparent !important;
-}
-</style>"""
-
 
 class HypsterInteractWidget(anywidget.AnyWidget):
     _esm = Path(__file__).parent / "interact.js"
@@ -40,13 +27,6 @@ class HypsterInteractWidget(anywidget.AnyWidget):
         if not action:
             return
         self._result.dispatch(_decode_action(action))
-
-    def _ipython_display_(self) -> None:
-        from IPython.display import HTML, display
-
-        display(HTML(_BACKGROUND_SHIM))
-        data, metadata = super()._repr_mimebundle_()
-        display(data, metadata=metadata, raw=True)
 
 
 def _decode_action(action: Dict[str, Any]) -> Dict[str, Any]:

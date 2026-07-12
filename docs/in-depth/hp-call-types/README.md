@@ -14,6 +14,7 @@ The examples in this reference sometimes return small dictionaries to keep the c
 | `hp.bool` | Booleans | Requires actual `True` or `False`, not string values. |
 | `hp.select` | One categorical choice | Supports list options or dict-backed key-to-value mapping. |
 | `hp.rules` | Declarative WHEN/THEN rule lists | Returns `Rule` objects and records JSON-friendly rule dictionaries for replay. |
+| `hp.schema` | Typed field-definition lists | Returns `SchemaField` objects; see [Schema](schema.md). |
 
 ## Multi-Value Calls
 

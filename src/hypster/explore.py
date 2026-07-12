@@ -5,16 +5,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from .core import (
-    ConfigFunc,
-    _handle_unknown_parameters,
-    _reject_removed_execution_argument_containers,
-    _reject_reserved_execution_arguments,
-    _validate_on_unknown,
+from ._execution import (
+    reject_removed_execution_argument_containers,
+    reject_reserved_execution_arguments,
 )
-from .hp import HP
-from .hp_calls import HPCallError
-from .utils import normalize_values, validate_config_func_signature
+from .core import ConfigFunc, _run_config
 
 
 def _format_value(value: Any) -> str:
@@ -154,16 +149,12 @@ class ConfigSchema:
         return self.format_tree()
 
 
-class SchemaTracer(HP):
-    def __init__(self, values: Dict[str, Any], parameter_tracker: Optional[Any] = None):
-        tracker = parameter_tracker or self
-        super().__init__(values, parameter_tracker=tracker)
-        if parameter_tracker is None:
-            self._schema = ConfigSchema(name="")
-            self._nodes_by_path: Dict[str, ParameterInfo] = {}
-        else:
-            self._schema = tracker._schema
-            self._nodes_by_path = tracker._nodes_by_path
+class SchemaBuilder:
+    """Parameter tracker that assembles a ConfigSchema tree from HP recording events."""
+
+    def __init__(self) -> None:
+        self.schema = ConfigSchema(name="")
+        self._nodes_by_path: Dict[str, ParameterInfo] = {}
 
     def record_nest(
         self,
@@ -173,7 +164,7 @@ class SchemaTracer(HP):
         description: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        group = self._ensure_group(path, name)
+        group = self._ensure_group(path)
         group.description = description
         if metadata is not None:
             group.metadata = metadata
@@ -192,9 +183,6 @@ class SchemaTracer(HP):
         description: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        parent_path = path.rpartition(".")[0]
-        container = self._schema.parameters if not parent_path else self._ensure_group_path(parent_path).children
-
         parameter = ParameterInfo(
             name=name,
             path=path,
@@ -209,7 +197,7 @@ class SchemaTracer(HP):
         )
         existing = self._nodes_by_path.get(path)
         if existing is None:
-            container.append(parameter)
+            self._container_for(path).append(parameter)
             self._nodes_by_path[path] = parameter
             return
 
@@ -223,28 +211,23 @@ class SchemaTracer(HP):
         existing.metadata = metadata
 
     def build_schema(self, root_name: str) -> ConfigSchema:
-        self._schema.name = root_name
-        return self._schema
+        self.schema.name = root_name
+        return self.schema
 
-    def _ensure_group_path(self, path: str) -> ParameterInfo:
+    def _container_for(self, path: str) -> List[ParameterInfo]:
+        parent_path = path.rpartition(".")[0]
+        if not parent_path:
+            return self.schema.parameters
+        return self._ensure_group(parent_path).children
+
+    def _ensure_group(self, path: str) -> ParameterInfo:
         existing = self._nodes_by_path.get(path)
         if existing is not None:
             return existing
 
-        parent_path, _, name = path.rpartition(".")
-        return self._ensure_group(path, name, parent_path=parent_path or None)
-
-    def _ensure_group(self, path: str, name: str, parent_path: Optional[str] = None) -> ParameterInfo:
-        existing = self._nodes_by_path.get(path)
-        if existing is not None:
-            return existing
-
-        if parent_path is None:
-            parent_path = path.rpartition(".")[0]
-
-        container = self._schema.parameters if not parent_path else self._ensure_group_path(parent_path).children
+        name = path.rpartition(".")[2]
         group = ParameterInfo(name=name, path=path, kind="group")
-        container.append(group)
+        self._container_for(path).append(group)
         self._nodes_by_path[path] = group
         return group
 
@@ -257,30 +240,17 @@ def explore(
     return_schema: bool = False,
     **kwargs: Any,
 ) -> Optional[ConfigSchema]:
-    validate_config_func_signature(func)
-    _validate_on_unknown(on_unknown)
-    _reject_removed_execution_argument_containers(kwargs)
-    _reject_reserved_execution_arguments(
+    reject_removed_execution_argument_containers(kwargs)
+    reject_reserved_execution_arguments(
         "explore()",
         kwargs,
         {"return_info"},
         "Use return_schema=True to return a ConfigSchema, or rename this execution argument.",
     )
 
-    normalized_values: Dict[str, Any] = normalize_values(values)
-    tracer = SchemaTracer(normalized_values)
-    original_called_params = tracer.called_params.copy()
-
-    try:
-        func(tracer, **kwargs)
-    except HPCallError as e:
-        raise ValueError(str(e)) from e
-
-    called_params = tracer.called_params - original_called_params
-    leaf_params = called_params - tracer.nested_scope_paths
-    _handle_unknown_parameters(normalized_values, leaf_params, on_unknown)
-
-    schema = tracer.build_schema(getattr(func, "__name__", func.__class__.__name__))
+    builder = SchemaBuilder()
+    _run_config(func, values=values, kwargs=kwargs, on_unknown=on_unknown, parameter_tracker=builder)
+    schema = builder.build_schema(getattr(func, "__name__", func.__class__.__name__))
 
     if return_schema:
         return schema
