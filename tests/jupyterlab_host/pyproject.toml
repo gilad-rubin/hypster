@@ -6,6 +6,7 @@ dependencies = [
     "anywidget>=0.9,<0.12",
     "jupyterlab>=4,<5",
     "jupyterlab-widgets>=3,<4",
+    "notebook>=7,<8",
     "playwright>=1.55,<2",
     "pytest>=8,<10",
 ]

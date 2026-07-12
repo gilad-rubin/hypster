@@ -1,27 +1,25 @@
-# JupyterLab real-host harness
+# Notebook real-host harness
 
-This harness proves the current Hypster anywidget through a real JupyterLab 4
-server, kernel, and Chromium page. Its sole notebook fixture is
-`branch_round_trip.ipynb`.
+This harness proves the current Hypster anywidget through real JupyterLab 4 +
+Chromium and Notebook 7 + Firefox hosts. Both use the sole notebook fixture,
+`branch_round_trip.ipynb`, and the same basic branch/numeric round trip.
 
 The test creates a temporary kernel environment, installs the repository's
 built wheel with `[viz]` from the checked-in kernel lock, and copies the fixture
 outside the source checkout. It then crosses the real boundary:
 
 ```text
-Chromium DOM event -> anywidget comm -> Python controller -> replacement DOM
+Browser DOM event -> anywidget comm -> Python controller -> replacement DOM
 ```
 
-Notebook verification cells are independent Python oracles for auto-applied,
-staged, invalid, applied, and reset `result.params` values. The canonical
-scenario also switches the real JupyterLab theme, verifies Branch Choice
-Memory, drives Apply and Reset in manual mode, and sends a mismatched Protocol
-V1 snapshot through the live widget comm before recovering with a valid
-snapshot. Reused Python oracle cells must publish a new execution count and
-unique output identity. Browser errors, cell errors, unexpected visible widget
-errors, missing comm-driven replacement DOM, and timeouts fail the run. The
-browser, Jupyter server, kernel, and their process group are terminated on
-every exit.
+The Notebook 7 job runs the shared basic scenario and its fresh Python oracle.
+The canonical JupyterLab scenario additionally switches the real host theme,
+verifies Branch Choice Memory, drives Apply and Reset in manual mode, and sends
+a mismatched Protocol V1 snapshot through the live widget comm before recovery.
+Reused Python oracle cells must publish a new execution count and unique output
+identity. Browser errors, cell errors, unexpected visible widget errors,
+missing comm-driven replacement DOM, and timeouts fail the run. The browser,
+Jupyter server, kernel, and their process group terminate on every exit.
 
 ## Local run
 
@@ -30,13 +28,33 @@ From the repository root:
 ```bash
 uv sync --project tests/jupyterlab_host --frozen
 uv build --wheel --out-dir dist
-uv run --project tests/jupyterlab_host --frozen playwright install chromium
+uv run --project tests/jupyterlab_host --frozen playwright install chromium firefox
 WHEEL=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
 HYPSTER_HOST_WHEEL="$WHEEL" \
-HYPSTER_HOST_ARTIFACT_DIR="$PWD/host-evidence" \
+HYPSTER_HOST_ARTIFACT_DIR="$PWD/host-evidence-jupyterlab" \
 uv run --project tests/jupyterlab_host --frozen \
-  pytest tests/jupyterlab_host/test_jupyterlab_host.py -o addopts= -q -s
+  pytest tests/jupyterlab_host/test_jupyterlab_host.py::test_real_jupyterlab_round_trip -o addopts= -q -s
+
+HYPSTER_HOST_WHEEL="$WHEEL" \
+HYPSTER_HOST_ARTIFACT_DIR="$PWD/host-evidence-notebook7" \
+uv run --project tests/jupyterlab_host --frozen \
+  pytest tests/jupyterlab_host/test_jupyterlab_host.py::test_real_notebook7_round_trip -o addopts= -q -s
 ```
 
 The wheel path and artifact directory are mandatory; the harness has no source
 checkout or evidence-path fallback.
+
+## Current Notebook 7 blocker
+
+Issue #108 records a Notebook `7.6.0` page exception observed in Firefox before
+any Hypster cell executes. The Notebook node intentionally remains red on that
+exception: the harness records errors before widget execution, after the basic
+round trip, and at shutdown, then fails without filtering host errors.
+
+The required fault injections were also exercised against the physical host:
+
+- Sending `1.50` while the shared oracle requires `1.25` failed at the
+  replacement-DOM value assertion (`1.5 != 1.25`).
+- Leaving the previous verification output in place while making the next cell
+  execution a no-op failed because the prompt stayed at `[2]:`; stale marker
+  text did not satisfy the fresh-execution check.

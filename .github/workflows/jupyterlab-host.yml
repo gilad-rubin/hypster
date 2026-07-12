@@ -1,4 +1,4 @@
-name: JupyterLab host
+name: Notebook hosts
 
 on:
   pull_request:
@@ -10,8 +10,19 @@ permissions:
 
 jobs:
   real-host-round-trip:
+    name: ${{ matrix.host }} (${{ matrix.browser }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: jupyterlab
+            browser: chromium
+            test: test_real_jupyterlab_round_trip
+          - host: notebook7
+            browser: firefox
+            test: test_real_notebook7_round_trip
     steps:
       - uses: actions/checkout@v6.0.2
         with:
@@ -28,32 +39,32 @@ jobs:
 
       - name: Capture setup versions
         run: |
-          mkdir -p host-evidence
-          uv --version > host-evidence/setup.txt
-          uv run --project tests/jupyterlab_host --frozen python --version >> host-evidence/setup.txt
+          mkdir -p host-evidence-${{ matrix.host }}
+          uv --version > host-evidence-${{ matrix.host }}/setup.txt
+          uv run --project tests/jupyterlab_host --frozen python --version >> host-evidence-${{ matrix.host }}/setup.txt
           uv run --project tests/jupyterlab_host --frozen python -c \
-            'import importlib.metadata as m; print("jupyterlab", m.version("jupyterlab")); print("playwright", m.version("playwright"))' \
-            >> host-evidence/setup.txt
+            'import importlib.metadata as m; names=("jupyter-server", "jupyterlab", "notebook", "playwright"); print("\n".join(f"{name} {m.version(name)}" for name in names))' \
+            >> host-evidence-${{ matrix.host }}/setup.txt
 
       - name: Build repository wheel
         run: uv build --wheel --out-dir dist
 
-      - name: Install Chromium
-        run: uv run --project tests/jupyterlab_host --frozen playwright install --with-deps chromium
+      - name: Install ${{ matrix.browser }}
+        run: uv run --project tests/jupyterlab_host --frozen playwright install --with-deps ${{ matrix.browser }}
 
-      - name: Run real JupyterLab round trip
+      - name: Run real ${{ matrix.host }} round trip
         run: |
           WHEEL=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
           test -n "$WHEEL"
           HYPSTER_HOST_WHEEL="$WHEEL" \
-          HYPSTER_HOST_ARTIFACT_DIR="$PWD/host-evidence" \
+          HYPSTER_HOST_ARTIFACT_DIR="$PWD/host-evidence-${{ matrix.host }}" \
           uv run --project tests/jupyterlab_host --frozen \
-            pytest tests/jupyterlab_host/test_jupyterlab_host.py -o addopts= -q -s
+            pytest tests/jupyterlab_host/test_jupyterlab_host.py::${{ matrix.test }} -o addopts= -q -s
 
       - name: Upload host evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: jupyterlab-host-${{ github.run_id }}
-          path: host-evidence/
+          name: ${{ matrix.host }}-${{ matrix.browser }}-${{ github.run_id }}
+          path: host-evidence-${{ matrix.host }}/
           if-no-files-found: error
