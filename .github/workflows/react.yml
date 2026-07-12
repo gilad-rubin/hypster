@@ -1,0 +1,32 @@
+name: React package
+
+on:
+  pull_request:
+    paths:
+      - "packages/react/**"
+      - ".github/workflows/react.yml"
+  push:
+    branches: [master]
+    paths:
+      - "packages/react/**"
+      - ".github/workflows/react.yml"
+
+jobs:
+  test-build-pack:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/react
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: packages/react/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm pack --dry-run
