@@ -177,7 +177,7 @@ _Avoid_: exploration error, validation error
 - Reachable `values=` entries seed both the initial widget state and the remembered branch-choice state for that interactive session.
 - **Branch Choice Memory** is created only from reachable `values=` entries and subsequent user **Interactive Actions** during the live session.
 - **Branch Choice Memory** is in-memory state scoped to one **Interactive Result**; it is not persisted or shared across fresh interactive sessions.
-- When a parameter becomes reachable again, the interactive controller chooses the most recent compatible value from **Branch Choice Memory**, then the parameter default, then the first available option when the parameter kind supports option fallback.
+- When an **Interactive Action** re-derives a downstream parameter, the interactive controller chooses the most recent compatible value from exact-context **Branch Choice Memory**, then its compatible current **Draft Value**, then the parameter default, then the first available option when the parameter kind supports option fallback.
 - Incompatible remembered values are skipped rather than treated as errors.
 - **Branch Choice Memory** applies to nested parameters by **Parameter Path**.
 - Reset restores the **Interactive Baseline**, clears later branch memory and pending edits, and applies that restored state immediately.

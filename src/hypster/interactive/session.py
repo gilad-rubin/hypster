@@ -12,7 +12,7 @@ from hypster.core import ConfigFunc, UnknownPolicy, instantiate_with_params
 from hypster.explore import ConfigSchema, ParameterInfo, explore
 from hypster.utils import normalize_values
 
-from .branch_memory import BranchChoiceMemory
+from .branch_memory import BranchChoiceMemory, is_compatible_value
 
 T = TypeVar("T")
 
@@ -182,7 +182,10 @@ class InteractiveSession(Generic[T]):
         self._memory.remember(current_parameter, value, _context_for(current_parameters, prefix_values, path))
 
         try:
-            schema, selected_values = self._build_values(prefix_values)
+            schema, selected_values = self._build_values(
+                prefix_values,
+                current_draft_values=dict(self._draft_values),
+            )
         except Exception as exc:
             self._draft_values = {**self._draft_values, **prefix_values}
             self._draft_error = InteractiveError(kind="exploration", message=str(exc))
@@ -238,7 +241,11 @@ class InteractiveSession(Generic[T]):
         except Exception as exc:
             self._applied_error = InteractiveError(kind="instantiation", message=str(exc))
 
-    def _build_values(self, seed_values: Dict[str, Any]) -> tuple[ConfigSchema, Dict[str, Any]]:
+    def _build_values(
+        self,
+        seed_values: Dict[str, Any],
+        current_draft_values: Optional[Mapping[str, Any]] = None,
+    ) -> tuple[ConfigSchema, Dict[str, Any]]:
         values = dict(seed_values)
         while True:
             schema = self._explore(values)
@@ -248,7 +255,42 @@ class InteractiveSession(Generic[T]):
                 return schema, values
 
             found, value = self._memory.latest_compatible(missing, _context_for(parameters, values, missing.path))
-            values[missing.path] = value if found else missing.selected_value
+            if found:
+                values[missing.path] = value
+            elif (
+                current_draft_values is not None
+                and missing.path in current_draft_values
+                and self._is_compatible_current_value(
+                    missing,
+                    current_draft_values[missing.path],
+                    values,
+                )
+            ):
+                # An upstream edit re-derives everything after the changed
+                # path; a still-compatible current value survives it instead
+                # of collapsing to the schema default. Exact-context branch
+                # memory above stays the stronger signal.
+                values[missing.path] = current_draft_values[missing.path]
+            else:
+                values[missing.path] = missing.selected_value
+
+    def _is_compatible_current_value(
+        self,
+        parameter: ParameterInfo,
+        value: Any,
+        preceding_values: Mapping[str, Any],
+    ) -> bool:
+        if value is not None:
+            return is_compatible_value(parameter, value)
+
+        # Explore Schema does not expose allow_none. Ask the backend whether
+        # this previously valid explicit None remains valid after the upstream
+        # edit instead of duplicating nullability rules in the controller.
+        try:
+            self._explore({**preceding_values, parameter.path: value})
+        except Exception:
+            return False
+        return True
 
     def _explore(self, values: Dict[str, Any]) -> ConfigSchema:
         schema = explore(

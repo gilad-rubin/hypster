@@ -158,7 +158,7 @@ def test_interact_remembers_latest_compatible_branch_choice() -> None:
     assert result.params == {"provider": "gemini", "model": "pro"}
 
 
-def test_interact_separates_same_path_values_by_branch_context() -> None:
+def test_interact_carries_into_unvisited_branch_then_restores_context_memory() -> None:
     def config(hp: HP) -> Dict[str, Any]:
         mode = hp.select(["a", "b"], name="mode", default="a")
         if mode == "a":
@@ -172,7 +172,9 @@ def test_interact_separates_same_path_values_by_branch_context() -> None:
     result.dispatch({"protocol_version": 1, "type": "set_value", "path": "n", "value": 7})
     result.dispatch({"protocol_version": 1, "type": "set_value", "path": "mode", "value": "b"})
 
-    assert result.params == {"mode": "b", "n": 0}
+    # No memory under the b-context yet, but the current value is still
+    # shape-compatible, so it carries across the upstream edit.
+    assert result.params == {"mode": "b", "n": 7}
 
     result.dispatch({"protocol_version": 1, "type": "set_value", "path": "n", "value": 3})
     result.dispatch({"protocol_version": 1, "type": "set_value", "path": "mode", "value": "a"})
@@ -324,6 +326,49 @@ def test_interact_reset_reports_errors_without_stale_value() -> None:
     assert snapshot["selected_params"] is None
     with pytest.raises(RuntimeError, match="reset failed"):
         result.value
+
+
+def test_interact_upstream_edit_preserves_independent_downstream_values() -> None:
+    """Editing one parameter must not reset unrelated later parameters.
+
+    Regression: a session seeded with non-default values (values=...) lost
+    every parameter after the edited path — text prompts collapsed to "" and
+    rules to [] — because re-derivation only consulted exact-context branch
+    memory before falling back to schema defaults."""
+
+    def config(hp: HP) -> Dict[str, Any]:
+        top_k = hp.int(30, name="top_k", min=1, max=100)
+        system_prompt = hp.text("", name="system_prompt")
+        use_citations = hp.bool(False, name="use_citations")
+        return {"top_k": top_k, "system_prompt": system_prompt, "use_citations": use_citations}
+
+    result = interact(
+        config,
+        values={"system_prompt": "seeded prompt", "use_citations": True},
+    )
+
+    assert result.params == {"top_k": 30, "system_prompt": "seeded prompt", "use_citations": True}
+
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "top_k", "value": 25})
+
+    assert snapshot["status"] == "applied"
+    assert result.params == {"top_k": 25, "system_prompt": "seeded prompt", "use_citations": True}
+    assert snapshot["draft_values"]["system_prompt"] == "seeded prompt"
+    assert snapshot["selected_params"]["use_citations"] is True
+
+
+def test_interact_upstream_edit_preserves_nullable_downstream_value() -> None:
+    def config(hp: HP) -> Dict[str, Any]:
+        top_k = hp.int(30, name="top_k", min=1, max=100)
+        optional_note = hp.text("fallback", name="optional_note", allow_none=True)
+        return {"top_k": top_k, "optional_note": optional_note}
+
+    result = interact(config, values={"optional_note": None})
+
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "top_k", "value": 25})
+
+    assert snapshot["status"] == "applied"
+    assert snapshot["selected_params"] == {"top_k": 25, "optional_note": None}
 
 
 def test_interact_branch_memory_rejects_incompatible_multi_value_history() -> None:

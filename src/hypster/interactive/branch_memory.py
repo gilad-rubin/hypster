@@ -25,7 +25,7 @@ class BranchChoiceMemory:
 
     def latest_compatible(self, parameter: ParameterInfo, context: Mapping[str, Any]) -> tuple[bool, Any]:
         for value in reversed(self._history.get(_memory_key(parameter, context), [])):
-            if _is_compatible(parameter, value):
+            if is_compatible_value(parameter, value):
                 return True, value
         return False, None
 
@@ -55,7 +55,7 @@ def _stable_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, default=repr, separators=(",", ":"))
 
 
-def _is_compatible(parameter: ParameterInfo, value: Any) -> bool:
+def is_compatible_value(parameter: ParameterInfo, value: Any) -> bool:
     if parameter.options is not None:
         return _matches_options(parameter.kind, value, parameter.options)
     if parameter.kind == "bool":
