@@ -158,7 +158,7 @@ def test_interact_remembers_latest_compatible_branch_choice() -> None:
     assert result.params == {"provider": "gemini", "model": "pro"}
 
 
-def test_interact_separates_same_path_values_by_branch_context() -> None:
+def test_interact_carries_into_unvisited_branch_then_restores_context_memory() -> None:
     def config(hp: HP) -> Dict[str, Any]:
         mode = hp.select(["a", "b"], name="mode", default="a")
         if mode == "a":
@@ -355,6 +355,20 @@ def test_interact_upstream_edit_preserves_independent_downstream_values() -> Non
     assert result.params == {"top_k": 25, "system_prompt": "seeded prompt", "use_citations": True}
     assert snapshot["draft_values"]["system_prompt"] == "seeded prompt"
     assert snapshot["selected_params"]["use_citations"] is True
+
+
+def test_interact_upstream_edit_preserves_nullable_downstream_value() -> None:
+    def config(hp: HP) -> Dict[str, Any]:
+        top_k = hp.int(30, name="top_k", min=1, max=100)
+        optional_note = hp.text("fallback", name="optional_note", allow_none=True)
+        return {"top_k": top_k, "optional_note": optional_note}
+
+    result = interact(config, values={"optional_note": None})
+
+    snapshot = result.dispatch({"protocol_version": 1, "type": "set_value", "path": "top_k", "value": 25})
+
+    assert snapshot["status"] == "applied"
+    assert snapshot["selected_params"] == {"top_k": 25, "optional_note": None}
 
 
 def test_interact_branch_memory_rejects_incompatible_multi_value_history() -> None:

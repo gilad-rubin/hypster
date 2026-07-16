@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.1] - 2026-07-16
 
 ### Fixed
-- An interactive `set_value` no longer resets every parameter after the edited path to its schema default. Re-derivation now falls back to the parameter's current value when it is still shape-compatible (options, bounds, kind) before collapsing to the default; exact-context Branch Choice Memory still takes precedence, so per-branch recall is unchanged. Previously, any upstream edit silently discarded seeded or user-entered downstream values — a session seeded with `values=` (for example, profile-provided prompts) lost them to `""`/`[]` on the first unrelated edit.
+- An interactive `set_value` no longer resets every parameter after the edited path to its schema default. Re-derivation now falls back to the parameter's current value when it is still shape-compatible (options, bounds, kind, and nullability) before collapsing to the default; exact-context Branch Choice Memory still takes precedence, so revisiting a branch restores its remembered value. Previously, any upstream edit silently discarded seeded or user-entered downstream values — a session seeded with `values=` (for example, profile-provided prompts or an explicit nullable value) lost them to their defaults on the first unrelated edit.
 
 ## [0.9.0] - 2026-07-12
 
