@@ -12,7 +12,7 @@ from hypster.core import ConfigFunc, UnknownPolicy, instantiate_with_params
 from hypster.explore import ConfigSchema, ParameterInfo, explore
 from hypster.utils import normalize_values
 
-from .branch_memory import BranchChoiceMemory
+from .branch_memory import BranchChoiceMemory, is_compatible
 
 T = TypeVar("T")
 
@@ -182,7 +182,7 @@ class InteractiveSession(Generic[T]):
         self._memory.remember(current_parameter, value, _context_for(current_parameters, prefix_values, path))
 
         try:
-            schema, selected_values = self._build_values(prefix_values)
+            schema, selected_values = self._build_values(prefix_values, carry=dict(self._draft_values))
         except Exception as exc:
             self._draft_values = {**self._draft_values, **prefix_values}
             self._draft_error = InteractiveError(kind="exploration", message=str(exc))
@@ -238,7 +238,9 @@ class InteractiveSession(Generic[T]):
         except Exception as exc:
             self._applied_error = InteractiveError(kind="instantiation", message=str(exc))
 
-    def _build_values(self, seed_values: Dict[str, Any]) -> tuple[ConfigSchema, Dict[str, Any]]:
+    def _build_values(
+        self, seed_values: Dict[str, Any], carry: Optional[Mapping[str, Any]] = None
+    ) -> tuple[ConfigSchema, Dict[str, Any]]:
         values = dict(seed_values)
         while True:
             schema = self._explore(values)
@@ -248,7 +250,16 @@ class InteractiveSession(Generic[T]):
                 return schema, values
 
             found, value = self._memory.latest_compatible(missing, _context_for(parameters, values, missing.path))
-            values[missing.path] = value if found else missing.selected_value
+            if found:
+                values[missing.path] = value
+            elif carry is not None and missing.path in carry and is_compatible(missing, carry[missing.path]):
+                # An upstream edit re-derives everything after the changed
+                # path; a still-compatible current value survives it instead
+                # of collapsing to the schema default. Exact-context branch
+                # memory above stays the stronger signal.
+                values[missing.path] = carry[missing.path]
+            else:
+                values[missing.path] = missing.selected_value
 
     def _explore(self, values: Dict[str, Any]) -> ConfigSchema:
         schema = explore(
