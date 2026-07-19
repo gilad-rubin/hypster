@@ -16,7 +16,7 @@ jobs:
       HYPSTER_NOTEBOOK: ${{ github.workspace }}/tests/jupyterlab_host/branch_round_trip.ipynb
       HYPSTER_VSCODE_ARTIFACT_DIR: ${{ github.workspace }}/host-evidence/vscode
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
 
