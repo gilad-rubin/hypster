@@ -172,7 +172,7 @@ def test_interact_carries_into_unvisited_branch_then_restores_context_memory() -
     result.dispatch({"protocol_version": 1, "type": "set_value", "path": "n", "value": 7})
     result.dispatch({"protocol_version": 1, "type": "set_value", "path": "mode", "value": "b"})
 
-    # No memory under the b-context yet, but the current value is still
+    # No memory under the b-context yet, but the value the user set is still
     # shape-compatible, so it carries across the upstream edit.
     assert result.params == {"mode": "b", "n": 7}
 
@@ -369,6 +369,149 @@ def test_interact_upstream_edit_preserves_nullable_downstream_value() -> None:
 
     assert snapshot["status"] == "applied"
     assert snapshot["selected_params"] == {"top_k": 25, "optional_note": None}
+
+
+def _encoder(hp: HP) -> Dict[str, Any]:
+    size = hp.select(["small", "base"], name="size", default="small")
+    hidden_size = hp.int(384 if size == "small" else 768, name="hidden_size", min=1)
+    num_heads = hp.int(6 if size == "small" else 12, name="num_heads", min=1)
+    return {"size": size, "hidden_size": hidden_size, "num_heads": num_heads}
+
+
+_ATTENTION_PRESETS = {
+    "small": {"hidden_size": 384, "num_heads": 6},
+    "base": {"hidden_size": 768, "num_heads": 12},
+}
+
+
+def _attention(hp: HP, preset: Dict[str, int]) -> Dict[str, int]:
+    return {
+        "hidden_size": hp.int(preset["hidden_size"], name="hidden_size", min=1),
+        "num_heads": hp.int(preset["num_heads"], name="num_heads", min=1),
+    }
+
+
+def _preset_encoder(hp: HP) -> Dict[str, Any]:
+    preset = hp.select(["small", "base"], name="preset", default="small")
+    return {"preset": preset, "attention": hp.nest(_attention, name="attention", preset=_ATTENTION_PRESETS[preset])}
+
+
+def _nested_model(hp: HP) -> Dict[str, Any]:
+    return {"encoder": hp.nest(_preset_encoder, name="encoder")}
+
+
+def test_interact_upstream_edit_rederives_dependent_default() -> None:
+    """A default computed from an upstream choice follows that choice.
+
+    Regression (0.9.1): an upstream edit carried every current draft value
+    forward, defaults included, so ``hidden_size`` stayed 384 after
+    ``size="base"`` while ``instantiate`` gave 768."""
+
+    result = interact(_encoder)
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "size", "value": "base"})
+
+    assert result.params == {"size": "base", "hidden_size": 768, "num_heads": 12}
+    assert result.params == instantiate_with_params(_encoder, values={"size": "base"}).params
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "size", "value": "small"})
+
+    assert result.params == {"size": "small", "hidden_size": 384, "num_heads": 6}
+
+
+def test_interact_upstream_edit_keeps_user_value_and_rederives_untouched_defaults() -> None:
+    """A value the user set survives an upstream edit (the 0.9.0 regression);
+    a sibling the user never touched still re-derives its default (the 0.9.1
+    regression). The session then matches ``instantiate`` with the user's values."""
+
+    result = interact(_encoder)
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "hidden_size", "value": 1000})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "size", "value": "base"})
+
+    assert result.params == {"size": "base", "hidden_size": 1000, "num_heads": 12}
+    assert result.params == instantiate_with_params(_encoder, values={"hidden_size": 1000, "size": "base"}).params
+
+
+def test_interact_nested_upstream_edit_rederives_dependent_defaults() -> None:
+    result = interact(_nested_model)
+
+    assert result.params == {
+        "encoder.preset": "small",
+        "encoder.attention.hidden_size": 384,
+        "encoder.attention.num_heads": 6,
+    }
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "encoder.preset", "value": "base"})
+
+    assert result.params == {
+        "encoder.preset": "base",
+        "encoder.attention.hidden_size": 768,
+        "encoder.attention.num_heads": 12,
+    }
+    assert result.params == instantiate_with_params(_nested_model, values={"encoder.preset": "base"}).params
+
+
+def test_interact_nested_upstream_edit_keeps_user_value_and_rederives_untouched_defaults() -> None:
+    result = interact(_nested_model)
+
+    result.dispatch(
+        {"protocol_version": 1, "type": "set_value", "path": "encoder.attention.hidden_size", "value": 1000}
+    )
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "encoder.preset", "value": "base"})
+
+    assert result.params == {
+        "encoder.preset": "base",
+        "encoder.attention.hidden_size": 1000,
+        "encoder.attention.num_heads": 12,
+    }
+    assert (
+        result.params
+        == instantiate_with_params(
+            _nested_model,
+            values={"encoder.attention.hidden_size": 1000, "encoder.preset": "base"},
+        ).params
+    )
+
+
+def test_interact_forced_value_is_not_carried_as_a_user_choice() -> None:
+    """When an option list narrows, the session falls back to what is left.
+    That forced value is not the user's choice, so it must not outlive the
+    narrowing; the user's own choice comes back instead."""
+
+    def config(hp: HP) -> Dict[str, str]:
+        fill = hp.select(["none", "solid", "tint"], name="fill", default="solid")
+        inks = ["tone"] if fill == "none" else ["cut", "tone", "ring"]
+        ink = hp.select(inks, name="ink", default=inks[0])
+        return {"fill": fill, "ink": ink}
+
+    result = interact(config)
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "fill", "value": "none"})
+    assert result.params == {"fill": "none", "ink": "tone"}
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "fill", "value": "tint"})
+    assert result.params == {"fill": "tint", "ink": "cut"}
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "ink", "value": "ring"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "fill", "value": "none"})
+    assert result.params == {"fill": "none", "ink": "tone"}
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "fill", "value": "solid"})
+    assert result.params == {"fill": "solid", "ink": "ring"}
+
+
+def test_interact_reset_forgets_user_values_but_keeps_seeded_values() -> None:
+    result = interact(_encoder, values={"num_heads": 8})
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "hidden_size", "value": 1000})
+    result.dispatch({"protocol_version": 1, "type": "reset"})
+
+    assert result.params == {"size": "small", "hidden_size": 384, "num_heads": 8}
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "size", "value": "base"})
+
+    assert result.params == {"size": "base", "hidden_size": 768, "num_heads": 8}
 
 
 def test_interact_branch_memory_rejects_incompatible_multi_value_history() -> None:
