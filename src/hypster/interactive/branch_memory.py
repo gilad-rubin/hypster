@@ -7,7 +7,11 @@ from hypster.explore import ParameterInfo
 
 
 class BranchChoiceMemory:
-    """Session-local memory for values that may become reachable again."""
+    """Session-local memory of the values the user chose in each branch context.
+
+    Only user choices (and reachable seed values) are remembered; displayed
+    defaults are not, so they are re-derived when their context changes.
+    """
 
     def __init__(self) -> None:
         self._history: Dict[str, list[Any]] = {}
@@ -16,12 +20,6 @@ class BranchChoiceMemory:
         history = self._history.setdefault(_memory_key(parameter, context), [])
         history[:] = [item for item in history if item != value]
         history.append(value)
-
-    def remember_many(self, parameters: list[ParameterInfo], values: Dict[str, Any]) -> None:
-        for index, parameter in enumerate(parameters):
-            if parameter.path not in values:
-                continue
-            self.remember(parameter, values[parameter.path], _context_for(parameters, values, index))
 
     def latest_compatible(self, parameter: ParameterInfo, context: Mapping[str, Any]) -> tuple[bool, Any]:
         for value in reversed(self._history.get(_memory_key(parameter, context), [])):
@@ -41,14 +39,6 @@ def _memory_key(parameter: ParameterInfo, context: Mapping[str, Any]) -> str:
         "maximum": parameter.maximum,
     }
     return _stable_json({"parameter": signature, "context": dict(context)})
-
-
-def _context_for(parameters: list[ParameterInfo], values: Mapping[str, Any], index: int) -> Dict[str, Any]:
-    context: Dict[str, Any] = {}
-    for previous in parameters[:index]:
-        if previous.path in values:
-            context[previous.path] = values[previous.path]
-    return context
 
 
 def _stable_json(value: Any) -> str:

@@ -100,6 +100,10 @@ _Avoid_: reset defaults, saved state
 The current reachable override inputs represented by the interactive widgets, including unapplied edits in manual apply mode.
 _Avoid_: selected params, pending params
 
+**User Values**:
+The values the user set through interactive actions in one session, plus that session's reachable seed values; the only draft values an interactive action carries forward.
+_Avoid_: draft values, touched values
+
 **Applied Values**:
 The reachable override inputs that produced the current interactive result value and selected params.
 _Avoid_: saved values, committed params
@@ -177,10 +181,11 @@ _Avoid_: exploration error, validation error
 - Reachable `values=` entries seed both the initial widget state and the remembered branch-choice state for that interactive session.
 - **Branch Choice Memory** is created only from reachable `values=` entries and subsequent user **Interactive Actions** during the live session.
 - **Branch Choice Memory** is in-memory state scoped to one **Interactive Result**; it is not persisted or shared across fresh interactive sessions.
-- When an **Interactive Action** re-derives a downstream parameter, the interactive controller chooses the most recent compatible value from exact-context **Branch Choice Memory**, then its compatible current **Draft Value**, then the parameter default, then the first available option when the parameter kind supports option fallback.
+- When an **Interactive Action** re-derives a downstream parameter, the interactive controller chooses the most recent compatible value from exact-context **Branch Choice Memory**, then the parameter's compatible **User Value**, then the parameter default as the current run computes it, then the first available option when the parameter kind supports option fallback.
+- A **Draft Value** that is not a **User Value** (a displayed default, or a fallback forced because an option list narrowed) is re-derived on every **Interactive Action** and never enters **Branch Choice Memory**, so a default computed from an upstream choice follows that choice, as it does in `instantiate`.
 - Incompatible remembered values are skipped rather than treated as errors.
 - **Branch Choice Memory** applies to nested parameters by **Parameter Path**.
-- Reset restores the **Interactive Baseline**, clears later branch memory and pending edits, and applies that restored state immediately.
+- Reset restores the **Interactive Baseline**, clears later branch memory, pending edits and **User Values** other than seed values, and applies that restored state immediately.
 - An **Interactive Result** exposes the latest **Instantiation Value** separately from the latest **Interactive Snapshot**.
 - An **Interactive Result** exposes the latest **Selected Params** through `params`.
 - `result.params` returns a caller-owned plain dictionary copy.

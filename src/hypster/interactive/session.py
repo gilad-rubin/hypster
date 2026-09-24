@@ -88,6 +88,11 @@ class InteractiveSession(Generic[T]):
         self._params: Dict[str, Any] = {}
         self._schema: ConfigSchema | None = None
         self._baseline_values: Dict[str, Any] = {}
+        # Only values the user set, plus reachable seed values, are the user's.
+        # Every other draft value is a default (or a fallback forced by a
+        # narrowed option list) and is re-derived on each action.
+        self._seed_values: Dict[str, Any] = {}
+        self._user_values: Dict[str, Any] = {}
         self._value: T
         self._draft_error: InteractiveError | None = None
         self._applied_error: InteractiveError | None = None
@@ -154,9 +159,19 @@ class InteractiveSession(Generic[T]):
 
     def _initialize(self, values: Dict[str, Any]) -> None:
         schema, selected_values = self._build_values(values)
+        parameters = _parameters(schema)
+        reachable_paths = {parameter.path for parameter in parameters}
         self._baseline_values = dict(selected_values)
-        self._memory.remember_many(_parameters(schema), selected_values)
+        self._seed_values = {path: value for path, value in values.items() if path in reachable_paths}
+        self._user_values = dict(self._seed_values)
+        self._remember_seed_values(parameters, selected_values)
         self._apply(schema, selected_values)
+
+    def _remember_seed_values(self, parameters: list[ParameterInfo], selected_values: Mapping[str, Any]) -> None:
+        for parameter in parameters:
+            if parameter.path in self._seed_values:
+                context = _context_for(parameters, selected_values, parameter.path)
+                self._memory.remember(parameter, selected_values[parameter.path], context)
 
     def _set_value(self, path: str, value: Any) -> None:
         if self._schema is None:
@@ -170,8 +185,8 @@ class InteractiveSession(Generic[T]):
             self._explore({**self._draft_values, path: value})
             return  # on_unknown is warn/ignore: nothing reachable to set
 
-        self._memory.remember_many(current_parameters, self._draft_values)
-
+        # Values before the edited path cannot depend on it, so they stay as
+        # drawn; everything after it is re-derived by _build_values.
         prefix_values: Dict[str, Any] = {}
         for parameter in current_parameters:
             if parameter.path == path:
@@ -179,13 +194,11 @@ class InteractiveSession(Generic[T]):
                 break
             if parameter.path in self._draft_values:
                 prefix_values[parameter.path] = self._draft_values[parameter.path]
+        self._user_values[path] = value
         self._memory.remember(current_parameter, value, _context_for(current_parameters, prefix_values, path))
 
         try:
-            schema, selected_values = self._build_values(
-                prefix_values,
-                current_draft_values=dict(self._draft_values),
-            )
+            schema, selected_values = self._build_values(prefix_values)
         except Exception as exc:
             self._draft_values = {**self._draft_values, **prefix_values}
             self._draft_error = InteractiveError(kind="exploration", message=str(exc))
@@ -193,7 +206,6 @@ class InteractiveSession(Generic[T]):
                 self._applied_error = self._draft_error
             return
 
-        self._memory.remember_many(_parameters(schema), selected_values)
         self._draft_error = None
         if self.auto_apply:
             try:
@@ -210,6 +222,7 @@ class InteractiveSession(Generic[T]):
 
     def _reset(self) -> None:
         self._memory = BranchChoiceMemory()
+        self._user_values = dict(self._seed_values)
         try:
             schema, selected_values = self._build_values(dict(self._baseline_values))
         except Exception as exc:
@@ -220,7 +233,7 @@ class InteractiveSession(Generic[T]):
             self._applied_error = self._draft_error
             return
 
-        self._memory.remember_many(_parameters(schema), selected_values)
+        self._remember_seed_values(_parameters(schema), selected_values)
         self._draft_error = None
         self._applied_error = None
         try:
@@ -241,12 +254,8 @@ class InteractiveSession(Generic[T]):
         except Exception as exc:
             self._applied_error = InteractiveError(kind="instantiation", message=str(exc))
 
-    def _build_values(
-        self,
-        seed_values: Dict[str, Any],
-        current_draft_values: Optional[Mapping[str, Any]] = None,
-    ) -> tuple[ConfigSchema, Dict[str, Any]]:
-        values = dict(seed_values)
+    def _build_values(self, pinned_values: Dict[str, Any]) -> tuple[ConfigSchema, Dict[str, Any]]:
+        values = dict(pinned_values)
         while True:
             schema = self._explore(values)
             parameters = _parameters(schema)
@@ -257,24 +266,21 @@ class InteractiveSession(Generic[T]):
             found, value = self._memory.latest_compatible(missing, _context_for(parameters, values, missing.path))
             if found:
                 values[missing.path] = value
-            elif (
-                current_draft_values is not None
-                and missing.path in current_draft_values
-                and self._is_compatible_current_value(
-                    missing,
-                    current_draft_values[missing.path],
-                    values,
-                )
+            elif missing.path in self._user_values and self._is_compatible_user_value(
+                missing,
+                self._user_values[missing.path],
+                values,
             ):
-                # An upstream edit re-derives everything after the changed
-                # path; a still-compatible current value survives it instead
-                # of collapsing to the schema default. Exact-context branch
-                # memory above stays the stronger signal.
-                values[missing.path] = current_draft_values[missing.path]
+                # A value the user set survives an upstream edit while it is
+                # still compatible. Exact-context branch memory above stays
+                # the stronger signal.
+                values[missing.path] = self._user_values[missing.path]
             else:
+                # Not the user's: take the default as this run computes it, so
+                # a default that depends on an upstream choice follows it.
                 values[missing.path] = missing.selected_value
 
-    def _is_compatible_current_value(
+    def _is_compatible_user_value(
         self,
         parameter: ParameterInfo,
         value: Any,
