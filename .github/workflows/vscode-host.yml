@@ -28,7 +28,7 @@ jobs:
           echo "HYPSTER_VSCODE_KERNEL_PREFIX=$RUNNER_TEMP/hypster-vscode-kernels" >> "$GITHUB_ENV"
           echo "JUPYTER_PATH=$RUNNER_TEMP/hypster-vscode-kernels/share/jupyter" >> "$GITHUB_ENV"
 
-      - uses: astral-sh/setup-uv@v8.1.0
+      - uses: astral-sh/setup-uv@v8.3.0
         with:
           version: "0.11.8"
           enable-cache: true
