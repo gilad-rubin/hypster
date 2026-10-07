@@ -18,7 +18,7 @@ jobs:
           - os: windows-latest
             python-version: "3.13"
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
       - uses: astral-sh/setup-uv@v8.1.0
         with:
           python-version: ${{ matrix.python-version }}

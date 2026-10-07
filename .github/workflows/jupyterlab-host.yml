@@ -24,7 +24,7 @@ jobs:
             browser: firefox
             test: test_real_notebook7_round_trip
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
         with:
           persist-credentials: false
 

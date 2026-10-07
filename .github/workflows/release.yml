@@ -48,7 +48,7 @@ jobs:
           echo "::error::Releases are dispatched from master only (got $REF)."
           exit 1
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
 
       - name: Assert exact source commit
         env:
@@ -115,7 +115,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
 
       - uses: astral-sh/setup-uv@v8.1.0
         with:
@@ -219,7 +219,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
 
       - uses: actions/download-artifact@v4
         with:
