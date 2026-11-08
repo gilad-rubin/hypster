@@ -715,3 +715,25 @@ def test_set_value_unreachable_path_surfaces_backend_error() -> None:
 
     with pytest.raises(ValueError, match="Unknown or unreachable parameters"):
         result.dispatch({"protocol_version": 1, "type": "set_value", "path": "nope", "value": 3})
+
+
+def _strategy(hp: HP) -> Dict[str, Any]:
+    strategy = hp.select(["direct", "agent"], name="strategy", default="direct")
+    if strategy == "agent":
+        return {"strategy": strategy, "instructions": hp.text("default brief", name="instructions")}
+    return {"strategy": strategy}
+
+
+def test_interact_seed_for_a_branch_not_yet_reachable_takes_effect_when_it_opens() -> None:
+    seed = {"strategy": "direct", "instructions": "seeded brief"}
+    result = interact(_strategy, values=seed, on_unknown="ignore")
+    assert result.params == {"strategy": "direct"}
+
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "strategy", "value": "agent"})
+
+    expected = instantiate_with_params(_strategy, values={**seed, "strategy": "agent"}).params
+    assert result.params == expected == {"strategy": "agent", "instructions": "seeded brief"}
+
+    result.dispatch({"protocol_version": 1, "type": "reset"})
+    result.dispatch({"protocol_version": 1, "type": "set_value", "path": "strategy", "value": "agent"})
+    assert result.params["instructions"] == "seeded brief"

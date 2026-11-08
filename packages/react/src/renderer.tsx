@@ -215,7 +215,10 @@ function ParameterControl({
         onAction={onAction}
         context={
           <div className="hypster-schema-fields">
-            Schema fields: {parameter.metadata.schema_fields.map((field) => field.label || field.key).join(", ")}
+            Schema fields:{" "}
+            {parameter.metadata.schema_fields
+              .map((field) => `${field.label || field.key}${field.may_be_empty ? " (may be empty)" : ""}`)
+              .join(", ")}
           </div>
         }
       />
