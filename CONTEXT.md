@@ -101,7 +101,7 @@ The current reachable override inputs represented by the interactive widgets, in
 _Avoid_: selected params, pending params
 
 **User Values**:
-The values the user set through interactive actions in one session, plus that session's reachable seed values; the only draft values an interactive action carries forward.
+The values the user set through interactive actions in one session, plus that session's seed values (a seed for a branch not yet reachable takes effect when the branch opens, as `instantiate` gives it); the only draft values an interactive action carries forward.
 _Avoid_: draft values, touched values
 
 **Applied Values**:

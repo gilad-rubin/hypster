@@ -88,7 +88,9 @@ class InteractiveSession(Generic[T]):
         self._params: Dict[str, Any] = {}
         self._schema: ConfigSchema | None = None
         self._baseline_values: Dict[str, Any] = {}
-        # Only values the user set, plus reachable seed values, are the user's.
+        # Only values the user set, plus every seed value, are the user's: a
+        # seed for a branch not yet reachable takes effect when the branch
+        # opens, as instantiate() gives it with the same values.
         # Every other draft value is a default (or a fallback forced by a
         # narrowed option list) and is re-derived on each action.
         self._seed_values: Dict[str, Any] = {}
@@ -160,9 +162,8 @@ class InteractiveSession(Generic[T]):
     def _initialize(self, values: Dict[str, Any]) -> None:
         schema, selected_values = self._build_values(values)
         parameters = _parameters(schema)
-        reachable_paths = {parameter.path for parameter in parameters}
         self._baseline_values = dict(selected_values)
-        self._seed_values = {path: value for path, value in values.items() if path in reachable_paths}
+        self._seed_values = dict(values)
         self._user_values = dict(self._seed_values)
         self._remember_seed_values(parameters, selected_values)
         self._apply(schema, selected_values)
