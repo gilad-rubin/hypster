@@ -107,6 +107,7 @@ async function terminateProcess(process, exited) {
 test("renders every current snapshot parameter kind from snake_case data", () => {
   const schemaFields = [
     { key: "invoice_number", value_type: "text", label: "Invoice number" },
+    { key: "district", value_type: "enum", possible_values: ["North"], may_be_empty: true },
   ];
   const rules = [
     {
@@ -164,7 +165,7 @@ test("renders every current snapshot parameter kind from snake_case data", () =>
   assert.equal(screen.getByRole("textbox", { name: "weights" }).value, "[\n  0.2,\n  0.8\n]");
   assert.equal(screen.getByRole("textbox", { name: "labels" }).value, '[\n  "a",\n  "b"\n]');
   assert.match(screen.getByText(/Condition fields:/).textContent, /audience/);
-  assert.match(screen.getByText(/Schema fields:/).textContent, /Invoice number/);
+  assert.match(screen.getByText(/Schema fields:/).textContent, /Invoice number, district \(may be empty\)$/);
   assert.equal(screen.getByRole("group", { name: "Advanced" }) !== null, true);
   assert.equal(screen.getByRole("textbox", { name: "note" }).value, "nested");
 });

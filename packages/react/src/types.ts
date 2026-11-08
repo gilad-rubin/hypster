@@ -34,6 +34,7 @@ export type SchemaField = {
   readonly possible_values?: readonly string[];
   readonly unit?: string;
   readonly required?: boolean;
+  readonly may_be_empty?: boolean;
 };
 
 export type SchemaMetadata = {

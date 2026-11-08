@@ -178,3 +178,97 @@ def test_schema_field_required_round_trips_through_dict():
     assert SchemaField.from_dict(field.to_dict()) == field
     # And the default stays out of the dict, so existing pins are byte-stable.
     assert "required" not in SchemaField(key="tags", value_type="text").to_dict()
+
+
+# --- SchemaField.may_be_empty: an explicit empty value is valid only where declared ---
+
+EMPTY_VALUES = [None, "", "   ", []]
+DUE = SchemaField(key="due", value_type="date")
+
+
+@pytest.mark.parametrize("empty", EMPTY_VALUES)
+def test_a_field_that_may_be_empty_accepts_an_explicit_empty_value(empty):
+    field = SchemaField(key="district", value_type="enum", possible_values=["North", "South"], may_be_empty=True)
+    assert field.check(empty) is None
+
+
+@pytest.mark.parametrize("empty", EMPTY_VALUES)
+def test_a_field_that_may_not_be_empty_refuses_an_explicit_empty_value_by_name(empty):
+    field = SchemaField(key="district", value_type="enum", possible_values=["North", "South"])
+    assert field.check(empty) == "district: may not be empty"
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        (SchemaField(key="title", value_type="text"), "Sepsis protocol"),
+        (SchemaField(key="dose", value_type="number"), 2.5),
+        (SchemaField(key="dose", value_type="number"), 3),
+        (SchemaField(key="valid_from", value_type="date"), "2026-11-08"),
+        (SchemaField(key="status", value_type="enum", possible_values=["paid", "unpaid"]), "paid"),
+        (SchemaField(key="status", value_type="enum"), "anything"),
+        (SchemaField(key="tags", value_type="text", multi_valued=True), ["a", "b"]),
+    ],
+)
+def test_a_filled_value_that_fits_is_accepted(field, value):
+    assert field.check(value) is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "problem"),
+    [
+        (SchemaField(key="dose", value_type="number"), "2", "dose: expected a number, got '2'"),
+        (SchemaField(key="dose", value_type="number"), True, "dose: expected a number, got True"),
+        (SchemaField(key="dose", value_type="number"), float("nan"), "dose: expected a number, got nan"),
+        (SchemaField(key="title", value_type="text"), 7, "title: expected text, got 7"),
+        (DUE, "08/11/2026", "due: expected a date (YYYY-MM-DD), got '08/11/2026'"),
+        (DUE, "2026-02-30", "due: expected a date (YYYY-MM-DD), got '2026-02-30'"),
+        (
+            SchemaField(key="status", value_type="enum", possible_values=["paid", "unpaid"]),
+            "late",
+            "status: 'late' is not one of paid, unpaid",
+        ),
+        (SchemaField(key="tags", value_type="text", multi_valued=True), "a", "tags: expected a list, got 'a'"),
+        (SchemaField(key="tags", value_type="text", multi_valued=True), ["a", 3], "tags: expected text, got 3"),
+    ],
+)
+def test_a_wrong_value_is_refused_by_name_whether_or_not_the_field_may_be_empty(field, value, problem):
+    assert field.check(value) == problem
+    assert SchemaField(**{**field.__dict__, "may_be_empty": True}).check(value) == problem
+
+
+def test_may_be_empty_defaults_false_and_stays_out_of_the_dict():
+    field = SchemaField(key="title", value_type="text")
+    assert field.may_be_empty is False
+    assert "may_be_empty" not in field.to_dict()
+
+
+def test_may_be_empty_round_trips_through_dict_and_the_explore_form():
+    field = SchemaField(key="district", value_type="enum", possible_values=["North"], may_be_empty=True)
+    assert field.to_dict()["may_be_empty"] is True
+    assert SchemaField.from_dict(field.to_dict()) == field
+
+    def config(hp):
+        hp.schema(name="fields", default=[field])
+
+    schema = explore(config, return_schema=True)
+    assert schema.parameters[0].metadata["schema_fields"][0]["may_be_empty"] is True
+
+
+def test_may_be_empty_from_values_is_validated():
+    def config(hp):
+        return hp.schema(name="fields")
+
+    from hypster.core import instantiate
+
+    out = instantiate(config, values={"fields": [{"key": "d", "value_type": "text", "may_be_empty": True}]})
+    assert out[0].may_be_empty is True
+    with pytest.raises(ValueError, match="d: may_be_empty must be true or false, got 'yes'"):
+        instantiate(config, values={"fields": [{"key": "d", "value_type": "text", "may_be_empty": "yes"}]})
+
+
+def test_to_json_schema_may_be_empty_admits_null():
+    prop = SchemaField(
+        key="district", value_type="enum", possible_values=["North"], description="The district.", may_be_empty=True
+    ).to_json_schema()
+    assert prop == {"anyOf": [{"type": "string", "enum": ["North"]}, {"type": "null"}], "description": "The district."}

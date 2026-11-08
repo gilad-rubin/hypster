@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `SchemaField.may_be_empty`: whether an explicit empty value (`None`, a blank string or an empty list) is one of the field's values. It round-trips through `to_dict`/`from_dict` (left out of the dict when false, so existing pins stay byte-stable), appears in `explore`'s `schema_fields` metadata and in `@hypster/react`'s `SchemaField` type and schema summary, and makes `to_json_schema()` admit `null`. A non-boolean value is refused when the field is built.
+- `SchemaField.check(value)`: why a value is not one of the field's values (empty where it may not be, wrong type, outside `possible_values`), naming the field, or `None` when it is.
+
 ### Fixed
 - In `interact()`, a default computed from an upstream choice now follows that choice again. With `hidden = hp.int(384 if size == "small" else 768, name="hidden_size")`, setting `size="base"` showed and applied `hidden_size=384`, while `instantiate` with the same values gave 768. Since 0.9.1 the session carried every current draft value across an upstream edit, and it also stored displayed defaults in Branch Choice Memory, so it could not tell a value the user set from a default it had displayed. The session now keeps the values the user set (plus reachable `values=` seeds) apart from displayed defaults. User values still survive upstream edits (the 0.9.0 regression stays fixed), and returning to a branch still restores what the user set there. Every other parameter, including a value forced because an option list narrowed, is re-derived from its current default. Reset forgets user values other than the seed.
 

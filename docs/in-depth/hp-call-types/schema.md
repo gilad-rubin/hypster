@@ -39,12 +39,32 @@ class SchemaField:
     possible_values: list[str] | None = None   # only for value_type="enum"
     unit: str | None = None               # e.g. "USD", "days"
     required: bool = False                # mandatory for consumers that gate on it
+    may_be_empty: bool = False            # an explicit empty value is one of its values
 ```
 {% endcode %}
 
 Round-trip with `.to_dict()` / `SchemaField.from_dict(data)`.
 
 `required` lives on the field itself so renaming a field can never orphan its requiredness in a parallel key list. It is deliberately **not** emitted by `.to_json_schema()`: JSON Schema expresses requiredness as a `required` array on the parent object, so the code assembling the full schema reads the flag and builds that array.
+
+## Empty values and `check`
+
+`may_be_empty` says whether "nothing" is a value the field may hold. An explicit empty value is `None`, a blank string or an empty list (`hypster.schema_field.is_empty`). It is apart from `required`: required says a value must be given, `may_be_empty` says whether an empty one counts.
+
+`field.check(value)` returns why a value is not one of the field's values, naming the field, or `None` when it is:
+
+{% code overflow="wrap" %}
+```python
+district = SchemaField(key="district", value_type="enum", possible_values=["North", "South"])
+district.check(None)      # "district: may not be empty"
+district.check("East")    # "district: 'East' is not one of North, South"
+district.check("North")   # None
+
+SchemaField(key="district", value_type="enum", possible_values=["North"], may_be_empty=True).check(None)  # None
+```
+{% endcode %}
+
+A number is an `int` or a finite `float` (never a `bool`); a date is a `datetime.date` or a `YYYY-MM-DD` string; a multi-valued field takes a list of such values. Whether a value must be given at all, and what fills one left out, is the caller's.
 
 ## Feeding a structured-output LLM call
 
@@ -63,7 +83,7 @@ SchemaField(key="tags", value_type="text", multi_valued=True).to_json_schema()
 ```
 {% endcode %}
 
-`"date"` maps to `{"type": "string", "format": "date"}`; a set `description` is included on the property.
+`"date"` maps to `{"type": "string", "format": "date"}`; a set `description` is included on the property. A field that may be empty admits `null`: `{"anyOf": [<property>, {"type": "null"}]}`.
 
 ## Rendering a schema editor in a UI
 
